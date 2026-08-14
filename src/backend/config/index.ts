@@ -9,6 +9,10 @@ function requireEnv(name: string, fallback?: string): string {
   return value;
 }
 
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET must be set in production');
+}
+
 export const config = {
   port: Number(process.env.PORT ?? 5000),
   clientUrl: process.env.CLIENT_URL ?? '*',
@@ -25,6 +29,13 @@ export const config = {
     apiKey: process.env.PAYMENT_API_KEY ?? '',
     apiSecret: process.env.PAYMENT_API_SECRET ?? '',
     webhookSecret: process.env.PAYMENT_WEBHOOK_SECRET ?? '',
+  },
+
+  auth: {
+    jwtSecret: process.env.JWT_SECRET ?? 'dev-only-insecure-secret-change-me',
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '15m',
+    refreshTokenExpiresInDays: Number(process.env.REFRESH_TOKEN_EXPIRES_IN_DAYS ?? 30),
+    bcryptSaltRounds: Number(process.env.BCRYPT_SALT_ROUNDS ?? 12),
   },
 
   telematics: {

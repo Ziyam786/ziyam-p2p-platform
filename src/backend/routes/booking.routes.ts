@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import paymentGateway from '../services/paymentGateway';
 import { PayoutEngine } from '../services/payoutEngine';
 import { TelematicsService } from '../services/telematicsService';
+import { requireAuth, AuthenticatedRequest } from '../middleware/auth.middleware';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -19,8 +20,9 @@ router.get('/cars/search', async (req: Request, res: Response) => {
 });
 
 // Create a booking + split payment intent
-router.post('/booking', async (req: Request, res: Response) => {
-  const { customerId, carId, startTime, endTime, totalAmount } = req.body;
+router.post('/booking', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const customerId = req.user!.sub;
+  const { carId, startTime, endTime, totalAmount } = req.body;
 
   try {
     const car = await prisma.car.findUnique({ where: { id: carId }, include: { owner: true } });
@@ -62,7 +64,7 @@ router.post('/booking', async (req: Request, res: Response) => {
 });
 
 // Mark a trip completed -> release N+1 payout escrow
-router.post('/booking/:id/complete', async (req: Request, res: Response) => {
+router.post('/booking/:id/complete', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   try {
     const booking = await prisma.booking.update({
@@ -77,13 +79,16 @@ router.post('/booking/:id/complete', async (req: Request, res: Response) => {
 });
 
 // Remote keyless unlock for an active booking
-router.post('/booking/:id/unlock', async (req: Request, res: Response) => {
+router.post('/booking/:id/unlock', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
-  const { userId } = req.body;
+  const userId = req.user!.sub;
 
   const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
   if (!booking || booking.status !== BookingStatus.ACTIVE) {
     return res.status(400).json({ error: 'Booking is not active' });
+  }
+  if (booking.customerId !== userId) {
+    return res.status(403).json({ error: 'You may only unlock a vehicle for your own booking' });
   }
   if (!booking.car.telematicsImei) {
     return res.status(400).json({ error: 'Vehicle has no keyless IoT hardware' });

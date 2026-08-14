@@ -1,9 +1,21 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { getStoredUser, logout, AuthUser } from '../lib/auth';
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    setUser(getStoredUser());
+  }, []);
+
+  const handleLogout = async () => {
+    await logout();
+    setUser(null);
+    window.location.href = '/';
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md">
@@ -24,16 +36,29 @@ export default function Navbar() {
 
         {/* Auth buttons */}
         <div className="hidden md:flex items-center gap-3">
-          <a href="/login" className="text-sm font-medium text-gray-700 hover:text-amber-500 transition">Log In</a>
-          <a
-            href="/signup"
-            className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
-          >
-            Sign Up
-          </a>
-          <a href="/user/dashboard" className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-sm ml-2 hover:border-amber-400 transition" aria-label="User Profile">
-            👤
-          </a>
+          {user ? (
+            <>
+              <a href="/user/dashboard" className="text-sm font-medium text-gray-700 hover:text-amber-500 transition">
+                Hi, {user.fullName.split(' ')[0]}
+              </a>
+              <button
+                onClick={handleLogout}
+                className="border border-gray-200 hover:border-amber-400 text-sm font-semibold px-4 py-2 rounded-lg transition text-gray-700"
+              >
+                Log Out
+              </button>
+            </>
+          ) : (
+            <>
+              <a href="/login" className="text-sm font-medium text-gray-700 hover:text-amber-500 transition">Log In</a>
+              <a
+                href="/signup"
+                className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+              >
+                Sign Up
+              </a>
+            </>
+          )}
         </div>
 
         {/* Mobile hamburger */}
@@ -60,14 +85,22 @@ export default function Navbar() {
           <a href="/host/dashboard" className="hover:text-amber-500 transition">List Your Car</a>
           <a href="/support" className="hover:text-amber-500 transition">Support</a>
           <hr className="border-gray-100" />
-          <a href="/user/dashboard" className="hover:text-amber-500 transition">My Bookings</a>
-          <a href="/login" className="hover:text-amber-500 transition">Log In</a>
-          <a
-            href="/signup"
-            className="bg-amber-500 text-white text-center py-2 rounded-lg hover:bg-amber-600 transition"
-          >
-            Sign Up
-          </a>
+          {user ? (
+            <>
+              <a href="/user/dashboard" className="hover:text-amber-500 transition">My Bookings</a>
+              <button onClick={handleLogout} className="text-left text-red-600 hover:text-red-700 transition">Log Out</button>
+            </>
+          ) : (
+            <>
+              <a href="/login" className="hover:text-amber-500 transition">Log In</a>
+              <a
+                href="/signup"
+                className="bg-amber-500 text-white text-center py-2 rounded-lg hover:bg-amber-600 transition"
+              >
+                Sign Up
+              </a>
+            </>
+          )}
         </div>
       )}
     </nav>

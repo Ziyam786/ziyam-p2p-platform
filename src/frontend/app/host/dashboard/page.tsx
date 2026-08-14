@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { getStoredUser, authFetch, AuthUser } from '../../../lib/auth';
 
 interface EarningsOverview {
   totalGross: number;
@@ -19,19 +20,23 @@ const EMPTY: EarningsOverview = {
 };
 
 export default function FleetOperatorDashboard() {
-  const hostId = process.env.NEXT_PUBLIC_DEMO_HOST_ID;
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [metrics, setMetrics] = useState<EarningsOverview>(EMPTY);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!hostId) {
+    const stored = getStoredUser();
+    setUser(stored);
+
+    const hostId = stored?.id;
+    if (!hostId || !['SELF_HOST', 'FLEET_OPERATOR', 'ADMIN'].includes(stored.role)) {
       setLoading(false);
       return;
     }
 
     async function load() {
       try {
-        const res = await fetch(`/api/host/${hostId}/earnings`);
+        const res = await authFetch(`/api/host/${hostId}/earnings`);
         const json = await res.json();
         if (json.success) setMetrics(json.data);
       } catch (err) {
@@ -41,7 +46,26 @@ export default function FleetOperatorDashboard() {
       }
     }
     load();
-  }, [hostId]);
+  }, []);
+
+  if (!loading && (!user || !['SELF_HOST', 'FLEET_OPERATOR', 'ADMIN'].includes(user.role))) {
+    return (
+      <div className="min-h-screen bg-gray-950 text-white p-8 font-sans flex flex-col items-center justify-center text-center">
+        <h1 className="text-2xl font-bold text-amber-500 mb-3">Host Access Required</h1>
+        <p className="text-gray-400 mb-6 max-w-md">
+          Sign in with a host account to view your fleet earnings, or sign up to start listing your car.
+        </p>
+        <div className="flex gap-4">
+          <a href="/login" className="bg-amber-500 hover:bg-amber-600 text-black font-semibold px-5 py-2.5 rounded-lg transition">
+            Log In
+          </a>
+          <a href="/signup" className="border border-gray-700 hover:border-amber-500 text-white font-semibold px-5 py-2.5 rounded-lg transition">
+            Become a Host
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 text-white p-8 font-sans">

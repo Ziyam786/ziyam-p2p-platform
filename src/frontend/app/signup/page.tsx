@@ -3,18 +3,29 @@
 import React, { useState } from 'react';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
+import { register } from '../../lib/auth';
 
 export default function SignupPage() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'CUSTOMER' | 'SELF_HOST'>('CUSTOMER');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement actual signup API integration
-    alert(`Signing up ${fullName} as ${role}`);
-    window.location.href = '/login';
+    setError('');
+    setLoading(true);
+    try {
+      await register({ fullName, email, phoneNumber, password, role });
+      window.location.href = role === 'SELF_HOST' ? '/host/dashboard' : '/user/dashboard';
+    } catch (err: any) {
+      setError(err.message || 'Signup failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -29,6 +40,11 @@ export default function SignupPage() {
           </div>
           
           <form onSubmit={handleSignup} className="space-y-5">
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+                {error}
+              </div>
+            )}
             <div>
               <label className="block text-xs font-semibold text-gray-700 uppercase mb-2">Full Name</label>
               <input
@@ -52,6 +68,18 @@ export default function SignupPage() {
                 placeholder="name@example.com"
               />
             </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase mb-2">Phone Number</label>
+              <input
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                required
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500 bg-gray-50 text-sm"
+                placeholder="+91 98765 43210"
+              />
+            </div>
             
             <div>
               <label className="block text-xs font-semibold text-gray-700 uppercase mb-2">Password</label>
@@ -60,8 +88,9 @@ export default function SignupPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={8}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500 bg-gray-50 text-sm"
-                placeholder="••••••••"
+                placeholder="At least 8 characters"
               />
             </div>
             
@@ -91,9 +120,10 @@ export default function SignupPage() {
             
             <button
               type="submit"
-              className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3.5 rounded-xl transition text-base mt-4"
+              disabled={loading}
+              className="w-full bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white font-bold py-3.5 rounded-xl transition text-base mt-4"
             >
-              Create Account
+              {loading ? 'Creating account...' : 'Create Account'}
             </button>
           </form>
           

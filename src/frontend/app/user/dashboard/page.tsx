@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
+import { getStoredUser, logout, AuthUser } from '../../../lib/auth';
 
 const MOCK_BOOKINGS = [
   {
@@ -24,6 +25,35 @@ const MOCK_BOOKINGS = [
 ];
 
 export default function UserDashboard() {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    setUser(getStoredUser());
+    setChecked(true);
+  }, []);
+
+  const handleLogout = async () => {
+    await logout();
+    window.location.href = '/login';
+  };
+
+  if (checked && !user) {
+    return (
+      <div className="min-h-screen bg-gray-50 font-sans flex flex-col">
+        <Navbar />
+        <main className="flex-1 flex flex-col items-center justify-center pt-24 pb-20 px-4 text-center">
+          <h1 className="text-2xl font-extrabold text-gray-900 mb-3">Please Log In</h1>
+          <p className="text-gray-500 mb-6 max-w-md">Sign in to view your bookings, profile, and payment history.</p>
+          <a href="/login" className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-6 py-3 rounded-xl transition">
+            Log In
+          </a>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 font-sans flex flex-col">
       <Navbar />
@@ -35,15 +65,17 @@ export default function UserDashboard() {
           <div className="md:col-span-1 space-y-2">
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4 text-center">
               <div className="w-16 h-16 bg-amber-100 text-3xl flex items-center justify-center rounded-full mx-auto mb-3">👤</div>
-              <h3 className="font-bold text-gray-900">John Doe</h3>
-              <p className="text-xs text-gray-500 mb-2">john@example.com</p>
-              <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded-full font-bold">KYC Verified</span>
+              <h3 className="font-bold text-gray-900">{user?.fullName ?? 'Guest'}</h3>
+              <p className="text-xs text-gray-500 mb-2">{user?.email ?? ''}</p>
+              <span className={`text-xs px-2 py-1 rounded-full font-bold ${user?.isKycVerified ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                {user?.isKycVerified ? 'KYC Verified' : 'KYC Pending'}
+              </span>
             </div>
             
             <a href="#" className="block px-4 py-3 rounded-lg font-semibold bg-amber-50 text-amber-700 border-l-4 border-amber-500">My Bookings</a>
             <a href="#" className="block px-4 py-3 rounded-lg font-semibold text-gray-600 hover:bg-gray-100">Profile Settings</a>
             <a href="#" className="block px-4 py-3 rounded-lg font-semibold text-gray-600 hover:bg-gray-100">Payment Methods</a>
-            <a href="#" className="block px-4 py-3 rounded-lg font-semibold text-red-600 hover:bg-red-50">Logout</a>
+            <button onClick={handleLogout} className="w-full text-left px-4 py-3 rounded-lg font-semibold text-red-600 hover:bg-red-50">Logout</button>
           </div>
 
           <div className="md:col-span-3 space-y-6">
