@@ -9,7 +9,28 @@ import hostRoutes from './routes/host.routes';
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: config.clientUrl }));
+
+// CORS configuration - allow multiple origins
+const allowedOrigins = [
+  config.clientUrl,
+  'https://ziyam-frontend-ab3r-git-main-ziyam786s-projects.vercel.app',
+  'https://ziyam-frontend-ab3r-n951nxyb-ziyam786s-projects.vercel.app',
+  'https://ziyam-frontend-production.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:5000',
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+}));
+
 app.use(express.json());
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'ZiyamSelfDrive API' }));
