@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import Navbar from '../../../components/Navbar';
-import Footer from '../../../components/Footer';
-import SearchBar from '../../../components/SearchBar';
-import CarCard, { Car } from '../../../components/CarCard';
+import Navbar from '../../components/Navbar';
+import Footer from '../../components/Footer';
+import SearchBar from '../../components/SearchBar';
+import CarCard, { Car } from '../../components/CarCard';
 
 /* ── Mock catalogue – replace with API fetch ───────────────────── */
 const ALL_CARS: Car[] = [
@@ -129,6 +129,10 @@ const SORT_OPTIONS = [
 ];
 
 export default function CarsPage() {
+  const [city, setCity] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return new URLSearchParams(window.location.search).get('city') ?? '';
+  });
   const [category, setCategory] = useState('All');
   const [transmission, setTransmission] = useState('All');
   const [fuel, setFuel] = useState('All');
@@ -138,6 +142,7 @@ export default function CarsPage() {
 
   const filtered = useMemo(() => {
     let cars = ALL_CARS.filter((c) => {
+      if (city && c.city !== city) return false;
       if (category !== 'All' && c.category !== category) return false;
       if (transmission !== 'All' && c.transmission !== transmission) return false;
       if (fuel !== 'All' && c.fuelType !== fuel) return false;
@@ -151,7 +156,7 @@ export default function CarsPage() {
     else if (sortBy === 'rating') cars = [...cars].sort((a, b) => b.rating - a.rating);
 
     return cars;
-  }, [category, transmission, fuel, maxPrice, sortBy, showAvailableOnly]);
+  }, [city, category, transmission, fuel, maxPrice, sortBy, showAvailableOnly]);
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
@@ -160,7 +165,7 @@ export default function CarsPage() {
       {/* Search bar strip */}
       <div className="bg-gray-900 pt-20 pb-6 px-4">
         <div className="max-w-5xl mx-auto">
-          <SearchBar compact />
+          <SearchBar compact onSearch={({ city: selectedCity }) => setCity(selectedCity)} />
         </div>
       </div>
 
@@ -281,6 +286,7 @@ export default function CarsPage() {
           <div className="flex items-center justify-between mb-6">
             <p className="text-sm text-gray-500">
               <span className="font-bold text-gray-900">{filtered.length}</span> cars found
+              {city && <> in <span className="font-semibold text-gray-700">{city}</span></>}
             </p>
             <select
               value={sortBy}

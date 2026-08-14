@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import Navbar from '../../../../components/Navbar';
-import Footer from '../../../../components/Footer';
-import { Car } from '../../../../components/CarCard';
+import Navbar from '../../../components/Navbar';
+import Footer from '../../../components/Footer';
+import { Car } from '../../../components/CarCard';
 
 /* ── Mock car data for the detail page ─────────────────────────── */
 const MOCK_CAR: Car & {

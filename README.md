@@ -15,6 +15,9 @@ cp .env.example .env        # fill in DB, payment, KYC, telematics credentials
 npm install
 npx prisma migrate dev      # create tables
 npm run dev                 # starts API on :5000
+npm run frontend:dev        # starts the Next.js frontend on :3000
+npm run frontend:build      # creates the optimized frontend build
+npm run frontend:start      # serves the optimized frontend build
 ```
 
 Health check: `GET http://localhost:5000/health`
@@ -79,6 +82,7 @@ src/backend/routes/
   host.routes.ts                  Host onboarding, car listing, earnings, utilization
 src/backend/server.ts             Express entrypoint
 src/frontend/app/host/dashboard/  Fleet operator dashboard (React)
+src/frontend/app/                 Consumer booking frontend (Next.js App Router)
 devops/                           Dockerfile, docker-compose, nginx.conf
 .github/workflows/deploy.yml      CI/CD
 ```

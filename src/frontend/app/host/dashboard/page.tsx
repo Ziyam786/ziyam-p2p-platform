@@ -18,11 +18,17 @@ const EMPTY: EarningsOverview = {
   settledPayouts: 0,
 };
 
-export default function FleetOperatorDashboard({ hostId }: { hostId: string }) {
+export default function FleetOperatorDashboard() {
+  const hostId = process.env.NEXT_PUBLIC_DEMO_HOST_ID;
   const [metrics, setMetrics] = useState<EarningsOverview>(EMPTY);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!hostId) {
+      setLoading(false);
+      return;
+    }
+
     async function load() {
       try {
         const res = await fetch(`/api/host/${hostId}/earnings`);

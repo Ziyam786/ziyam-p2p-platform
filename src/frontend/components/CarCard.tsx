@@ -100,13 +100,26 @@ export default function CarCard({ car, onBook }: CarCardProps) {
           >
             View Details
           </a>
-          <button
-            disabled={!car.available}
-            onClick={() => onBook?.(car.id)}
-            className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white text-sm font-bold py-2 rounded-xl transition"
-          >
-            Book Now
-          </button>
+          {onBook ? (
+            <button
+              disabled={!car.available}
+              onClick={() => onBook(car.id)}
+              className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white text-sm font-bold py-2 rounded-xl transition"
+            >
+              Book Now
+            </button>
+          ) : car.available ? (
+            <a
+              href={`/cars/${car.id}`}
+              className="flex-1 bg-amber-500 hover:bg-amber-600 text-center text-white text-sm font-bold py-2 rounded-xl transition"
+            >
+              Book Now
+            </a>
+          ) : (
+            <span className="flex-1 bg-gray-200 text-center text-gray-400 text-sm font-bold py-2 rounded-xl cursor-not-allowed">
+              Unavailable
+            </span>
+          )}
         </div>
       </div>
     </div>
