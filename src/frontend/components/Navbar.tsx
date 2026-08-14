@@ -31,6 +31,9 @@ export default function Navbar() {
           >
             Sign Up
           </a>
+          <a href="/user/dashboard" className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-sm ml-2 hover:border-amber-400 transition" aria-label="User Profile">
+            👤
+          </a>
         </div>
 
         {/* Mobile hamburger */}
@@ -57,6 +60,7 @@ export default function Navbar() {
           <a href="/host/dashboard" className="hover:text-amber-500 transition">List Your Car</a>
           <a href="/support" className="hover:text-amber-500 transition">Support</a>
           <hr className="border-gray-100" />
+          <a href="/user/dashboard" className="hover:text-amber-500 transition">My Bookings</a>
           <a href="/login" className="hover:text-amber-500 transition">Log In</a>
           <a
             href="/signup"
