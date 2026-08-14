@@ -13,20 +13,31 @@ app.use(helmet());
 // CORS configuration - allow multiple origins
 const allowedOrigins = [
   config.clientUrl,
-  'https://ziyam-frontend-ab3r-git-main-ziyam786s-projects.vercel.app',
-  'https://ziyam-frontend-ab3r-n951nxyb-ziyam786s-projects.vercel.app',
-  'https://ziyam-frontend-production.vercel.app',
   'http://localhost:3000',
   'http://localhost:5000',
 ];
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Allow requests without Origin header (same-origin requests)
+    if (!origin) {
       callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+      return;
     }
+    
+    // Check hardcoded origins
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    
+    // Allow all Vercel deployments (ziyam-frontend-*.vercel.app)
+    if (origin.includes('vercel.app') && origin.includes('ziyam-frontend')) {
+      callback(null, true);
+      return;
+    }
+    
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
 }));
