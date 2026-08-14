@@ -1,6 +1,6 @@
 import React from 'react';
-import Navbar from '../../../components/Navbar';
-import Footer from '../../../components/Footer';
+import Navbar from '../../components/Navbar';
+import Footer from '../../components/Footer';
 
 const STEPS = [
   {
@@ -40,7 +40,7 @@ const STEPS = [
     step: '04',
     icon: '🚗',
     title: 'Pick Up & Drive',
-    desc: 'Meet the host at the pickup point, do a quick vehicle inspection, and you're off. No driver needed.',
+    desc: "Meet the host at the pickup point, do a quick vehicle inspection, and you're off. No driver needed.",
     detail: [
       'Host hands over keys at agreed location',
       'App-based digital trip log',

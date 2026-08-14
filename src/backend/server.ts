@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { config } from './config';
 import { PayoutEngine } from './services/payoutEngine';
+import authRoutes from './routes/auth.routes';
 import bookingRoutes from './routes/booking.routes';
 import hostRoutes from './routes/host.routes';
 
@@ -46,6 +47,7 @@ app.use(express.json());
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'ZiyamSelfDrive API' }));
 
+app.use('/api', authRoutes);
 app.use('/api', bookingRoutes);
 app.use('/api', hostRoutes);
 

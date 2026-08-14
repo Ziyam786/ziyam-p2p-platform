@@ -1,10 +1,10 @@
 'use client';
 
 import React from 'react';
-import Navbar from '../../components/Navbar';
-import Footer from '../../components/Footer';
-import SearchBar from '../../components/SearchBar';
-import CarCard, { Car } from '../../components/CarCard';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
+import SearchBar from '../components/SearchBar';
+import CarCard, { Car } from '../components/CarCard';
 
 /* ── Mock data – replace with API calls ─────────────────────────── */
 const FEATURED_CARS: Car[] = [

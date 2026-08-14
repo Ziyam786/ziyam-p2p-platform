@@ -15,6 +15,9 @@ cp .env.example .env        # fill in DB, payment, KYC, telematics credentials
 npm install
 npx prisma migrate dev      # create tables
 npm run dev                 # starts API on :5000
+npm run frontend:dev        # starts the Next.js frontend on :3000
+npm run frontend:build      # creates the optimized frontend build
+npm run frontend:start      # serves the optimized frontend build
 ```
 
 Health check: `GET http://localhost:5000/health`
@@ -29,12 +32,37 @@ Health check: `GET http://localhost:5000/health`
 | Telematics unlock/lock/telemetry routes | ✅ implemented (stubbed HTTP calls) |
 | **Payment gateway calls** (`services/paymentGateway.ts`) | ⚠️ stubbed — wire up Razorpay Route / Stripe Connect / Cashfree SDK calls where marked `TODO` |
 | **KYC verification** | ⚠️ not implemented — plug in DigiLocker / Aadhaar XML API and gate `host.isKycVerified` |
-| Auth / session management | ⚠️ not implemented — add JWT or session auth before exposing routes publicly |
+| Auth / session management | ✅ implemented — JWT access + rotating refresh tokens (`/api/auth/register`, `/login`, `/refresh`, `/logout`, `/me`); booking/host routes now require a valid token and enforce ownership |
 | Telematics provider credentials | ⚠️ point `TELEMATICS_GATEWAY_URL` at your IoT vendor |
 
 The stubbed sections are intentional: real payment-gateway and KYC integration requires
 your live merchant/API credentials and legal agreements with the provider, so those calls
 return mock data until you fill in the `TODO`s with your provider's SDK.
+
+### Auth
+
+- `POST /api/auth/register` — creates a `CUSTOMER` or `SELF_HOST` account, hashes the password
+  (bcrypt), returns the user profile plus an access/refresh token pair.
+- `POST /api/auth/login` — verifies credentials, returns the same token pair.
+- `POST /api/auth/refresh` — rotates a refresh token (old one is revoked, a new one issued).
+- `POST /api/auth/logout` — revokes a refresh token server-side.
+- `GET /api/auth/me` — returns the authenticated user's profile (requires `Authorization: Bearer <accessToken>`).
+
+Access tokens are short-lived JWTs (`JWT_EXPIRES_IN`, default 15m). Refresh tokens are opaque
+random strings; only their SHA-256 hash is stored (`RefreshToken` table), so a leaked database
+does not expose usable tokens. Booking creation/completion/unlock and all host management
+routes now require a valid access token, and host/booking ownership is enforced server-side
+(a token can only manage its own cars, earnings, and bookings unless the caller is `ADMIN`).
+
+⚠️ **New required env vars** — see `.env.example`: `JWT_SECRET` (must be set in production —
+the app refuses to start with `NODE_ENV=production` and no `JWT_SECRET`), `JWT_EXPIRES_IN`,
+`REFRESH_TOKEN_EXPIRES_IN_DAYS`, `BCRYPT_SALT_ROUNDS`.
+
+⚠️ **Schema change requiring a migration** — `User.passwordHash` (required) and the new
+`RefreshToken` model were added to `prisma/schema.prisma`. Run `npx prisma migrate dev --name add_auth`
+against your dev database (or `npx prisma migrate deploy` in production) before starting the API,
+otherwise existing/new `User` rows will fail to satisfy the schema.
+
 
 ## 3. Deploying to `ziyam.in`
 
@@ -74,11 +102,20 @@ src/backend/services/
   paymentGateway.ts                Payment provider abstraction (stubbed)
   telematicsService.ts            Keyless unlock/lock + live telemetry
   fleetService.ts                 Earnings & utilization aggregation
+  authService.ts                  Password hashing, JWT signing, refresh-token lifecycle
+src/backend/middleware/
+  auth.middleware.ts               requireAuth / requireRole guards
 src/backend/routes/
-  booking.routes.ts               Search, book, complete trip, unlock
-  host.routes.ts                  Host onboarding, car listing, earnings, utilization
+  auth.routes.ts                   Register, login, refresh, logout, me
+  booking.routes.ts               Search, book, complete trip, unlock (auth required)
+  host.routes.ts                  Host onboarding, car listing, earnings, utilization (auth required)
 src/backend/server.ts             Express entrypoint
+src/frontend/lib/auth.ts          Client-side session storage + login/register/logout helpers
 src/frontend/app/host/dashboard/  Fleet operator dashboard (React)
+src/frontend/app/login/           Login page
+src/frontend/app/signup/          Signup page
+src/frontend/app/user/dashboard/  Customer bookings dashboard
+src/frontend/app/                 Consumer booking frontend (Next.js App Router)
 devops/                           Dockerfile, docker-compose, nginx.conf
 .github/workflows/deploy.yml      CI/CD
 ```
