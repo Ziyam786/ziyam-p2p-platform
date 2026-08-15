@@ -20,7 +20,8 @@ router.post('/host/:hostId/cars', requireAuth, async (req: Request, res: Respons
     make, model, registrationNo, year, category, fuelType, transmission, seats,
     dailyRate, securityDeposit, kmIncludedPerDay, extraKmCharge,
     description, images, features, city, telematicsImei, instantBook,
-    offersDelivery, deliveryFee,
+    offersDelivery, deliveryFee, offersPickup, pickupFee,
+    rcDocUrl, pollutionCertUrl, insuranceDocUrl, onboardingStep,
   } = req.body;
 
   const host = await prisma.user.findUnique({ where: { id: hostId } });
@@ -30,6 +31,8 @@ router.post('/host/:hostId/cars', requireAuth, async (req: Request, res: Respons
   if (!make || !model || !registrationNo || !year || !dailyRate || !city) {
     return res.status(400).json({ error: 'make, model, registrationNo, year, dailyRate, and city are required' });
   }
+
+  const docsComplete = Boolean(rcDocUrl && pollutionCertUrl && insuranceDocUrl);
 
   const car = await prisma.car.create({
     data: {
@@ -55,6 +58,13 @@ router.post('/host/:hostId/cars', requireAuth, async (req: Request, res: Respons
       ...(instantBook !== undefined && { instantBook: Boolean(instantBook) }),
       ...(offersDelivery !== undefined && { offersDelivery: Boolean(offersDelivery) }),
       ...(deliveryFee !== undefined && { deliveryFee: Number(deliveryFee) }),
+      ...(offersPickup !== undefined && { offersPickup: Boolean(offersPickup) }),
+      ...(pickupFee !== undefined && { pickupFee: Number(pickupFee) }),
+      ...(rcDocUrl !== undefined && { rcDocUrl }),
+      ...(pollutionCertUrl !== undefined && { pollutionCertUrl }),
+      ...(insuranceDocUrl !== undefined && { insuranceDocUrl }),
+      ...(docsComplete && { verificationStatus: 'VERIFIED' as const }),
+      ...(onboardingStep !== undefined && { onboardingStep: Number(onboardingStep) }),
     },
   });
   res.status(201).json({ success: true, data: car });

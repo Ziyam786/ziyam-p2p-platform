@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import type { Car } from '../lib/types';
 import { settingsApi } from '../lib/api';
+import FeaturePicker from './FeaturePicker';
 
 const CATEGORIES_FALLBACK = ['Hatchback', 'Sedan', 'SUV', 'Luxury', 'EV', 'MUV'];
 const FUEL_TYPES = ['Petrol', 'Diesel', 'Electric', 'CNG'];
@@ -153,8 +154,11 @@ export default function CarForm({
         <input value={values.images} onChange={(e) => set('images', e.target.value)} className={inputCls} placeholder="https://... , https://..." />
       </Field>
 
-      <Field label="Features (comma-separated)">
-        <input value={values.features} onChange={(e) => set('features', e.target.value)} className={inputCls} />
+      <Field label="Features">
+        <FeaturePicker
+          selected={values.features.split(',').map((s) => s.trim()).filter(Boolean)}
+          onChange={(next) => set('features', next.join(', '))}
+        />
       </Field>
 
       <div className="space-y-3">

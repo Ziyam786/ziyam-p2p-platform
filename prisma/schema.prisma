@@ -30,6 +30,12 @@ enum PayoutStatus {
   FAILED
 }
 
+enum CarVerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
 model User {
   id              String         @id @default(uuid())
   fullName        String
@@ -79,7 +85,25 @@ model Car {
   featured         Boolean   @default(false)
   offersDelivery   Boolean   @default(false)
   deliveryFee      Float     @default(0)
+  offersPickup     Boolean   @default(false)
+  pickupFee        Float     @default(0)
   telematicsImei   String?
+
+  // Onboarding / verification (RC, pollution cert, insurance) — see host/onboarding/car wizard
+  verificationStatus CarVerificationStatus @default(PENDING)
+  rcDocUrl           String?
+  pollutionCertUrl   String?
+  insuranceDocUrl    String?
+  onboardingStep     Int                   @default(0) // 0-4, drives the "Steps Completed" progress ring
+
+  // Booking preferences (host-controlled)
+  noNightBookings       Boolean @default(false)
+  nightBookingStart     String  @default("22:00")
+  nightBookingEnd       String  @default("06:00")
+  minInterBookingHours  Int     @default(2)
+  minBookingHours       Int     @default(4)
+  maxBookingDays        Int     @default(30)
+
   bookings         Booking[]
   reviews          Review[]
   blackouts        Blackout[]

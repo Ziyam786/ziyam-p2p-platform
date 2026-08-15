@@ -6,6 +6,8 @@ export type PayoutStatus = 'HELD_IN_ESCROW' | 'QUEUED_FOR_N1' | 'SETTLED' | 'FAI
 
 export type ProtectionPlan = 'BASIC' | 'STANDARD' | 'PREMIUM';
 
+export type CarVerificationStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
+
 export interface PublicUser {
   id: string;
   fullName: string;
@@ -45,9 +47,24 @@ export interface Car {
   featured: boolean;
   offersDelivery: boolean;
   deliveryFee: number;
+  offersPickup: boolean;
+  pickupFee: number;
   rating: number;
   reviewCount: number;
   createdAt: string;
+
+  verificationStatus: CarVerificationStatus;
+  rcDocUrl?: string | null;
+  pollutionCertUrl?: string | null;
+  insuranceDocUrl?: string | null;
+  onboardingStep: number;
+
+  noNightBookings: boolean;
+  nightBookingStart: string;
+  nightBookingEnd: string;
+  minInterBookingHours: number;
+  minBookingHours: number;
+  maxBookingDays: number;
 }
 
 export interface Booking {

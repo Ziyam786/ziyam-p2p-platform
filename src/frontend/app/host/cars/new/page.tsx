@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Navbar from '../../../../components/Navbar';
 import Footer from '../../../../components/Footer';
 import ProtectedRoute from '../../../../components/ProtectedRoute';
-import CarForm, { formValuesToPayload, type CarFormValues } from '../../../../components/CarForm';
+import CarOnboardingWizard, { wizardValuesToPayload, type WizardValues } from '../../../../components/CarOnboardingWizard';
 import { useAuth } from '../../../../lib/auth-context';
 import { useToast } from '../../../../components/Toast';
 import { hostApi } from '../../../../lib/api';
@@ -29,11 +29,11 @@ function NewCarInner() {
     );
   }
 
-  async function handleSubmit(values: CarFormValues) {
+  async function handleSubmit(values: WizardValues) {
     setSubmitting(true);
     try {
-      await hostApi.addCar(user!.id, formValuesToPayload(values));
-      show('Car listed successfully!', 'success');
+      await hostApi.addCar(user!.id, wizardValuesToPayload(values));
+      show('Car onboarded successfully!', 'success');
       router.push('/host/dashboard');
     } catch (err: any) {
       show(err.message ?? 'Failed to list car', 'error');
@@ -44,10 +44,10 @@ function NewCarInner() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 pt-28 pb-24">
-      <h1 className="text-2xl font-extrabold text-gray-900 mb-1">List a New Car</h1>
-      <p className="text-gray-500 text-sm mb-8">Add your vehicle's details to start earning</p>
+      <h1 className="text-2xl font-extrabold text-gray-900 mb-1">Onboard Your Car</h1>
+      <p className="text-gray-500 text-sm mb-8">A few quick steps to get your car earning</p>
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
-        <CarForm submitLabel="List Car" submitting={submitting} onSubmit={handleSubmit} />
+        <CarOnboardingWizard submitting={submitting} onSubmit={handleSubmit} />
       </div>
     </div>
   );

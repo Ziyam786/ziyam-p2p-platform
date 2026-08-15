@@ -78,6 +78,8 @@ export const carsApi = {
   addBlackout: (carId: string, data: { startDate: string; endDate: string; reason?: string }) =>
     post<{ success: true; data: Blackout }>(`/cars/${carId}/blackouts`, data),
   deleteBlackout: (id: string) => del<{ success: true }>(`/blackouts/${id}`),
+  reviewSummary: (carId: string) =>
+    get<{ success: true; data: { summary: string | null; positiveTags: string[]; negativeTags: string[] } }>(`/cars/${carId}/review-summary`),
 };
 
 /* ── Bookings ─────────────────────────────────────────────────────── */
