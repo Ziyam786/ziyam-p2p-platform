@@ -7,6 +7,7 @@ import Footer from '../../../../components/Footer';
 import ProtectedRoute from '../../../../components/ProtectedRoute';
 import Rating from '../../../../components/Rating';
 import { useToast } from '../../../../components/Toast';
+import { useAuth } from '../../../../lib/auth-context';
 import { bookingsApi, reviewsApi } from '../../../../lib/api';
 import type { Booking } from '../../../../lib/types';
 
@@ -14,12 +15,17 @@ function TripDetailInner() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { show } = useToast();
+  const { user } = useAuth();
 
   const [trip, setTrip] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
+  const [endOtp, setEndOtp] = useState<string | null>(null);
+  const [otpInput, setOtpInput] = useState('');
+
+  const isHost = Boolean(user && trip?.car && trip.car.ownerId === user.id);
 
   function load() {
     bookingsApi
@@ -29,6 +35,12 @@ function TripDetailInner() {
   }
 
   useEffect(load, [params.id]);
+
+  useEffect(() => {
+    if (trip?.status === 'ACTIVE' && isHost) {
+      bookingsApi.endOtp(trip.id).then((res) => setEndOtp(res.data.otp)).catch(() => {});
+    }
+  }, [trip?.status, isHost, trip?.id]);
 
   async function handleAction(action: 'start' | 'unlock' | 'cancel') {
     if (!trip) return;
@@ -41,6 +53,22 @@ function TripDetailInner() {
       load();
     } catch (err: any) {
       show(err.message ?? 'Action failed', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleCompleteTrip(e: React.FormEvent) {
+    e.preventDefault();
+    if (!trip) return;
+    setBusy(true);
+    try {
+      await bookingsApi.complete(trip.id, otpInput);
+      show('Trip completed!', 'success');
+      setOtpInput('');
+      load();
+    } catch (err: any) {
+      show(err.message ?? 'Failed to complete trip', 'error');
     } finally {
       setBusy(false);
     }
@@ -117,7 +145,7 @@ function TripDetailInner() {
                   Start Trip (Pickup)
                 </button>
               )}
-              {trip.status === 'ACTIVE' && (
+              {trip.status === 'ACTIVE' && !isHost && (
                 <button disabled={busy} onClick={() => handleAction('unlock')} className="bg-gray-900 hover:bg-black text-white text-sm font-bold px-5 py-2.5 rounded-xl transition disabled:opacity-50">
                   🔓 Keyless Unlock
                 </button>
@@ -127,7 +155,50 @@ function TripDetailInner() {
                   Cancel Booking
                 </button>
               )}
+              {['CONFIRMED', 'ACTIVE', 'COMPLETED'].includes(trip.status) && (
+                <a href={`/bookings/${trip.id}/agreement`} className="border border-gray-200 text-gray-700 hover:border-amber-400 text-sm font-bold px-5 py-2.5 rounded-xl transition">
+                  📄 View Lease Agreement
+                </a>
+              )}
             </div>
+
+            {trip.status === 'ACTIVE' && isHost && (
+              <div className="mt-6 bg-amber-50 border border-amber-100 rounded-xl p-5 text-center">
+                <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider mb-2">Trip-End Handover Code</p>
+                {endOtp ? (
+                  <div className="flex justify-center gap-2">
+                    {endOtp.split('').map((digit, i) => (
+                      <span key={i} className="w-10 h-12 flex items-center justify-center bg-white border border-amber-200 rounded-lg text-xl font-extrabold text-amber-700">{digit}</span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400">Loading…</p>
+                )}
+                <p className="text-xs text-gray-500 mt-3">Share this code with the guest only once they've physically returned the car — they'll enter it in their app to close out the trip.</p>
+              </div>
+            )}
+
+            {trip.status === 'ACTIVE' && !isHost && (
+              <form onSubmit={handleCompleteTrip} className="mt-6 bg-gray-50 border border-gray-100 rounded-xl p-5">
+                <p className="text-sm font-bold text-gray-800 mb-1">Returning the car?</p>
+                <p className="text-xs text-gray-500 mb-3">Ask the host for the 4-digit code shown in their app to complete this trip.</p>
+                <div className="flex gap-3">
+                  <input
+                    required
+                    inputMode="numeric"
+                    pattern="[0-9]{4}"
+                    maxLength={4}
+                    value={otpInput}
+                    onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
+                    placeholder="4-digit code"
+                    className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-center tracking-[0.5em] font-bold focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                  <button disabled={busy || otpInput.length !== 4} type="submit" className="btn-gradient disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none text-white font-bold px-6 rounded-xl transition text-sm">
+                    Complete Trip
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
 

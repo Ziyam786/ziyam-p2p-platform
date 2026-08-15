@@ -4,6 +4,7 @@ import { config } from '../config';
 import { requireAuth } from '../middleware/auth';
 import { notify } from '../services/notificationService';
 import { sandboxService } from '../services/sandboxService';
+import { digilockerApi, isSetuConfigured } from '../services/setuService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -64,6 +65,57 @@ router.post('/kyc/aadhaar/verify', requireAuth, async (req: Request, res: Respon
   await notify(user.id, 'KYC_VERIFIED', "You're verified!", 'Your identity has been confirmed. You can now book or list cars.', '/account');
 
   res.json({ success: true, message: 'KYC verified', data: user });
+});
+
+/**
+ * Alternative KYC path: Setu's DigiLocker consent flow. Returns a URL to
+ * redirect the user to DigiLocker's own sign-in/consent screen; they land
+ * back on /account/kyc afterwards and the frontend polls /status below.
+ */
+router.post('/kyc/digilocker/start', requireAuth, async (req: Request, res: Response) => {
+  if (!isSetuConfigured()) return res.status(503).json({ error: 'DigiLocker verification is not configured yet' });
+
+  try {
+    const redirectUrl = `${config.clientUrl}/account/kyc?digilocker=1`;
+    const request = await digilockerApi.createRequest(redirectUrl);
+    await prisma.user.update({
+      where: { id: req.user!.userId },
+      data: { digilockerRequestId: request.id, digilockerStatus: 'unauthenticated' },
+    });
+    res.json({ success: true, data: { url: request.url } });
+  } catch (err: any) {
+    console.error('[KYC] DigiLocker request creation failed:', err.response?.data ?? err.message);
+    res.status(502).json({ error: 'Could not start DigiLocker verification right now. Please try again shortly.' });
+  }
+});
+
+/** Polled by the frontend after the user returns from DigiLocker's consent screen. */
+router.get('/kyc/digilocker/status', requireAuth, async (req: Request, res: Response) => {
+  const user = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { digilockerRequestId: true, isKycVerified: true } });
+  if (!user?.digilockerRequestId) return res.status(400).json({ error: 'No DigiLocker verification in progress' });
+  if (user.isKycVerified) return res.json({ success: true, data: { status: 'authenticated', isKycVerified: true } });
+
+  try {
+    const status = await digilockerApi.getStatus(user.digilockerRequestId);
+    if (status.status === 'authenticated') {
+      const aadhaar = await digilockerApi.fetchAadhaar(user.digilockerRequestId).catch(() => null);
+      const updated = await prisma.user.update({
+        where: { id: req.user!.userId },
+        data: {
+          digilockerStatus: 'authenticated',
+          isKycVerified: true,
+          ...(aadhaar?.name && { aadhaarVerifiedName: aadhaar.name }),
+        },
+        select: { id: true, isKycVerified: true, aadhaarVerifiedName: true },
+      });
+      await notify(updated.id, 'KYC_VERIFIED', "You're verified!", 'Your identity has been confirmed via DigiLocker. You can now book or list cars.', '/account');
+      return res.json({ success: true, data: { status: 'authenticated', isKycVerified: true } });
+    }
+    res.json({ success: true, data: { status: status.status, isKycVerified: false } });
+  } catch (err: any) {
+    console.error('[KYC] DigiLocker status check failed:', err.response?.data ?? err.message);
+    res.status(502).json({ error: 'Could not check DigiLocker status right now.' });
+  }
 });
 
 /** Legacy single-step submit (kept for the .env-less / doc-URL fallback path). */

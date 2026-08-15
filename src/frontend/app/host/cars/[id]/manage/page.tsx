@@ -10,6 +10,8 @@ import BlackoutManager from '../../../../../components/BlackoutManager';
 import BookingPreferences from '../../../../../components/BookingPreferences';
 import RatingsPanel from '../../../../../components/RatingsPanel';
 import IncentivesPanel from '../../../../../components/IncentivesPanel';
+import CarLocationMap, { directionsUrl } from '../../../../../components/CarLocationMap';
+import VehicleServices from '../../../../../components/VehicleServices';
 import { useAuth } from '../../../../../lib/auth-context';
 import { useToast } from '../../../../../components/Toast';
 import { carsApi } from '../../../../../lib/api';
@@ -71,18 +73,30 @@ function ManageCarInner() {
         <img src={car.images[0]} alt="" className="w-full h-48 object-cover rounded-2xl bg-gray-100 mb-6" />
       )}
 
-      {/* Decorative Lock/Unlock/Navigate — real remote commands only fire during an active trip (see booking.routes.ts /unlock) */}
-      <div className="grid grid-cols-3 gap-3 mb-8">
+      {/* Lock/Unlock are decorative — real remote commands only fire during an active trip (see booking.routes.ts /unlock). Navigate is real, via Google Maps. */}
+      <div className="grid grid-cols-3 gap-3 mb-3">
         <button disabled className="border border-gray-200 text-gray-400 rounded-xl py-2.5 text-sm font-semibold cursor-not-allowed" title="Available during an active trip">
           🔒 Lock
         </button>
         <button disabled className="border border-gray-200 text-gray-400 rounded-xl py-2.5 text-sm font-semibold cursor-not-allowed" title="Available during an active trip">
           🔓 Unlock
         </button>
-        <a href={`/cars/${car.id}`} className="border border-gray-200 text-gray-700 hover:border-amber-400 rounded-xl py-2.5 text-sm font-semibold text-center transition">
-          📍 View Listing
-        </a>
+        {car.latitude && car.longitude ? (
+          <a href={directionsUrl(car.latitude, car.longitude)} target="_blank" rel="noopener noreferrer" className="border border-gray-200 text-gray-700 hover:border-amber-400 rounded-xl py-2.5 text-sm font-semibold text-center transition">
+            🧭 Navigate
+          </a>
+        ) : (
+          <a href={`/cars/${car.id}`} className="border border-gray-200 text-gray-700 hover:border-amber-400 rounded-xl py-2.5 text-sm font-semibold text-center transition">
+            📍 View Listing
+          </a>
+        )}
       </div>
+
+      {car.latitude && car.longitude && (
+        <div className="mb-8">
+          <CarLocationMap latitude={car.latitude} longitude={car.longitude} label={`${car.make} ${car.model}`} />
+        </div>
+      )}
 
       <Tabs
         active={tab}
@@ -91,6 +105,7 @@ function ManageCarInner() {
           { key: 'controls', label: 'Controls' },
           { key: 'preferences', label: 'Booking Preferences' },
           { key: 'incentives', label: 'Incentives' },
+          { key: 'services', label: 'Vehicle Services' },
           { key: 'ratings', label: 'Ratings & Reviews' },
         ]}
       />
@@ -113,6 +128,8 @@ function ManageCarInner() {
         {tab === 'preferences' && <BookingPreferences car={car} onUpdated={setCar} />}
 
         {tab === 'incentives' && <IncentivesPanel car={car} />}
+
+        {tab === 'services' && <VehicleServices car={car} />}
 
         {tab === 'ratings' && <RatingsPanel car={car} />}
       </div>

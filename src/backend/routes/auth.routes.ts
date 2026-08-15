@@ -16,10 +16,36 @@ const PUBLIC_USER_SELECT = {
   phoneNumber: true,
   role: true,
   isKycVerified: true,
+  isSuspended: true,
   avatarUrl: true,
   bio: true,
+  payoutAccountId: true,
+  bankAccountNumber: true,
+  bankIfsc: true,
+  bankNameAtBank: true,
+  bankAccountVerified: true,
+  signatureUrl: true,
+  selfieUrl: true,
+  alternatePhoneNumber: true,
+  referralCode: true,
+  creditsBalance: true,
   createdAt: true,
 };
+
+function randomCode() {
+  return Math.random().toString(36).slice(2, 6).toUpperCase();
+}
+
+/** Generates a short, human-shareable referral code, retrying on the rare collision. */
+async function generateUniqueReferralCode(fullName: string): Promise<string> {
+  const base = (fullName.split(' ')[0] || 'ZIYAM').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6) || 'ZIYAM';
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = `${base}${randomCode()}`;
+    const clash = await prisma.user.findUnique({ where: { referralCode: code } });
+    if (!clash) return code;
+  }
+  return `${base}${Date.now().toString(36).toUpperCase()}`;
+}
 
 function cookieOptions() {
   const isProd = config.nodeEnv === 'production';
@@ -34,7 +60,7 @@ function cookieOptions() {
 
 // Register as a renter or host
 router.post('/auth/signup', async (req: Request, res: Response) => {
-  const { fullName, email, phoneNumber, password, role } = req.body;
+  const { fullName, email, phoneNumber, password, role, referralCode } = req.body;
 
   if (!fullName || !email || !phoneNumber || !password) {
     return res.status(400).json({ error: 'fullName, email, phoneNumber, and password are required' });
@@ -49,9 +75,16 @@ router.post('/auth/signup', async (req: Request, res: Response) => {
     return res.status(409).json({ error: 'An account with this email or phone number already exists' });
   }
 
+  let referredById: string | undefined;
+  if (referralCode) {
+    const referrer = await prisma.user.findUnique({ where: { referralCode: String(referralCode).toUpperCase() } });
+    if (referrer) referredById = referrer.id;
+  }
+
   const passwordHash = await hashPassword(password);
+  const newReferralCode = await generateUniqueReferralCode(fullName);
   const user = await prisma.user.create({
-    data: { id: uuidv4(), fullName, email, phoneNumber, passwordHash, role: requestedRole },
+    data: { id: uuidv4(), fullName, email, phoneNumber, passwordHash, role: requestedRole, referralCode: newReferralCode, referredById },
     select: PUBLIC_USER_SELECT,
   });
 
@@ -87,11 +120,18 @@ router.post('/auth/logout', (_req: Request, res: Response) => {
 });
 
 router.get('/auth/me', requireAuth, async (req: Request, res: Response) => {
-  const user = await prisma.user.findUnique({
+  let user = await prisma.user.findUnique({
     where: { id: req.user!.userId },
     select: PUBLIC_USER_SELECT,
   });
   if (!user) return res.status(404).json({ error: 'User not found' });
+
+  // Backfill referral codes for accounts created before Refer & Earn shipped.
+  if (!user.referralCode) {
+    const code = await generateUniqueReferralCode(user.fullName);
+    user = await prisma.user.update({ where: { id: user.id }, data: { referralCode: code }, select: PUBLIC_USER_SELECT });
+  }
+
   res.json({ success: true, data: user });
 });
 

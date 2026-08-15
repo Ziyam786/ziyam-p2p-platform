@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
 import Rating from '../../../components/Rating';
+import CarLocationMap from '../../../components/CarLocationMap';
 import { useAuth } from '../../../lib/auth-context';
 import { useToast } from '../../../components/Toast';
 import { carsApi, bookingsApi, settingsApi, promoApi } from '../../../lib/api';
@@ -290,6 +291,15 @@ export default function CarDetailPage() {
                 ))}
               </div>
             </div>
+
+            {/* Pickup location */}
+            {car.latitude && car.longitude && (
+              <div className="bg-white rounded-2xl p-5 border border-gray-100">
+                <h2 className="font-bold text-gray-900 mb-1">Pickup Location</h2>
+                <p className="text-xs text-gray-500 mb-3">{car.address ?? car.city}</p>
+                <CarLocationMap latitude={car.latitude} longitude={car.longitude} label={`${car.make} ${car.model}`} />
+              </div>
+            )}
 
             {/* Host info */}
             {car.owner && (

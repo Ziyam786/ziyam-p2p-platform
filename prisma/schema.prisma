@@ -69,6 +69,13 @@ enum PaymentMode {
   FLEET_FUEL_CARD
 }
 
+enum ServiceRequestStatus {
+  REQUESTED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
 model User {
   id              String         @id @default(uuid())
   fullName        String
@@ -89,6 +96,23 @@ model User {
   bankIfsc            String?
   bankNameAtBank      String?
   bankAccountVerified Boolean @default(false)
+
+  // Extended verification checklist (matches host-app profile: signature for
+  // lease agreements, alternate contact, liveness selfie)
+  signatureUrl        String?
+  selfieUrl           String?
+  alternatePhoneNumber String?
+
+  // Setu DigiLocker KYC (OAuth-style consent redirect — see setuService.ts)
+  digilockerRequestId String?
+  digilockerStatus    String? // unauthenticated | authenticated
+
+  // Refer & Earn
+  referralCode  String? @unique // backfilled lazily on first login post-migration; new signups always get one
+  referredById  String?
+  referredBy    User?   @relation("Referrals", fields: [referredById], references: [id])
+  referrals     User[]  @relation("Referrals")
+  creditsBalance Float  @default(0)
   cars            Car[]
   bookings        Booking[]      @relation("CustomerBookings")
   payouts         PayoutLedger[]
@@ -99,6 +123,7 @@ model User {
   loggedPlatformBookings PlatformBooking[]
   loggedJournalEntries   JournalEntry[]
   loggedFleetExpenses    FleetExpense[]
+  requestedServices      ServiceRequest[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -123,6 +148,9 @@ model Car {
   images           String[]  @default([])
   features         String[]  @default([])
   city             String
+  address          String?
+  latitude         Float?
+  longitude        Float?
   isAvailable      Boolean   @default(true)
   instantBook      Boolean   @default(true)
   featured         Boolean   @default(false)
@@ -154,6 +182,7 @@ model Car {
   platformBookings PlatformBooking[]
   journalEntries   JournalEntry[]
   fleetExpenses    FleetExpense[]
+  serviceRequests  ServiceRequest[]
   createdAt        DateTime  @default(now())
 }
 
@@ -211,6 +240,16 @@ model Booking {
   deliveryRequested Boolean       @default(false)
   promoCode        String?
   status           BookingStatus  @default(PENDING)
+  // 4-digit code generated when the trip starts; shown only to the host and
+  // must be supplied by whoever completes the trip — proves the handover
+  // actually happened in person rather than either side just tapping "done".
+  endOtp           String?
+
+  // Setu Aadhaar eSign — real e-signing of the generated lease agreement PDF
+  // (see setuService.ts + fleetLedger-adjacent /bookings/:id/esign routes)
+  esignRequestId    String?
+  esignStatus       String? // sign_initiated | sign_pending | sign_in_progress | sign_complete
+  esignDownloadUrl  String?
   paymentIntentId  String?
   payoutLedger     PayoutLedger?
   review           Review?
@@ -332,10 +371,34 @@ model FleetExpense {
   description String?
   createdById String
   createdBy   User              @relation(fields: [createdById], references: [id])
+  serviceRequest ServiceRequest?
   createdAt   DateTime          @default(now())
 
   @@index([carId])
   @@index([expenseType])
+}
+
+// Host-requested vehicle maintenance/servicing (matches the "Vehicle Services"
+// booking screen). Completing a request auto-logs a FleetExpense so the
+// financial ledger stays in sync without manual double-entry.
+model ServiceRequest {
+  id              String              @id @default(uuid())
+  carId           String
+  car             Car                 @relation(fields: [carId], references: [id])
+  requestedById   String
+  requestedBy     User                @relation(fields: [requestedById], references: [id])
+  serviceType     String              // "Basic Service" | "Standard Services" | custom
+  priceEstimate   Float
+  scheduledDate   DateTime
+  serviceLocation String
+  status          ServiceRequestStatus @default(REQUESTED)
+  notes           String?
+  fleetExpenseId  String?             @unique
+  fleetExpense    FleetExpense?       @relation(fields: [fleetExpenseId], references: [id])
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([carId])
 }
 
 // Traceability for admin mutations (suspend, feature, refund, etc).

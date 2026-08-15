@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import FeaturePicker from './FeaturePicker';
+import AddressAutocomplete from './AddressAutocomplete';
 import { settingsApi } from '../lib/api';
 
 const CATEGORIES_FALLBACK = ['Hatchback', 'Sedan', 'SUV', 'Luxury', 'EV', 'MUV'];
@@ -13,6 +14,7 @@ const PHOTO_SLOTS = ['Front View', 'Left View', 'Right View', 'Rear View', 'Inte
 export interface WizardValues {
   registrationNo: string; make: string; model: string; year: number; category: string;
   fuelType: string; transmission: string; seats: number; city: string;
+  address: string; latitude: number | null; longitude: number | null;
   rcDocUrl: string; pollutionCertUrl: string; insuranceDocUrl: string;
   images: string[]; description: string; features: string[];
   dailyRate: number; securityDeposit: number; kmIncludedPerDay: number; extraKmCharge: number;
@@ -22,6 +24,7 @@ export interface WizardValues {
 const DEFAULTS: WizardValues = {
   registrationNo: '', make: '', model: '', year: new Date().getFullYear(), category: 'Hatchback',
   fuelType: 'Petrol', transmission: 'Manual', seats: 5, city: 'Bengaluru',
+  address: '', latitude: null, longitude: null,
   rcDocUrl: '', pollutionCertUrl: '', insuranceDocUrl: '',
   images: ['', '', '', '', ''], description: '', features: ['Air Conditioning', 'Power Steering', 'Bluetooth', 'Power Windows', 'Music System'],
   dailyRate: 1200, securityDeposit: 3000, kmIncludedPerDay: 300, extraKmCharge: 10,
@@ -34,6 +37,7 @@ export function wizardValuesToPayload(v: WizardValues) {
     fuelType: v.fuelType, transmission: v.transmission, seats: Number(v.seats), dailyRate: Number(v.dailyRate),
     securityDeposit: Number(v.securityDeposit), kmIncludedPerDay: Number(v.kmIncludedPerDay),
     extraKmCharge: Number(v.extraKmCharge), city: v.city, description: v.description,
+    address: v.address || undefined, latitude: v.latitude ?? undefined, longitude: v.longitude ?? undefined,
     images: v.images.map((s) => s.trim()).filter(Boolean),
     features: v.features,
     instantBook: v.instantBook, offersDelivery: v.offersDelivery, deliveryFee: Number(v.deliveryFee),
@@ -154,6 +158,18 @@ export default function CarOnboardingWizard({
               </select>
             </Field>
           </div>
+          <Field label="Exact Location">
+            <AddressAutocomplete
+              value={values.address}
+              onChange={(address) => set('address', address)}
+              onSelect={(sel) => {
+                set('address', sel.address);
+                set('latitude', sel.latitude);
+                set('longitude', sel.longitude);
+              }}
+              placeholder="Search for the car's pickup address…"
+            />
+          </Field>
         </div>
       )}
 

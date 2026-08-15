@@ -23,13 +23,18 @@ export interface PublicUser {
   bankIfsc?: string | null;
   bankNameAtBank?: string | null;
   bankAccountVerified?: boolean;
+  signatureUrl?: string | null;
+  selfieUrl?: string | null;
+  alternatePhoneNumber?: string | null;
+  referralCode?: string | null;
+  creditsBalance?: number;
   createdAt: string;
 }
 
 export interface Car {
   id: string;
   ownerId: string;
-  owner?: { id?: string; fullName: string; avatarUrl?: string | null; bio?: string | null; createdAt?: string };
+  owner?: { id?: string; fullName: string; avatarUrl?: string | null; bio?: string | null; createdAt?: string; signatureUrl?: string | null };
   make: string;
   model: string;
   registrationNo: string;
@@ -46,6 +51,9 @@ export interface Car {
   images: string[];
   features: string[];
   city: string;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   isAvailable: boolean;
   instantBook: boolean;
   featured: boolean;
@@ -76,7 +84,7 @@ export interface Booking {
   carId: string;
   car?: Car;
   customerId: string;
-  customer?: { fullName: string; email: string };
+  customer?: { id?: string; fullName: string; email: string; signatureUrl?: string | null };
   startTime: string;
   endTime: string;
   totalAmount: number;
@@ -88,6 +96,9 @@ export interface Booking {
   status: BookingStatus;
   paymentIntentId?: string | null;
   review?: Review | null;
+  esignRequestId?: string | null;
+  esignStatus?: string | null;
+  esignDownloadUrl?: string | null;
   createdAt: string;
 }
 
@@ -168,6 +179,27 @@ export interface PromoCode {
   usedCount: number;
   active: boolean;
   expiresAt?: string | null;
+  createdAt: string;
+}
+
+export type ServiceRequestStatus = 'REQUESTED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
+
+export interface ServiceCatalogEntry {
+  serviceType: string;
+  description: string;
+  priceFrom: number;
+}
+
+export interface ServiceRequest {
+  id: string;
+  carId: string;
+  serviceType: string;
+  priceEstimate: number;
+  scheduledDate: string;
+  serviceLocation: string;
+  status: ServiceRequestStatus;
+  notes?: string | null;
+  fleetExpenseId?: string | null;
   createdAt: string;
 }
 

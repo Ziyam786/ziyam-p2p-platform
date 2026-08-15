@@ -1,6 +1,6 @@
 import type {
   AdminStats, AppNotification, Blackout, Booking, Car, EarningsOverview, IncentiveProgress, ProtectionPlan, PublicSettings, PublicUser,
-  Review, UtilizationEntry,
+  Review, ServiceCatalogEntry, ServiceRequest, UtilizationEntry,
 } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api';
@@ -39,7 +39,7 @@ const del = <T>(path: string) => request<T>(path, { method: 'DELETE' });
 
 /* ── Auth ─────────────────────────────────────────────────────────── */
 export const authApi = {
-  signup: (data: { fullName: string; email: string; phoneNumber: string; password: string; role?: string }) =>
+  signup: (data: { fullName: string; email: string; phoneNumber: string; password: string; role?: string; referralCode?: string }) =>
     post<{ success: true; data: PublicUser }>('/auth/signup', data),
   login: (data: { email: string; password: string }) =>
     post<{ success: true; data: PublicUser }>('/auth/login', data),
@@ -96,7 +96,10 @@ export const bookingsApi = {
   }) => post<{ success: true; bookingId: string }>('/booking', data),
   createCheckoutSession: (id: string) => post<{ success: true; data: PayuCheckoutSession }>(`/booking/${id}/checkout-session`),
   start: (id: string) => post<{ success: true; data: Booking }>(`/booking/${id}/start`),
-  complete: (id: string) => post<{ success: true; message: string }>(`/booking/${id}/complete`),
+  complete: (id: string, otp: string) => post<{ success: true; message: string }>(`/booking/${id}/complete`, { otp }),
+  endOtp: (id: string) => get<{ success: true; data: { otp: string | null } }>(`/booking/${id}/end-otp`),
+  startEsign: (id: string) => post<{ success: true; data: { esignRequestId: string } }>(`/bookings/${id}/esign/start`),
+  esignStatus: (id: string) => get<{ success: true; data: { status: string | null; downloadUrl?: string } }>(`/bookings/${id}/esign/status`),
   unlock: (id: string) => post<{ success: boolean; message: string }>(`/booking/${id}/unlock`),
   cancel: (id: string) => post<{ success: true; data: Booking }>(`/bookings/${id}/cancel`),
   get: (id: string) => get<{ success: true; data: Booking }>(`/bookings/${id}`),
@@ -106,7 +109,7 @@ export const bookingsApi = {
 /* ── Users ────────────────────────────────────────────────────────── */
 export const usersApi = {
   me: () => get<{ success: true; data: PublicUser }>('/users/me'),
-  update: (data: Partial<Pick<PublicUser, 'fullName' | 'bio' | 'avatarUrl' | 'payoutAccountId'>>) =>
+  update: (data: Partial<Pick<PublicUser, 'fullName' | 'bio' | 'avatarUrl' | 'payoutAccountId' | 'signatureUrl' | 'selfieUrl' | 'alternatePhoneNumber'>>) =>
     patch<{ success: true; data: PublicUser }>('/users/me', data),
 };
 
@@ -117,6 +120,8 @@ export const kycApi = {
     post<{ success: true; stubbed: boolean; referenceId?: string | number; message: string }>('/kyc/aadhaar/otp', { aadhaarNumber }),
   verifyAadhaarOtp: (referenceId: string | number | undefined, otp: string | undefined) =>
     post<{ success: true; message: string; data: { isKycVerified: boolean; aadhaarVerifiedName?: string } }>('/kyc/aadhaar/verify', { referenceId, otp }),
+  startDigilocker: () => post<{ success: true; data: { url: string } }>('/kyc/digilocker/start'),
+  digilockerStatus: () => get<{ success: true; data: { status: string; isKycVerified: boolean } }>('/kyc/digilocker/status'),
 };
 
 /* ── Bank account verification ───────────────────────────────────── */
@@ -176,6 +181,16 @@ export const notificationsApi = {
   list: () => get<{ success: true; count: number; unreadCount: number; data: AppNotification[] }>('/users/me/notifications'),
   markRead: (id: string) => post<{ success: true; data: AppNotification }>(`/notifications/${id}/read`),
   markAllRead: () => post<{ success: true }>('/notifications/read-all'),
+};
+
+/* ── Vehicle Services (maintenance booking) ──────────────────────────── */
+export const serviceApi = {
+  catalog: () => get<{ success: true; data: ServiceCatalogEntry[] }>('/services/catalog'),
+  list: (carId?: string) => get<{ success: true; count: number; data: ServiceRequest[] }>(`/services${carId ? `?carId=${carId}` : ''}`),
+  create: (data: { carId: string; serviceType: string; priceEstimate: number; scheduledDate: string; serviceLocation: string; notes?: string }) =>
+    post<{ success: true; data: ServiceRequest }>('/services', data),
+  updateStatus: (id: string, status: string, paymentMode?: string) =>
+    patch<{ success: true; data: ServiceRequest }>(`/services/${id}`, { status, paymentMode }),
 };
 
 /* ── Admin ────────────────────────────────────────────────────────── */

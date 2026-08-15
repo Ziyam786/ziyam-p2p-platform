@@ -66,6 +66,19 @@ export const config = {
     },
   },
 
+  // Setu (bridge.setu.co) — DigiLocker KYC (OAuth-style consent redirect) + Aadhaar eSign.
+  // Both products share the same "data" gateway base URL.
+  setu: {
+    mode: process.env.SETU_MODE ?? 'test', // 'test' | 'live'
+    clientId: process.env.SETU_CLIENT_ID ?? '',
+    clientSecret: process.env.SETU_CLIENT_SECRET ?? '',
+    digilockerProductInstanceId: process.env.SETU_DIGILOCKER_PRODUCT_INSTANCE_ID ?? '',
+    esignProductInstanceId: process.env.SETU_ESIGN_PRODUCT_INSTANCE_ID ?? '',
+    get baseUrl() {
+      return this.mode === 'live' ? 'https://dg.setu.co' : 'https://dg-sandbox.setu.co';
+    },
+  },
+
   ai: {
     anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? '',
     model: process.env.AI_MODEL ?? 'claude-haiku-4-5-20251001',

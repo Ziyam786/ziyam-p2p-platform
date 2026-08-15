@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
 import ProtectedRoute from '../../../components/ProtectedRoute';
@@ -11,6 +12,7 @@ import { kycApi } from '../../../lib/api';
 function KycInner() {
   const { user, refresh } = useAuth();
   const { show } = useToast();
+  const searchParams = useSearchParams();
   const [aadhaar, setAadhaar] = useState('');
   const [otp, setOtp] = useState('');
   const [referenceId, setReferenceId] = useState<string | number | undefined>();
@@ -18,6 +20,38 @@ function KycInner() {
   const [stage, setStage] = useState<'aadhaar' | 'otp'>('aadhaar');
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [digilockerLoading, setDigilockerLoading] = useState(false);
+  const [checkingDigilocker, setCheckingDigilocker] = useState(false);
+
+  // Returned from DigiLocker's consent screen — poll for the final status.
+  useEffect(() => {
+    if (searchParams.get('digilocker') !== '1' || !user || user.isKycVerified) return;
+    setCheckingDigilocker(true);
+    kycApi
+      .digilockerStatus()
+      .then(async (res) => {
+        if (res.data.isKycVerified) {
+          await refresh();
+          show('Verified via DigiLocker!', 'success');
+        } else {
+          show('DigiLocker verification is still pending — try again in a moment.', 'error');
+        }
+      })
+      .catch((err: any) => show(err.message ?? 'Could not confirm DigiLocker status', 'error'))
+      .finally(() => setCheckingDigilocker(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  async function handleStartDigilocker() {
+    setDigilockerLoading(true);
+    try {
+      const res = await kycApi.startDigilocker();
+      window.location.href = res.data.url;
+    } catch (err: any) {
+      show(err.message ?? 'Could not start DigiLocker verification', 'error');
+      setDigilockerLoading(false);
+    }
+  }
 
   if (!user) return null;
 
@@ -68,7 +102,9 @@ function KycInner() {
         </p>
 
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
-          {user.isKycVerified ? (
+          {checkingDigilocker ? (
+            <p className="text-center text-sm text-gray-400 py-8">Confirming your DigiLocker verification…</p>
+          ) : user.isKycVerified ? (
             <div className="text-center py-8">
               <span className="text-4xl block mb-3">✅</span>
               <p className="font-bold text-gray-900">You're verified</p>
@@ -78,6 +114,18 @@ function KycInner() {
             <form onSubmit={handleSendOtp} className="space-y-5">
               <div className="flex gap-3">
                 <span className="text-xs font-semibold bg-amber-50 text-amber-600 px-3 py-1.5 rounded-full">🪪 Aadhaar eKYC</span>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleStartDigilocker}
+                disabled={digilockerLoading}
+                className="w-full border-2 border-gray-900 text-gray-900 font-bold py-3 rounded-xl transition hover:bg-gray-900 hover:text-white disabled:opacity-50"
+              >
+                {digilockerLoading ? 'Redirecting to DigiLocker…' : '🔒 Verify Instantly via DigiLocker'}
+              </button>
+              <div className="flex items-center gap-3 text-xs text-gray-400">
+                <div className="flex-1 h-px bg-gray-100" /> or verify with OTP <div className="flex-1 h-px bg-gray-100" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
@@ -143,7 +191,9 @@ function KycInner() {
 export default function KycPage() {
   return (
     <ProtectedRoute>
-      <KycInner />
+      <Suspense fallback={<div className="min-h-screen bg-gray-50" />}>
+        <KycInner />
+      </Suspense>
     </ProtectedRoute>
   );
 }

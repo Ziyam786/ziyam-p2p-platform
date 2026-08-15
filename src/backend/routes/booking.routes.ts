@@ -11,6 +11,32 @@ const router = Router();
 const prisma = new PrismaClient();
 
 const VALID_PLANS = ['BASIC', 'STANDARD', 'PREMIUM'];
+const REFERRAL_REWARD = 500; // ₹ credited to the referrer once their referred user completes their first trip
+
+/**
+ * Credits a referrer's Z-Credits-style wallet the first (and only the first)
+ * time a user they referred completes a trip — avoids reward-farming via
+ * repeat bookings or fake signups with no real trip.
+ */
+async function creditReferralRewardIfFirstTrip(customerId: string) {
+  const customer = await prisma.user.findUnique({ where: { id: customerId }, select: { referredById: true } });
+  if (!customer?.referredById) return;
+
+  const completedTripCount = await prisma.booking.count({ where: { customerId, status: BookingStatus.COMPLETED } });
+  if (completedTripCount !== 1) return; // only the referred user's very first completed trip triggers the reward
+
+  const referrer = await prisma.user.update({
+    where: { id: customer.referredById },
+    data: { creditsBalance: { increment: REFERRAL_REWARD } },
+  });
+  await notify(
+    referrer.id,
+    'GENERIC',
+    "You've earned a referral reward!",
+    `Your referral completed their first trip — ₹${REFERRAL_REWARD} has been credited to your account.`,
+    '/account'
+  );
+}
 
 // Create a booking (no payment yet — the checkout page starts a PayU session separately)
 router.post('/booking', requireAuth, async (req: Request, res: Response) => {
@@ -114,6 +140,7 @@ router.post('/booking/:id/checkout-session', requireAuth, async (req: Request, r
       amount: booking.totalAmount,
       customerName: booking.customer.fullName,
       customerEmail: booking.customer.email,
+      customerPhone: booking.customer.phoneNumber,
       productInfo: `${booking.car.make} ${booking.car.model} — ${booking.car.city}`,
     });
 
@@ -135,7 +162,11 @@ router.post('/booking/:id/start', requireAuth, async (req: Request, res: Respons
     return res.status(400).json({ error: `Cannot start trip from status ${booking.status}` });
   }
 
-  const updated = await prisma.booking.update({ where: { id }, data: { status: BookingStatus.ACTIVE } });
+  // Generate the trip-end handover code now — shown only to the host, and
+  // required from whoever calls /complete, so a trip can't be closed out
+  // without the two parties actually meeting for the handover.
+  const endOtp = String(Math.floor(1000 + Math.random() * 9000));
+  const updated = await prisma.booking.update({ where: { id }, data: { status: BookingStatus.ACTIVE, endOtp } });
   await notify(
     booking.car.ownerId,
     'TRIP_STARTED',
@@ -146,9 +177,23 @@ router.post('/booking/:id/start', requireAuth, async (req: Request, res: Respons
   res.json({ success: true, data: updated });
 });
 
-// Mark a trip completed -> release N+1 payout escrow
+// The host-only trip-end handover code (see /start above).
+router.get('/booking/:id/end-otp', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  if (booking.car.ownerId !== req.user!.userId) return res.status(403).json({ error: 'Only the host can view this code' });
+  if (booking.status !== BookingStatus.ACTIVE) return res.status(400).json({ error: 'Trip is not active' });
+  res.json({ success: true, data: { otp: booking.endOtp } });
+});
+
+// Mark a trip completed -> release N+1 payout escrow. Requires the trip-end
+// handover code the host was shown (see /start and /end-otp above) — proves
+// the two parties actually met for the handover rather than either side
+// just tapping "done" remotely.
 router.post('/booking/:id/complete', requireAuth, async (req: Request, res: Response) => {
   const { id } = req.params;
+  const { otp } = req.body;
   try {
     const existing = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
     if (!existing) return res.status(404).json({ error: 'Booking not found' });
@@ -158,12 +203,16 @@ router.post('/booking/:id/complete', requireAuth, async (req: Request, res: Resp
     if (existing.status !== BookingStatus.ACTIVE) {
       return res.status(400).json({ error: `Cannot complete trip from status ${existing.status}` });
     }
+    if (!existing.endOtp || otp !== existing.endOtp) {
+      return res.status(400).json({ error: 'Incorrect trip-end code. Ask the host for the code shown in their app.' });
+    }
 
     const booking = await prisma.booking.update({
       where: { id },
       data: { status: BookingStatus.COMPLETED },
     });
     await PayoutEngine.createEscrowLedger(booking.id);
+    await creditReferralRewardIfFirstTrip(booking.customerId);
     res.json({ success: true, message: 'Trip completed. N+1 payout scheduled.' });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

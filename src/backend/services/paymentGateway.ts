@@ -6,6 +6,7 @@ interface InitiateCheckoutParams {
   amount: number;
   customerName: string;
   customerEmail: string;
+  customerPhone: string;
   productInfo: string;
 }
 
@@ -55,7 +56,7 @@ class PaymentGateway {
       firstname: firstname || params.customerName,
       lastname: rest.join(' '),
       email: params.customerEmail,
-      phone: '',
+      phone: params.customerPhone,
       udf1: params.bookingId,
       surl: `${config.serverUrl}/api/payments/payu/callback`,
       furl: `${config.serverUrl}/api/payments/payu/callback`,

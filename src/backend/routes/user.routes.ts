@@ -2,6 +2,9 @@ import { Router, Request, Response } from 'express';
 import { PrismaClient, BookingStatus } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
 import { sandboxService } from '../services/sandboxService';
+import { esignApi, isSetuConfigured } from '../services/setuService';
+import { renderLeaseAgreementPdf } from '../services/leaseAgreementPdf';
+import { config } from '../config';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -20,6 +23,11 @@ const PUBLIC_USER_SELECT = {
   bankIfsc: true,
   bankNameAtBank: true,
   bankAccountVerified: true,
+  signatureUrl: true,
+  selfieUrl: true,
+  alternatePhoneNumber: true,
+  referralCode: true,
+  creditsBalance: true,
   createdAt: true,
 };
 
@@ -30,7 +38,7 @@ router.get('/users/me', requireAuth, async (req: Request, res: Response) => {
 });
 
 router.patch('/users/me', requireAuth, async (req: Request, res: Response) => {
-  const { fullName, bio, avatarUrl, payoutAccountId } = req.body;
+  const { fullName, bio, avatarUrl, payoutAccountId, signatureUrl, selfieUrl, alternatePhoneNumber } = req.body;
   const user = await prisma.user.update({
     where: { id: req.user!.userId },
     data: {
@@ -38,6 +46,9 @@ router.patch('/users/me', requireAuth, async (req: Request, res: Response) => {
       ...(bio !== undefined && { bio }),
       ...(avatarUrl !== undefined && { avatarUrl }),
       ...(payoutAccountId !== undefined && { payoutAccountId }),
+      ...(signatureUrl !== undefined && { signatureUrl }),
+      ...(selfieUrl !== undefined && { selfieUrl }),
+      ...(alternatePhoneNumber !== undefined && { alternatePhoneNumber }),
     },
     select: PUBLIC_USER_SELECT,
   });
@@ -91,7 +102,11 @@ router.get('/bookings/:id', requireAuth, async (req: Request, res: Response) => 
   const { id } = req.params;
   const booking = await prisma.booking.findUnique({
     where: { id },
-    include: { car: { include: { owner: { select: { id: true, fullName: true, avatarUrl: true } } } }, review: true },
+    include: {
+      car: { include: { owner: { select: { id: true, fullName: true, email: true, avatarUrl: true, signatureUrl: true } } } },
+      customer: { select: { id: true, fullName: true, email: true, signatureUrl: true } },
+      review: true,
+    },
   });
   if (!booking) return res.status(404).json({ error: 'Booking not found' });
   const isCustomer = booking.customerId === req.user!.userId;
@@ -100,6 +115,86 @@ router.get('/bookings/:id', requireAuth, async (req: Request, res: Response) => 
     return res.status(403).json({ error: 'Not part of this booking' });
   }
   res.json({ success: true, data: booking });
+});
+
+// Real Aadhaar e-signing of the generated lease agreement, via Setu eSign —
+// renders the same content as /bookings/:id/agreement into a PDF, uploads it,
+// and creates a two-signer (host + guest) signature request.
+router.post('/bookings/:id/esign/start', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const booking = await prisma.booking.findUnique({
+    where: { id },
+    include: { car: { include: { owner: true } }, customer: true },
+  });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  const isCustomer = booking.customerId === req.user!.userId;
+  const isHost = booking.car.ownerId === req.user!.userId;
+  if (!isCustomer && !isHost) return res.status(403).json({ error: 'Not part of this booking' });
+
+  if (!isSetuConfigured()) return res.status(503).json({ error: 'eSign is not configured yet' });
+  if (booking.esignRequestId) return res.status(409).json({ error: 'An eSign request already exists for this booking' });
+
+  try {
+    const pdf = await renderLeaseAgreementPdf({
+      bookingId: booking.id,
+      createdAt: booking.createdAt,
+      hostName: booking.car.owner.fullName,
+      guestName: booking.customer.fullName,
+      registrationNo: booking.car.registrationNo,
+      make: booking.car.make,
+      model: booking.car.model,
+      year: booking.car.year,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      protectionPlan: booking.protectionPlan,
+      totalAmount: booking.totalAmount,
+    });
+    const { documentId } = await esignApi.uploadDocument(pdf, `lease-agreement-${booking.id.slice(0, 8)}`);
+    const signature = await esignApi.createSignatureRequest(
+      documentId,
+      [
+        { identifier: booking.car.owner.email, displayName: booking.car.owner.fullName },
+        { identifier: booking.customer.email, displayName: booking.customer.fullName },
+      ],
+      `${config.clientUrl}/bookings/${booking.id}/agreement?esigned=1`
+    );
+    await prisma.booking.update({ where: { id }, data: { esignRequestId: signature.id, esignStatus: 'sign_initiated' } });
+    res.json({ success: true, data: { esignRequestId: signature.id } });
+  } catch (err: any) {
+    console.error('[ESIGN] start failed:', err.response?.data ?? err.message);
+    res.status(502).json({ error: 'Could not start eSign right now. Please try again shortly.' });
+  }
+});
+
+router.get('/bookings/:id/esign/status', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  const isCustomer = booking.customerId === req.user!.userId;
+  const isHost = booking.car.ownerId === req.user!.userId;
+  if (!isCustomer && !isHost) return res.status(403).json({ error: 'Not part of this booking' });
+  if (!booking.esignRequestId) return res.json({ success: true, data: { status: null } });
+
+  if (booking.esignStatus === 'sign_complete' && booking.esignDownloadUrl) {
+    return res.json({ success: true, data: { status: booking.esignStatus, downloadUrl: booking.esignDownloadUrl } });
+  }
+
+  try {
+    const { status } = await esignApi.getStatus(booking.esignRequestId);
+    let downloadUrl: string | undefined;
+    if (status === 'sign_complete') {
+      const download = await esignApi.getDownloadUrl(booking.esignRequestId);
+      downloadUrl = download.downloadUrl;
+    }
+    await prisma.booking.update({
+      where: { id },
+      data: { esignStatus: status, ...(downloadUrl && { esignDownloadUrl: downloadUrl }) },
+    });
+    res.json({ success: true, data: { status, downloadUrl } });
+  } catch (err: any) {
+    console.error('[ESIGN] status check failed:', err.response?.data ?? err.message);
+    res.status(502).json({ error: 'Could not check eSign status right now.' });
+  }
 });
 
 router.post('/bookings/:id/cancel', requireAuth, async (req: Request, res: Response) => {
