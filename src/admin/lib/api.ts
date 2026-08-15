@@ -1,6 +1,7 @@
 import type {
   AdminBooking, AdminCar, AdminPayout, AdminReview, AdminStats, AdminUser, AuditEntry,
-  ChatConversationSummary, ChatMessageRow, PromoCode, SessionUser, SettingRow,
+  ChatConversationSummary, ChatMessageRow, FleetExpenseRow, FleetSummary, JournalEntryRow,
+  PlatformBookingEntry, PromoCode, SessionUser, SettingRow,
 } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api';
@@ -70,4 +71,32 @@ export const adminApi = {
     post<{ success: true; data: PromoCode }>('/admin/promo-codes', data),
   togglePromoCode: (code: string, active: boolean) => patch<{ success: true; data: PromoCode }>(`/admin/promo-codes/${code}`, { active }),
   deletePromoCode: (code: string) => del<{ success: true }>(`/admin/promo-codes/${code}`),
+};
+
+/* ── Fleet Financial Dashboard & Ledger ──────────────────────────────── */
+export type FleetFilters = { carId?: string; platform?: string; category?: string; expenseType?: string; from?: string; to?: string };
+function toQuery(params: Record<string, unknown>) {
+  const usp = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') usp.set(k, String(v)); });
+  const qs = usp.toString();
+  return qs ? `?${qs}` : '';
+}
+
+export const fleetApi = {
+  summary: (f: FleetFilters = {}) => get<{ success: true; data: FleetSummary }>(`/fleet/summary${toQuery(f)}`),
+
+  bookings: (f: FleetFilters = {}) => get<{ success: true; count: number; data: PlatformBookingEntry[] }>(`/fleet/bookings${toQuery(f)}`),
+  addBooking: (data: { carId: string; platform: string; externalBookingId: string; bookedAt: string; totalFare: number; doorstepCharges?: number; platformCommission?: number }) =>
+    post<{ success: true; data: PlatformBookingEntry }>('/fleet/bookings', data),
+  deleteBooking: (id: string) => del<{ success: true }>(`/fleet/bookings/${id}`),
+
+  journalEntries: (f: FleetFilters = {}) => get<{ success: true; count: number; data: JournalEntryRow[] }>(`/fleet/journal-entries${toQuery(f)}`),
+  addJournalEntry: (data: { carId: string; collectionDate: string; amountCollected: number; totalAmount: number; category: string; remarks?: string }) =>
+    post<{ success: true; data: JournalEntryRow }>('/fleet/journal-entries', data),
+  deleteJournalEntry: (id: string) => del<{ success: true }>(`/fleet/journal-entries/${id}`),
+
+  expenses: (f: FleetFilters = {}) => get<{ success: true; count: number; data: FleetExpenseRow[] }>(`/fleet/expenses${toQuery(f)}`),
+  addExpense: (data: { expenseType: string; carId?: string; paymentMode: string; amount: number; date: string; description?: string }) =>
+    post<{ success: true; data: FleetExpenseRow }>('/fleet/expenses', data),
+  deleteExpense: (id: string) => del<{ success: true }>(`/fleet/expenses/${id}`),
 };
