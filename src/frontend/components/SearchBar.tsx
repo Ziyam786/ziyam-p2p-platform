@@ -73,7 +73,7 @@ export default function SearchBar({ onSearch, compact = false }: SearchBarProps)
 
       <button
         type="submit"
-        className={`bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition whitespace-nowrap ${compact ? 'px-5 py-2 text-sm' : 'px-8 py-3'}`}
+        className={`btn-gradient text-white font-bold rounded-xl transition whitespace-nowrap ${compact ? 'px-5 py-2 text-sm' : 'px-8 py-3'}`}
       >
         Search Cars
       </button>

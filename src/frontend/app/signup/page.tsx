@@ -1,141 +1,132 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
-import { register } from '../../lib/auth';
+import { useAuth } from '../../lib/auth-context';
+import { ApiError } from '../../lib/api';
+
+const ROLES = [
+  { value: 'CUSTOMER', label: 'Rent a car', desc: 'Browse and book self-drive cars near you', icon: '🚗' },
+  { value: 'SELF_HOST', label: 'List my car', desc: 'Earn passive income from your own vehicle', icon: '🔑' },
+  { value: 'FLEET_OPERATOR', label: 'Fleet operator', desc: 'Manage multiple vehicles as a business', icon: '🏢' },
+];
 
 export default function SignupPage() {
+  const router = useRouter();
+  const { signup } = useAuth();
+
+  const [role, setRole] = useState('CUSTOMER');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'CUSTOMER' | 'SELF_HOST'>('CUSTOMER');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSignup = async (e: React.FormEvent) => {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await register({ fullName, email, phoneNumber, password, role });
-      window.location.href = role === 'SELF_HOST' ? '/host/dashboard' : '/user/dashboard';
-    } catch (err: any) {
-      setError(err.message || 'Signup failed. Please try again.');
+      await signup({ fullName, email, phoneNumber, password, role });
+      if (role === 'SELF_HOST' || role === 'FLEET_OPERATOR') router.push('/host/onboarding');
+      else router.push('/account');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Signup failed. Please try again.');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+    <div className="min-h-screen bg-gray-50 font-sans">
       <Navbar />
-      
-      <main className="flex-1 flex items-center justify-center pt-24 pb-16 px-4">
-        <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100 max-w-md w-full">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-extrabold text-gray-900 mb-2">Join ZiyamSelfDrive</h1>
-            <p className="text-sm text-gray-500">Create an account to start driving or earning.</p>
+      <div className="max-w-xl mx-auto px-4 pt-32 pb-24">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+          <h1 className="text-2xl font-extrabold text-gray-900 mb-1">Create your account</h1>
+          <p className="text-gray-500 text-sm mb-6">Join India's trusted P2P self-drive community</p>
+
+          {error && <div className="bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 mb-4">{error}</div>}
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+            {ROLES.map((r) => (
+              <button
+                key={r.value}
+                type="button"
+                onClick={() => setRole(r.value)}
+                className={`text-left p-4 rounded-xl border-2 transition ${
+                  role === r.value ? 'border-amber-500 bg-amber-50' : 'border-gray-100 hover:border-gray-200'
+                }`}
+              >
+                <span className="text-2xl">{r.icon}</span>
+                <p className="font-semibold text-sm text-gray-900 mt-2">{r.label}</p>
+                <p className="text-xs text-gray-500 mt-1">{r.desc}</p>
+              </button>
+            ))}
           </div>
-          
-          <form onSubmit={handleSignup} className="space-y-5">
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
-                {error}
-              </div>
-            )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase mb-2">Full Name</label>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Full Name</label>
               <input
-                type="text"
+                required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                required
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500 bg-gray-50 text-sm"
-                placeholder="John Doe"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                placeholder="Aisha Sharma"
               />
             </div>
-            
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase mb-2">Email Address</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500 bg-gray-50 text-sm"
-                placeholder="name@example.com"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase mb-2">Phone Number</label>
-              <input
-                type="tel"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                required
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500 bg-gray-50 text-sm"
-                placeholder="+91 98765 43210"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase mb-2">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500 bg-gray-50 text-sm"
-                placeholder="At least 8 characters"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase mb-3">I want to...</label>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  type="button"
-                  onClick={() => setRole('CUSTOMER')}
-                  className={`py-3 rounded-xl border-2 text-sm font-semibold transition ${
-                    role === 'CUSTOMER' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 text-gray-600 hover:border-amber-300'
-                  }`}
-                >
-                  Rent a Car
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRole('SELF_HOST')}
-                  className={`py-3 rounded-xl border-2 text-sm font-semibold transition ${
-                    role === 'SELF_HOST' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 text-gray-600 hover:border-amber-300'
-                  }`}
-                >
-                  Host my Car
-                </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Email</label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  placeholder="you@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Phone Number</label>
+                <input
+                  required
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  placeholder="+91 90000 00000"
+                />
               </div>
             </div>
-            
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Password</label>
+              <input
+                type="password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                placeholder="At least 6 characters"
+              />
+            </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white font-bold py-3.5 rounded-xl transition text-base mt-4"
+              className="w-full btn-gradient disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none text-white font-bold py-3 rounded-xl transition"
             >
-              {loading ? 'Creating account...' : 'Create Account'}
+              {loading ? 'Creating account…' : 'Create Account'}
             </button>
           </form>
-          
-          <div className="mt-8 pt-6 border-t border-gray-100 text-center">
-            <p className="text-sm text-gray-600">
-              Already have an account?{' '}
-              <a href="/login" className="text-amber-600 font-bold hover:underline">Log in</a>
-            </p>
-          </div>
+
+          <p className="text-center text-sm text-gray-500 mt-6">
+            Already have an account? <a href="/login" className="text-amber-500 font-semibold hover:underline">Log in</a>
+          </p>
         </div>
-      </main>
-      
+      </div>
       <Footer />
     </div>
   );

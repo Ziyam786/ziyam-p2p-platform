@@ -1,65 +1,75 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
-import { Car } from '../../../components/CarCard';
-
-/* ── Mock car data for the detail page ─────────────────────────── */
-const MOCK_CAR: Car & {
-  description: string;
-  features: string[];
-  pickupAddress: string;
-  hostName: string;
-  hostRating: number;
-  hostTrips: number;
-} = {
-  id: 'c1',
-  make: 'Maruti',
-  model: 'Swift',
-  year: 2022,
-  category: 'Hatchback',
-  transmission: 'Manual',
-  fuelType: 'Petrol',
-  seats: 5,
-  pricePerDay: 1199,
-  rating: 4.5,
-  reviewCount: 382,
-  imageUrl: 'https://imgd.aeplcdn.com/664x374/n/cw/ec/159099/swift-exterior-right-front-three-quarter-6.jpeg',
-  city: 'Bengaluru',
-  available: true,
-  kmIncluded: 300,
-  extraKmCharge: 8,
-  description:
-    'A well-maintained 2022 Maruti Swift in excellent condition. Perfect for city drives and weekend getaways. Non-smoking, pet-free. AC fully functional. Music system with Bluetooth.',
-  features: [
-    'Air Conditioning',
-    'Bluetooth / Aux',
-    'Power Steering',
-    'Central Locking',
-    'Reverse Camera',
-    'USB Charging',
-    'First Aid Kit',
-    'Spare Tyre',
-  ],
-  pickupAddress: 'Koramangala 5th Block, Bengaluru — 560095',
-  hostName: 'Ravi Kumar',
-  hostRating: 4.8,
-  hostTrips: 214,
-};
+import Rating from '../../../components/Rating';
+import { useAuth } from '../../../lib/auth-context';
+import { useToast } from '../../../components/Toast';
+import { carsApi, bookingsApi, settingsApi, promoApi } from '../../../lib/api';
+import type { Car, LongRentalDiscount, Review } from '../../../lib/types';
 
 const INCLUDED_ITEMS = [
-  { icon: '🛣️', label: '300 km/day included' },
   { icon: '⛽', label: 'Fuel not included' },
   { icon: '🛡️', label: 'Basic insurance' },
   { icon: '📞', label: '24/7 roadside support' },
 ];
 
-export default function CarDetailPage({ params }: { params: { id: string } }) {
-  const car = MOCK_CAR; // In production: fetch by params.id
+const PROTECTION_PLANS = [
+  { value: 'BASIC', label: 'Basic', ratePerDay: 0, desc: 'Standard third-party coverage, included free.' },
+  { value: 'STANDARD', label: 'Standard', ratePerDay: 149, desc: 'Reduced liability + roadside assistance.' },
+  { value: 'PREMIUM', label: 'Premium', ratePerDay: 349, desc: 'Zero liability on damage + 24/7 priority support.' },
+] as const;
+
+const LONG_RENTAL_DISCOUNTS_FALLBACK: LongRentalDiscount[] = [
+  { minDays: 3, percent: 0.05 },
+  { minDays: 5, percent: 0.10 },
+  { minDays: 10, percent: 0.15 },
+];
+
+export default function CarDetailPage() {
+  const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const { user } = useAuth();
+  const { show } = useToast();
+
+  const [car, setCar] = useState<(Car & { reviews: Review[] }) | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [activeImg, setActiveImg] = useState('');
   const [pickup, setPickup] = useState('');
   const [dropoff, setDropoff] = useState('');
-  const [activeImg, setActiveImg] = useState(car.imageUrl);
+  const [plan, setPlan] = useState<'BASIC' | 'STANDARD' | 'PREMIUM'>('BASIC');
+  const [submitting, setSubmitting] = useState(false);
+  const [longRentalDiscounts, setLongRentalDiscounts] = useState<LongRentalDiscount[]>(LONG_RENTAL_DISCOUNTS_FALLBACK);
+  const [deliveryMode, setDeliveryMode] = useState<'PICKUP' | 'DELIVERY'>('PICKUP');
+  const [promoInput, setPromoInput] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<{ code: string; discount: number } | null>(null);
+  const [promoError, setPromoError] = useState('');
+  const [promoChecking, setPromoChecking] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    carsApi
+      .get(params.id)
+      .then((res) => {
+        if (!active) return;
+        setCar(res.data);
+        setActiveImg(res.data.images?.[0] ?? '');
+      })
+      .catch(() => active && setNotFound(true))
+      .finally(() => active && setLoading(false));
+    settingsApi
+      .public()
+      .then((res) => {
+        if (active && res.data.long_rental_discounts?.length) setLongRentalDiscounts(res.data.long_rental_discounts);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [params.id]);
 
   const days = useMemo(() => {
     if (!pickup || !dropoff) return 0;
@@ -67,10 +77,87 @@ export default function CarDetailPage({ params }: { params: { id: string } }) {
     return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   }, [pickup, dropoff]);
 
-  const baseFare = days * car.pricePerDay;
-  const platformFee = Math.round(baseFare * 0.08);
-  const securityDeposit = 2000;
-  const total = baseFare + platformFee + securityDeposit;
+  const baseFareRaw = days * (car?.dailyRate ?? 0);
+  const longRentalPercent = useMemo(() => {
+    const eligible = longRentalDiscounts.filter((d) => days >= d.minDays);
+    return eligible.length ? Math.max(...eligible.map((d) => d.percent)) : 0;
+  }, [longRentalDiscounts, days]);
+  const longRentalDiscountAmount = Math.round(baseFareRaw * longRentalPercent);
+  const baseFare = baseFareRaw - longRentalDiscountAmount;
+
+  const protectionFee = days * (PROTECTION_PLANS.find((p) => p.value === plan)?.ratePerDay ?? 0);
+  const deliveryFee = deliveryMode === 'DELIVERY' ? (car?.deliveryFee ?? 0) : 0;
+  const promoDiscount = appliedPromo?.discount ?? 0;
+  const preFeeSubtotal = Math.max(0, baseFare + protectionFee + deliveryFee - promoDiscount);
+  const platformFee = Math.round(preFeeSubtotal * 0.08);
+  const securityDeposit = car?.securityDeposit ?? 0;
+  const total = preFeeSubtotal + platformFee + securityDeposit;
+
+  async function applyPromo() {
+    if (!promoInput.trim()) return;
+    setPromoChecking(true);
+    setPromoError('');
+    try {
+      const res = await promoApi.validate(promoInput.trim(), baseFare + protectionFee + deliveryFee);
+      setAppliedPromo(res.data);
+      show(`Promo applied — ₹${res.data.discount.toLocaleString()} off`, 'success');
+    } catch (err: any) {
+      setPromoError(err.message ?? 'Invalid promo code');
+      setAppliedPromo(null);
+    } finally {
+      setPromoChecking(false);
+    }
+  }
+
+  async function handleBook() {
+    if (!car) return;
+    if (!user) {
+      router.push(`/login?redirect=/cars/${car.id}`);
+      return;
+    }
+    if (days === 0) return;
+
+    setSubmitting(true);
+    try {
+      const res = await bookingsApi.create({
+        carId: car.id,
+        startTime: new Date(pickup).toISOString(),
+        endTime: new Date(dropoff).toISOString(),
+        totalAmount: preFeeSubtotal + platformFee,
+        protectionPlan: plan,
+        deliveryRequested: deliveryMode === 'DELIVERY',
+        promoCode: appliedPromo?.code,
+      });
+      router.push(`/checkout/${res.bookingId}`);
+    } catch (err: any) {
+      show(err.message ?? 'Could not start booking', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-400">Loading car…</p>
+      </div>
+    );
+  }
+
+  if (notFound || !car) {
+    return (
+      <div className="min-h-screen bg-gray-50 font-sans">
+        <Navbar />
+        <div className="max-w-xl mx-auto px-4 pt-40 pb-24 text-center">
+          <span className="text-5xl block mb-4">🚗</span>
+          <h1 className="text-xl font-bold text-gray-900 mb-2">Car not found</h1>
+          <p className="text-gray-500 text-sm mb-6">This listing may have been removed or delisted.</p>
+          <a href="/cars" className="text-amber-500 font-semibold underline">Browse other cars</a>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
@@ -90,23 +177,25 @@ export default function CarDetailPage({ params }: { params: { id: string } }) {
           <div className="lg:col-span-2 space-y-6">
             {/* Hero image */}
             <div className="rounded-2xl overflow-hidden h-72 md:h-96 bg-gray-200">
-              <img src={activeImg} alt={`${car.make} ${car.model}`} className="w-full h-full object-cover" />
+              {activeImg && <img src={activeImg} alt={`${car.make} ${car.model}`} className="w-full h-full object-cover" />}
             </div>
 
-            {/* Thumbnails (single source mock) */}
-            <div className="flex gap-3">
-              {[car.imageUrl, car.imageUrl, car.imageUrl].map((img, i) => (
-                <button
-                  key={i}
-                  onClick={() => setActiveImg(img)}
-                  className={`w-20 h-14 rounded-xl overflow-hidden border-2 transition ${
-                    activeImg === img ? 'border-amber-500' : 'border-transparent'
-                  }`}
-                >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
-            </div>
+            {/* Thumbnails */}
+            {car.images.length > 1 && (
+              <div className="flex gap-3">
+                {car.images.map((img, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveImg(img)}
+                    className={`w-20 h-14 rounded-xl overflow-hidden border-2 transition ${
+                      activeImg === img ? 'border-amber-500' : 'border-transparent'
+                    }`}
+                  >
+                    <img src={img} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Car title */}
             <div>
@@ -117,7 +206,12 @@ export default function CarDetailPage({ params }: { params: { id: string } }) {
                 <span className="bg-amber-500 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">
                   {car.category}
                 </span>
-                {car.available ? (
+                {car.instantBook && (
+                  <span className="bg-emerald-100 text-emerald-700 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                    ⚡ Instant Book
+                  </span>
+                )}
+                {car.isAvailable ? (
                   <span className="bg-emerald-100 text-emerald-700 text-xs font-semibold px-2.5 py-0.5 rounded-full">
                     Available
                   </span>
@@ -126,13 +220,20 @@ export default function CarDetailPage({ params }: { params: { id: string } }) {
                     Booked
                   </span>
                 )}
+                {car.securityDeposit === 0 && (
+                  <span className="bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                    💰 Zero Deposit
+                  </span>
+                )}
+                {car.offersDelivery && (
+                  <span className="bg-purple-100 text-purple-700 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                    🚚 Delivery Available
+                  </span>
+                )}
               </div>
               <p className="text-gray-500 text-sm mt-1">📍 {car.city}</p>
-
-              {/* Rating */}
-              <div className="flex items-center gap-2 mt-2">
-                <span className="text-amber-400 font-bold">★ {car.rating.toFixed(1)}</span>
-                <span className="text-gray-500 text-sm">({car.reviewCount} reviews)</span>
+              <div className="mt-2">
+                <Rating value={car.rating} count={car.reviewCount} size="md" />
               </div>
             </div>
 
@@ -142,40 +243,45 @@ export default function CarDetailPage({ params }: { params: { id: string } }) {
                 { icon: '🔧', label: car.transmission },
                 { icon: '⛽', label: car.fuelType },
                 { icon: '💺', label: `${car.seats} Seats` },
-                { icon: '🛣️', label: `${car.kmIncluded} km/day` },
+                { icon: '🛣️', label: `${car.kmIncludedPerDay} km/day` },
                 { icon: '➕', label: `₹${car.extraKmCharge}/extra km` },
               ].map((s) => (
-                <span
-                  key={s.label}
-                  className="bg-gray-100 text-gray-700 text-sm px-3 py-1.5 rounded-full flex items-center gap-1.5"
-                >
+                <span key={s.label} className="bg-gray-100 text-gray-700 text-sm px-3 py-1.5 rounded-full flex items-center gap-1.5">
                   {s.icon} {s.label}
                 </span>
               ))}
             </div>
 
             {/* Description */}
-            <div className="bg-white rounded-2xl p-5 border border-gray-100">
-              <h2 className="font-bold text-gray-900 mb-2">About this car</h2>
-              <p className="text-gray-600 text-sm leading-relaxed">{car.description}</p>
-            </div>
+            {car.description && (
+              <div className="bg-white rounded-2xl p-5 border border-gray-100">
+                <h2 className="font-bold text-gray-900 mb-2">About this car</h2>
+                <p className="text-gray-600 text-sm leading-relaxed">{car.description}</p>
+              </div>
+            )}
 
             {/* Features */}
-            <div className="bg-white rounded-2xl p-5 border border-gray-100">
-              <h2 className="font-bold text-gray-900 mb-4">Features & Amenities</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {car.features.map((f) => (
-                  <div key={f} className="flex items-center gap-2 text-sm text-gray-700">
-                    <span className="text-emerald-500">✓</span> {f}
-                  </div>
-                ))}
+            {car.features.length > 0 && (
+              <div className="bg-white rounded-2xl p-5 border border-gray-100">
+                <h2 className="font-bold text-gray-900 mb-4">Features & Amenities</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {car.features.map((f) => (
+                    <div key={f} className="flex items-center gap-2 text-sm text-gray-700">
+                      <span className="text-emerald-500">✓</span> {f}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* What's included */}
             <div className="bg-white rounded-2xl p-5 border border-gray-100">
               <h2 className="font-bold text-gray-900 mb-4">What's Included</h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="flex flex-col items-center text-center gap-1">
+                  <span className="text-2xl">🛣️</span>
+                  <span className="text-xs text-gray-600">{car.kmIncludedPerDay} km/day included</span>
+                </div>
                 {INCLUDED_ITEMS.map((item) => (
                   <div key={item.label} className="flex flex-col items-center text-center gap-1">
                     <span className="text-2xl">{item.icon}</span>
@@ -186,28 +292,46 @@ export default function CarDetailPage({ params }: { params: { id: string } }) {
             </div>
 
             {/* Host info */}
-            <div className="bg-white rounded-2xl p-5 border border-gray-100 flex items-center gap-5">
-              <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center text-2xl">
-                👤
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">Hosted by</p>
-                <p className="font-bold text-gray-900">{car.hostName}</p>
-                <p className="text-xs text-gray-500">
-                  ★ {car.hostRating.toFixed(1)} · {car.hostTrips} trips
-                </p>
-              </div>
-            </div>
+            {car.owner && (
+              <a
+                href={`/hosts/${car.ownerId}`}
+                className="bg-white rounded-2xl p-5 border border-gray-100 flex items-center gap-5 hover:border-amber-300 transition"
+              >
+                <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center text-2xl overflow-hidden">
+                  {car.owner.avatarUrl ? (
+                    <img src={car.owner.avatarUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    '👤'
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">Hosted by</p>
+                  <p className="font-bold text-gray-900">{car.owner.fullName}</p>
+                  <p className="text-xs text-amber-500 font-semibold">View host profile →</p>
+                </div>
+              </a>
+            )}
 
-            {/* Pickup location */}
+            {/* Reviews */}
             <div className="bg-white rounded-2xl p-5 border border-gray-100">
-              <h2 className="font-bold text-gray-900 mb-2">Pickup Location</h2>
-              <p className="text-sm text-gray-600 flex items-center gap-2">
-                <span className="text-amber-500">📍</span> {car.pickupAddress}
-              </p>
-              <div className="mt-3 h-36 bg-gray-100 rounded-xl flex items-center justify-center text-gray-400 text-sm">
-                Map preview (Google Maps embed)
-              </div>
+              <h2 className="font-bold text-gray-900 mb-4">
+                Reviews {car.reviewCount > 0 && `(${car.reviewCount})`}
+              </h2>
+              {car.reviews.length === 0 ? (
+                <p className="text-sm text-gray-400">No reviews yet. Be the first to rent and review this car.</p>
+              ) : (
+                <div className="space-y-4">
+                  {car.reviews.map((r) => (
+                    <div key={r.id} className="border-b border-gray-50 last:border-0 pb-4 last:pb-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-semibold text-gray-800 text-sm">{r.author?.fullName ?? 'Renter'}</span>
+                        <Rating value={r.rating} />
+                      </div>
+                      {r.comment && <p className="text-sm text-gray-600">{r.comment}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -215,7 +339,7 @@ export default function CarDetailPage({ params }: { params: { id: string } }) {
           <div className="lg:col-span-1">
             <div className="sticky top-24 bg-white rounded-2xl shadow-lg border border-gray-100 p-6 space-y-5">
               <div>
-                <span className="text-3xl font-extrabold text-amber-500">₹{car.pricePerDay.toLocaleString()}</span>
+                <span className="text-3xl font-extrabold text-amber-500">₹{car.dailyRate.toLocaleString()}</span>
                 <span className="text-gray-400 text-sm">/day</span>
               </div>
 
@@ -229,6 +353,7 @@ export default function CarDetailPage({ params }: { params: { id: string } }) {
                 <input
                   type="datetime-local"
                   value={pickup}
+                  min={new Date().toISOString().slice(0, 16)}
                   onChange={(e) => setPickup(e.target.value)}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
                 />
@@ -240,18 +365,140 @@ export default function CarDetailPage({ params }: { params: { id: string } }) {
                 <input
                   type="datetime-local"
                   value={dropoff}
+                  min={pickup || new Date().toISOString().slice(0, 16)}
                   onChange={(e) => setDropoff(e.target.value)}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
                 />
               </div>
 
+              {/* Delivery vs self-pickup */}
+              {days > 0 && car.offersDelivery && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    Pickup Method
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryMode('PICKUP')}
+                      className={`p-2.5 rounded-xl border-2 text-sm font-semibold transition ${
+                        deliveryMode === 'PICKUP' ? 'border-amber-500 bg-amber-50 text-gray-900' : 'border-gray-100 text-gray-500 hover:border-gray-200'
+                      }`}
+                    >
+                      🏠 Self Pickup
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryMode('DELIVERY')}
+                      className={`p-2.5 rounded-xl border-2 text-sm font-semibold transition ${
+                        deliveryMode === 'DELIVERY' ? 'border-amber-500 bg-amber-50 text-gray-900' : 'border-gray-100 text-gray-500 hover:border-gray-200'
+                      }`}
+                    >
+                      🚚 Delivery {car.deliveryFee > 0 ? `(+₹${car.deliveryFee})` : '(Free)'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Protection plan */}
+              {days > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    Protection Plan
+                  </label>
+                  <div className="space-y-2">
+                    {PROTECTION_PLANS.map((p) => (
+                      <button
+                        key={p.value}
+                        type="button"
+                        onClick={() => setPlan(p.value)}
+                        className={`w-full text-left p-3 rounded-xl border-2 transition ${
+                          plan === p.value ? 'border-amber-500 bg-amber-50' : 'border-gray-100 hover:border-gray-200'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="font-semibold text-sm text-gray-900">{p.label}</span>
+                          <span className="text-xs font-bold text-gray-700">
+                            {p.ratePerDay === 0 ? 'Free' : `+₹${p.ratePerDay}/day`}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5">{p.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Promo code */}
+              {days > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    Promo Code
+                  </label>
+                  {appliedPromo ? (
+                    <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                      <span className="text-sm font-semibold text-emerald-700">✓ {appliedPromo.code} applied</span>
+                      <button
+                        type="button"
+                        onClick={() => { setAppliedPromo(null); setPromoInput(''); }}
+                        className="text-xs text-emerald-600 hover:text-emerald-800 underline"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        value={promoInput}
+                        onChange={(e) => { setPromoInput(e.target.value.toUpperCase()); setPromoError(''); }}
+                        placeholder="e.g. ZIYAM10"
+                        className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      />
+                      <button
+                        type="button"
+                        disabled={promoChecking || !promoInput.trim()}
+                        onClick={applyPromo}
+                        className="bg-gray-900 hover:bg-black disabled:bg-gray-200 text-white text-sm font-semibold px-4 rounded-xl transition"
+                      >
+                        {promoChecking ? '…' : 'Apply'}
+                      </button>
+                    </div>
+                  )}
+                  {promoError && <p className="text-xs text-red-500 mt-1">{promoError}</p>}
+                </div>
+              )}
+
               {/* Fare breakdown */}
               {days > 0 && (
                 <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
                   <div className="flex justify-between text-gray-700">
-                    <span>₹{car.pricePerDay.toLocaleString()} × {days} day{days > 1 ? 's' : ''}</span>
-                    <span>₹{baseFare.toLocaleString()}</span>
+                    <span>₹{car.dailyRate.toLocaleString()} × {days} day{days > 1 ? 's' : ''}</span>
+                    <span>₹{baseFareRaw.toLocaleString()}</span>
                   </div>
+                  {longRentalDiscountAmount > 0 && (
+                    <div className="flex justify-between text-emerald-600">
+                      <span>Long rental discount ({Math.round(longRentalPercent * 100)}%)</span>
+                      <span>−₹{longRentalDiscountAmount.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {protectionFee > 0 && (
+                    <div className="flex justify-between text-gray-500">
+                      <span>{plan} protection</span>
+                      <span>₹{protectionFee.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {deliveryFee > 0 && (
+                    <div className="flex justify-between text-gray-500">
+                      <span>Doorstep delivery</span>
+                      <span>₹{deliveryFee.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {promoDiscount > 0 && (
+                    <div className="flex justify-between text-emerald-600">
+                      <span>Promo ({appliedPromo?.code})</span>
+                      <span>−₹{promoDiscount.toLocaleString()}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-gray-500">
                     <span>Platform fee (8%)</span>
                     <span>₹{platformFee.toLocaleString()}</span>
@@ -269,10 +516,19 @@ export default function CarDetailPage({ params }: { params: { id: string } }) {
               )}
 
               <button
-                disabled={!car.available || days === 0}
-                className="w-full bg-amber-500 hover:bg-amber-600 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition text-base"
+                disabled={!car.isAvailable || days === 0 || submitting}
+                onClick={handleBook}
+                className="w-full btn-gradient active:scale-[0.98] disabled:!bg-none disabled:bg-gray-200 disabled:!shadow-none disabled:text-gray-400 disabled:cursor-not-allowed disabled:active:scale-100 text-white font-bold py-3.5 rounded-xl transition-transform text-base"
               >
-                {!car.available ? 'Car Unavailable' : days === 0 ? 'Select Dates to Book' : 'Proceed to Book'}
+                {submitting
+                  ? 'Starting booking…'
+                  : !car.isAvailable
+                  ? 'Car Unavailable'
+                  : days === 0
+                  ? 'Select Dates to Book'
+                  : user
+                  ? 'Proceed to Book'
+                  : 'Log In to Book'}
               </button>
 
               <p className="text-xs text-gray-400 text-center">

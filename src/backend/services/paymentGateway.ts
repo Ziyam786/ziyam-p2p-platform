@@ -1,41 +1,68 @@
 import { config } from '../config';
+import { generatePayuHash } from '../utils/payuHash';
 
-interface SplitPaymentParams {
+interface InitiateCheckoutParams {
+  bookingId: string;
   amount: number;
-  currency: string;
-  destinationAccountId: string;
-  platformFeeAmount: number;
-  metadata?: Record<string, string>;
+  customerName: string;
+  customerEmail: string;
+  productInfo: string;
 }
 
-interface SplitPaymentResult {
-  id: string;
-  clientSecret: string;
+export interface PayuCheckoutSession {
+  /** PayU's transaction id for this attempt — stored as Booking.paymentIntentId. */
+  txnid: string;
+  /** The URL the browser must POST `fields` to (PayU's hosted checkout page). */
+  checkoutUrl: string;
+  /** Hidden form fields to auto-submit, including the computed hash. */
+  fields: Record<string, string>;
 }
 
 /**
- * Thin abstraction over the split-payment provider so routes/services
- * don't depend on a specific SDK. Implement the marked methods against
- * Razorpay Route, Stripe Connect, or Cashfree.
+ * PayU Hosted Checkout integration (https://docs.payu.in/docs/generate-hash-payu-hosted).
+ *
+ * We collect the FULL booking amount into our own (aggregator) PayU merchant
+ * account here — hosts are paid out later on the existing N+1 escrow schedule
+ * via PayoutEngine, which calls PayU's Split After Transaction API. This
+ * matches our escrow/hold-then-release model; PayU's split-at-checkout
+ * feature (splitRequest) would send the host's cut instantly and bypass N+1,
+ * so we intentionally don't use it here.
  */
 class PaymentGateway {
-  async createSplitPayment(params: SplitPaymentParams): Promise<SplitPaymentResult> {
-    if (config.nodeEnv === 'production' && !config.payments.apiKey) {
-      throw new Error(`${config.payments.provider} API key is not configured`);
+  async initiateCheckout(params: InitiateCheckoutParams): Promise<PayuCheckoutSession> {
+    if (config.nodeEnv === 'production' && (!config.payu.key || !config.payu.salt)) {
+      throw new Error('PayU key/salt are not configured');
     }
-    // TODO: call the real provider, e.g. Razorpay Route:
-    // const order = await razorpay.orders.create({
-    //   amount: params.amount * 100,
-    //   currency: params.currency,
-    //   transfers: [{ account: params.destinationAccountId, amount: (params.amount - params.platformFeeAmount) * 100 }],
-    // });
-    const id = `pi_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
-    return { id, clientSecret: `${id}_secret` };
-  }
 
-  async releaseFunds(paymentIntentId: string): Promise<void> {
-    // TODO: call provider's transfer/payout release for the given payment intent.
-    console.log(`[PAYMENT GATEWAY] Released funds for ${paymentIntentId}`);
+    const txnid = `ziyam_${params.bookingId.slice(0, 8)}_${Date.now()}`;
+    const amount = params.amount.toFixed(2);
+    const [firstname, ...rest] = params.customerName.trim().split(' ');
+
+    const hash = generatePayuHash({
+      txnid,
+      amount,
+      productinfo: params.productInfo,
+      firstname: firstname || params.customerName,
+      email: params.customerEmail,
+      udf1: params.bookingId,
+    });
+
+    const fields: Record<string, string> = {
+      key: config.payu.key,
+      txnid,
+      amount,
+      productinfo: params.productInfo,
+      firstname: firstname || params.customerName,
+      lastname: rest.join(' '),
+      email: params.customerEmail,
+      phone: '',
+      udf1: params.bookingId,
+      surl: `${config.serverUrl}/api/payments/payu/callback`,
+      furl: `${config.serverUrl}/api/payments/payu/callback`,
+      hash,
+    };
+
+    return { txnid, checkoutUrl: config.payu.checkoutUrl, fields };
   }
 }
 

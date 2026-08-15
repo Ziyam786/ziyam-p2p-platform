@@ -145,7 +145,7 @@ export default function HowItWorksPage() {
           <div className="text-center mt-12">
             <a
               href="/cars"
-              className="inline-block bg-amber-500 hover:bg-amber-600 text-white font-bold px-10 py-4 rounded-xl text-base transition shadow-lg"
+              className="inline-block btn-gradient text-white font-bold px-10 py-4 rounded-xl text-base transition shadow-lg"
             >
               Browse Cars Now
             </a>
