@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import type { Car } from '../lib/types';
 import { settingsApi } from '../lib/api';
+import FeaturePicker from './FeaturePicker';
+import AddressAutocomplete from './AddressAutocomplete';
 
 const CATEGORIES_FALLBACK = ['Hatchback', 'Sedan', 'SUV', 'Luxury', 'EV', 'MUV'];
 const FUEL_TYPES = ['Petrol', 'Diesel', 'Electric', 'CNG'];
@@ -12,14 +14,15 @@ const CITIES_FALLBACK = ['Bengaluru', 'Mumbai', 'Delhi NCR', 'Hyderabad', 'Chenn
 export interface CarFormValues {
   make: string; model: string; registrationNo: string; year: number; category: string;
   fuelType: string; transmission: string; seats: number; dailyRate: number; securityDeposit: number;
-  kmIncludedPerDay: number; extraKmCharge: number; city: string; description: string;
+  kmIncludedPerDay: number; extraKmCharge: number; city: string; address: string;
+  latitude: number | null; longitude: number | null; description: string;
   images: string; features: string; instantBook: boolean; offersDelivery: boolean; deliveryFee: number;
 }
 
 const DEFAULTS: CarFormValues = {
   make: '', model: '', registrationNo: '', year: new Date().getFullYear(), category: 'Hatchback',
   fuelType: 'Petrol', transmission: 'Manual', seats: 5, dailyRate: 1200, securityDeposit: 3000,
-  kmIncludedPerDay: 300, extraKmCharge: 10, city: 'Bengaluru', description: '',
+  kmIncludedPerDay: 300, extraKmCharge: 10, city: 'Bengaluru', address: '', latitude: null, longitude: null, description: '',
   images: '', features: 'Air Conditioning, Bluetooth / Aux, Power Steering', instantBook: true,
   offersDelivery: false, deliveryFee: 0,
 };
@@ -29,7 +32,8 @@ export function carToFormValues(car: Car): CarFormValues {
     make: car.make, model: car.model, registrationNo: car.registrationNo, year: car.year, category: car.category,
     fuelType: car.fuelType, transmission: car.transmission, seats: car.seats, dailyRate: car.dailyRate,
     securityDeposit: car.securityDeposit, kmIncludedPerDay: car.kmIncludedPerDay, extraKmCharge: car.extraKmCharge,
-    city: car.city, description: car.description ?? '', images: car.images.join(', '), features: car.features.join(', '),
+    city: car.city, address: car.address ?? '', latitude: car.latitude ?? null, longitude: car.longitude ?? null,
+    description: car.description ?? '', images: car.images.join(', '), features: car.features.join(', '),
     instantBook: car.instantBook, offersDelivery: car.offersDelivery, deliveryFee: car.deliveryFee,
   };
 }
@@ -40,6 +44,7 @@ export function formValuesToPayload(v: CarFormValues) {
     fuelType: v.fuelType, transmission: v.transmission, seats: Number(v.seats), dailyRate: Number(v.dailyRate),
     securityDeposit: Number(v.securityDeposit), kmIncludedPerDay: Number(v.kmIncludedPerDay),
     extraKmCharge: Number(v.extraKmCharge), city: v.city, description: v.description,
+    address: v.address || undefined, latitude: v.latitude ?? undefined, longitude: v.longitude ?? undefined,
     images: v.images.split(',').map((s) => s.trim()).filter(Boolean),
     features: v.features.split(',').map((s) => s.trim()).filter(Boolean),
     instantBook: v.instantBook, offersDelivery: v.offersDelivery, deliveryFee: Number(v.deliveryFee),
@@ -145,6 +150,19 @@ export default function CarForm({
         </select>
       </Field>
 
+      <Field label="Exact Location">
+        <AddressAutocomplete
+          value={values.address}
+          onChange={(address) => set('address', address)}
+          onSelect={(sel) => {
+            set('address', sel.address);
+            set('latitude', sel.latitude);
+            set('longitude', sel.longitude);
+          }}
+          placeholder="Search for the car's pickup address…"
+        />
+      </Field>
+
       <Field label="Description">
         <textarea value={values.description} onChange={(e) => set('description', e.target.value)} rows={3} className={inputCls} placeholder="A well-maintained car, perfect for city drives..." />
       </Field>
@@ -153,8 +171,11 @@ export default function CarForm({
         <input value={values.images} onChange={(e) => set('images', e.target.value)} className={inputCls} placeholder="https://... , https://..." />
       </Field>
 
-      <Field label="Features (comma-separated)">
-        <input value={values.features} onChange={(e) => set('features', e.target.value)} className={inputCls} />
+      <Field label="Features">
+        <FeaturePicker
+          selected={values.features.split(',').map((s) => s.trim()).filter(Boolean)}
+          onChange={(next) => set('features', next.join(', '))}
+        />
       </Field>
 
       <div className="space-y-3">

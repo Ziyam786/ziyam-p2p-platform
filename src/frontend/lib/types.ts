@@ -6,6 +6,8 @@ export type PayoutStatus = 'HELD_IN_ESCROW' | 'QUEUED_FOR_N1' | 'SETTLED' | 'FAI
 
 export type ProtectionPlan = 'BASIC' | 'STANDARD' | 'PREMIUM';
 
+export type CarVerificationStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
+
 export interface PublicUser {
   id: string;
   fullName: string;
@@ -17,13 +19,22 @@ export interface PublicUser {
   avatarUrl?: string | null;
   bio?: string | null;
   payoutAccountId?: string | null;
+  bankAccountNumber?: string | null;
+  bankIfsc?: string | null;
+  bankNameAtBank?: string | null;
+  bankAccountVerified?: boolean;
+  signatureUrl?: string | null;
+  selfieUrl?: string | null;
+  alternatePhoneNumber?: string | null;
+  referralCode?: string | null;
+  creditsBalance?: number;
   createdAt: string;
 }
 
 export interface Car {
   id: string;
   ownerId: string;
-  owner?: { id?: string; fullName: string; avatarUrl?: string | null; bio?: string | null; createdAt?: string };
+  owner?: { id?: string; fullName: string; avatarUrl?: string | null; bio?: string | null; createdAt?: string; signatureUrl?: string | null };
   make: string;
   model: string;
   registrationNo: string;
@@ -40,14 +51,32 @@ export interface Car {
   images: string[];
   features: string[];
   city: string;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   isAvailable: boolean;
   instantBook: boolean;
   featured: boolean;
   offersDelivery: boolean;
   deliveryFee: number;
+  offersPickup: boolean;
+  pickupFee: number;
   rating: number;
   reviewCount: number;
   createdAt: string;
+
+  verificationStatus: CarVerificationStatus;
+  rcDocUrl?: string | null;
+  pollutionCertUrl?: string | null;
+  insuranceDocUrl?: string | null;
+  onboardingStep: number;
+
+  noNightBookings: boolean;
+  nightBookingStart: string;
+  nightBookingEnd: string;
+  minInterBookingHours: number;
+  minBookingHours: number;
+  maxBookingDays: number;
 }
 
 export interface Booking {
@@ -55,7 +84,7 @@ export interface Booking {
   carId: string;
   car?: Car;
   customerId: string;
-  customer?: { fullName: string; email: string };
+  customer?: { id?: string; fullName: string; email: string; signatureUrl?: string | null };
   startTime: string;
   endTime: string;
   totalAmount: number;
@@ -67,6 +96,9 @@ export interface Booking {
   status: BookingStatus;
   paymentIntentId?: string | null;
   review?: Review | null;
+  esignRequestId?: string | null;
+  esignStatus?: string | null;
+  esignDownloadUrl?: string | null;
   createdAt: string;
 }
 
@@ -97,6 +129,29 @@ export interface UtilizationEntry {
   utilizationPercent: number;
 }
 
+export interface IncentiveTarget {
+  met: boolean;
+  current: number;
+  target: number;
+  unit: string;
+  currentDays?: number;
+  targetDays?: number;
+}
+
+export interface IncentiveProgress {
+  month: string;
+  daysRemaining: number;
+  daysElapsedThisMonth: number;
+  allMet: boolean;
+  bonusPercent: number;
+  targets: {
+    fulfillment: IncentiveTarget;
+    listingDays: IncentiveTarget;
+    rating: IncentiveTarget;
+    bookings: IncentiveTarget;
+  };
+}
+
 export interface TrustBadge { label: string; sub: string; }
 export interface CategoryDef { label: string; icon: string; desc: string; }
 export interface CityDef { name: string; emoji: string; }
@@ -124,6 +179,27 @@ export interface PromoCode {
   usedCount: number;
   active: boolean;
   expiresAt?: string | null;
+  createdAt: string;
+}
+
+export type ServiceRequestStatus = 'REQUESTED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
+
+export interface ServiceCatalogEntry {
+  serviceType: string;
+  description: string;
+  priceFrom: number;
+}
+
+export interface ServiceRequest {
+  id: string;
+  carId: string;
+  serviceType: string;
+  priceEstimate: number;
+  scheduledDate: string;
+  serviceLocation: string;
+  status: ServiceRequestStatus;
+  notes?: string | null;
+  fleetExpenseId?: string | null;
   createdAt: string;
 }
 

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import ProtectedRoute from '../../../components/ProtectedRoute';
 import Tabs from '../../../components/Tabs';
 import StatCard from '../../../components/StatCard';
@@ -19,7 +20,8 @@ const EMPTY: EarningsOverview = {
 function DashboardInner() {
   const { user } = useAuth();
   const { show } = useToast();
-  const [tab, setTab] = useState('overview');
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState(searchParams.get('tab') ?? 'overview');
   const [metrics, setMetrics] = useState<EarningsOverview>(EMPTY);
   const [cars, setCars] = useState<Car[]>([]);
   const [utilization, setUtilization] = useState<UtilizationEntry[]>([]);
@@ -131,6 +133,9 @@ function DashboardInner() {
                     {car.isAvailable ? 'Live' : 'Delisted'}
                   </span>
                   <div className="flex gap-2">
+                    <a href={`/host/cars/${car.id}/manage`} className="text-xs font-semibold border border-amber-500/50 hover:border-amber-500 text-amber-400 px-3 py-2 rounded-lg transition">
+                      Manage
+                    </a>
                     <a href={`/host/cars/${car.id}/edit`} className="text-xs font-semibold border border-gray-700 hover:border-amber-500 text-gray-300 hover:text-amber-400 px-3 py-2 rounded-lg transition">
                       Edit
                     </a>
@@ -195,7 +200,9 @@ function Policy({ title, body }: { title: string; body: string }) {
 export default function FleetOperatorDashboard() {
   return (
     <ProtectedRoute roles={['SELF_HOST', 'FLEET_OPERATOR']}>
-      <DashboardInner />
+      <Suspense fallback={<div className="min-h-screen bg-gray-950" />}>
+        <DashboardInner />
+      </Suspense>
     </ProtectedRoute>
   );
 }

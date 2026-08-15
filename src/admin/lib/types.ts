@@ -143,3 +143,59 @@ export interface ChatMessageRow {
   content: string;
   createdAt: string;
 }
+
+/* ── Fleet Financial Dashboard & Ledger System ───────────────────────── */
+export type RentalPlatform = 'ZOOMCAR' | 'REVV' | 'BHARAT' | 'MARC8';
+export type LedgerCategory = 'FASTAG' | 'FUEL' | 'INSTANCES' | 'WASHING' | 'DAMAGE';
+export type FleetExpenseType = 'ROUTINE_MAINTENANCE' | 'INSURANCE_PREMIUMS' | 'STATE_PERMITS' | 'ROAD_TAX' | 'DRIVER_SALARIES' | 'GENERAL_ADMIN';
+export type PaymentMode = 'CASH' | 'UPI' | 'CORPORATE_CARD' | 'FLEET_FUEL_CARD';
+
+export interface PlatformBookingEntry {
+  id: string;
+  carId: string;
+  car?: { make: string; model: string; registrationNo: string };
+  platform: RentalPlatform;
+  externalBookingId: string;
+  bookedAt: string;
+  totalFare: number;
+  doorstepCharges: number;
+  platformCommission?: number | null;
+  createdAt: string;
+}
+
+export interface JournalEntryRow {
+  id: string;
+  carId: string;
+  car?: { make: string; model: string; registrationNo: string };
+  collectionDate: string;
+  amountCollected: number;
+  totalAmount: number;
+  category: LedgerCategory;
+  remarks?: string | null;
+  createdAt: string;
+}
+
+export interface FleetExpenseRow {
+  id: string;
+  expenseType: FleetExpenseType;
+  carId?: string | null;
+  car?: { make: string; model: string; registrationNo: string } | null;
+  paymentMode: PaymentMode;
+  amount: number;
+  date: string;
+  description?: string | null;
+  createdAt: string;
+}
+
+export interface FleetSummary {
+  totalRevenue: number;
+  totalCollected: number;
+  totalExpenses: number;
+  netPosition: number;
+  revenueByPlatform: Record<string, number>;
+  collectedByCategory: Record<string, number>;
+  expensesByType: Record<string, number>;
+  bookingCount: number;
+  journalEntryCount: number;
+  expenseCount: number;
+}

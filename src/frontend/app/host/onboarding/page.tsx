@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
-import CarForm, { formValuesToPayload, type CarFormValues } from '../../../components/CarForm';
+import CarOnboardingWizard, { wizardValuesToPayload, type WizardValues } from '../../../components/CarOnboardingWizard';
 import { useAuth } from '../../../lib/auth-context';
 import { useToast } from '../../../components/Toast';
 import { kycApi, hostApi } from '../../../lib/api';
@@ -46,11 +46,11 @@ export default function HostOnboardingPage() {
     }
   }
 
-  async function submitCar(values: CarFormValues) {
+  async function submitCar(values: WizardValues) {
     if (!user) return;
     setCarSubmitting(true);
     try {
-      await hostApi.addCar(user.id, formValuesToPayload(values));
+      await hostApi.addCar(user.id, wizardValuesToPayload(values));
       setHasCar(true);
       show('Your first car is live!', 'success');
     } catch (err: any) {
@@ -116,8 +116,7 @@ export default function HostOnboardingPage() {
           </div>
         ) : currentStep === 2 ? (
           <div className="bg-white rounded-2xl border border-gray-100 p-6">
-            <p className="font-bold text-gray-900 mb-4">Tell us about your car</p>
-            <CarForm submitLabel="List My Car" submitting={carSubmitting} onSubmit={submitCar} />
+            <CarOnboardingWizard submitting={carSubmitting} onSubmit={submitCar} />
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">

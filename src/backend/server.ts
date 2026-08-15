@@ -18,6 +18,8 @@ import promoCodeRoutes from './routes/promoCode.routes';
 import payuCallbackRoutes from './routes/payuCallback.routes';
 import wishlistRoutes from './routes/wishlist.routes';
 import notificationRoutes from './routes/notification.routes';
+import fleetLedgerRoutes from './routes/fleetLedger.routes';
+import serviceRequestRoutes from './routes/serviceRequest.routes';
 
 const app = express();
 
@@ -83,6 +85,8 @@ app.use('/api', aiRoutes);
 app.use('/api', promoCodeRoutes);
 app.use('/api', wishlistRoutes);
 app.use('/api', notificationRoutes);
+app.use('/api', fleetLedgerRoutes);
+app.use('/api', serviceRequestRoutes);
 
 // 404 handler for unmatched API routes
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));

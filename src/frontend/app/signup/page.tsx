@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import { useAuth } from '../../lib/auth-context';
@@ -13,9 +13,11 @@ const ROLES = [
   { value: 'FLEET_OPERATOR', label: 'Fleet operator', desc: 'Manage multiple vehicles as a business', icon: '🏢' },
 ];
 
-export default function SignupPage() {
+function SignupInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { signup } = useAuth();
+  const referralCode = searchParams.get('ref') ?? undefined;
 
   const [role, setRole] = useState('CUSTOMER');
   const [fullName, setFullName] = useState('');
@@ -30,7 +32,7 @@ export default function SignupPage() {
     setError('');
     setLoading(true);
     try {
-      await signup({ fullName, email, phoneNumber, password, role });
+      await signup({ fullName, email, phoneNumber, password, role, referralCode });
       if (role === 'SELF_HOST' || role === 'FLEET_OPERATOR') router.push('/host/onboarding');
       else router.push('/account');
     } catch (err) {
@@ -47,6 +49,12 @@ export default function SignupPage() {
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
           <h1 className="text-2xl font-extrabold text-gray-900 mb-1">Create your account</h1>
           <p className="text-gray-500 text-sm mb-6">Join India's trusted P2P self-drive community</p>
+
+          {referralCode && (
+            <div className="bg-emerald-50 text-emerald-700 text-sm rounded-xl px-4 py-3 mb-4">
+              🎁 You were invited with code <span className="font-bold">{referralCode}</span> — your friend earns a reward after your first trip!
+            </div>
+          )}
 
           {error && <div className="bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 mb-4">{error}</div>}
 
@@ -129,5 +137,13 @@ export default function SignupPage() {
       </div>
       <Footer />
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50" />}>
+      <SignupInner />
+    </Suspense>
   );
 }

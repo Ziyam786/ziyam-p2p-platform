@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
+import { generateChatReply } from '../services/aiService';
+import { FleetService } from '../services/fleetService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -88,9 +90,20 @@ router.patch('/cars/:id', requireAuth, async (req: Request, res: Response) => {
   const {
     make, model, year, category, fuelType, transmission, seats,
     dailyRate, securityDeposit, kmIncludedPerDay, extraKmCharge,
-    description, images, features, city, isAvailable, instantBook,
-    offersDelivery, deliveryFee,
+    description, images, features, city, address, latitude, longitude, isAvailable, instantBook,
+    offersDelivery, deliveryFee, offersPickup, pickupFee,
+    rcDocUrl, pollutionCertUrl, insuranceDocUrl, onboardingStep,
+    noNightBookings, nightBookingStart, nightBookingEnd,
+    minInterBookingHours, minBookingHours, maxBookingDays,
   } = req.body;
+
+  // Documents are self-attested at this stage (no live DigiLocker/RTO integration yet —
+  // same "stub as instant pass" pattern as kyc.routes.ts). Once all three are on file we
+  // mark the car verified so the host UI can show the green "Verified" badge.
+  const nextRc = rcDocUrl !== undefined ? rcDocUrl : car.rcDocUrl;
+  const nextPollution = pollutionCertUrl !== undefined ? pollutionCertUrl : car.pollutionCertUrl;
+  const nextInsurance = insuranceDocUrl !== undefined ? insuranceDocUrl : car.insuranceDocUrl;
+  const docsComplete = Boolean(nextRc && nextPollution && nextInsurance);
 
   const updated = await prisma.car.update({
     where: { id },
@@ -110,13 +123,63 @@ router.patch('/cars/:id', requireAuth, async (req: Request, res: Response) => {
       ...(images !== undefined && { images }),
       ...(features !== undefined && { features }),
       ...(city !== undefined && { city }),
+      ...(address !== undefined && { address }),
+      ...(latitude !== undefined && { latitude: latitude === null ? null : Number(latitude) }),
+      ...(longitude !== undefined && { longitude: longitude === null ? null : Number(longitude) }),
       ...(isAvailable !== undefined && { isAvailable }),
       ...(instantBook !== undefined && { instantBook }),
       ...(offersDelivery !== undefined && { offersDelivery }),
       ...(deliveryFee !== undefined && { deliveryFee }),
+      ...(offersPickup !== undefined && { offersPickup }),
+      ...(pickupFee !== undefined && { pickupFee }),
+      ...(rcDocUrl !== undefined && { rcDocUrl }),
+      ...(pollutionCertUrl !== undefined && { pollutionCertUrl }),
+      ...(insuranceDocUrl !== undefined && { insuranceDocUrl }),
+      ...(docsComplete && { verificationStatus: 'VERIFIED' as const }),
+      ...(onboardingStep !== undefined && { onboardingStep: Number(onboardingStep) }),
+      ...(noNightBookings !== undefined && { noNightBookings }),
+      ...(nightBookingStart !== undefined && { nightBookingStart }),
+      ...(nightBookingEnd !== undefined && { nightBookingEnd }),
+      ...(minInterBookingHours !== undefined && { minInterBookingHours: Number(minInterBookingHours) }),
+      ...(minBookingHours !== undefined && { minBookingHours: Number(minBookingHours) }),
+      ...(maxBookingDays !== undefined && { maxBookingDays: Number(maxBookingDays) }),
     },
   });
   res.json({ success: true, data: updated });
+});
+
+// AI-generated pro/con summary of a car's guest reviews (reuses the Claude wrapper
+// already wired up for the support chatbot — see aiService.ts).
+router.get('/cars/:id/review-summary', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const reviews = await prisma.review.findMany({
+    where: { carId: id, comment: { not: null } },
+    orderBy: { createdAt: 'desc' },
+    take: 30,
+  });
+
+  if (reviews.length === 0) {
+    return res.json({ success: true, data: { summary: null, positiveTags: [], negativeTags: [] } });
+  }
+
+  const transcript = reviews.map((r) => `${r.rating}★: ${r.comment}`).join('\n');
+  const prompt =
+    'You summarize guest reviews for a car rental host. Given the reviews below, respond with ONLY a JSON object ' +
+    '(no markdown fences, no prose) of the shape {"summary": string (1-2 sentences), "positiveTags": string[] (max 5, ' +
+    'short 1-3 word phrases like "car condition"), "negativeTags": string[] (max 3, same style)}. ' +
+    'If everything is positive, negativeTags can be empty.\n\nReviews:\n' + transcript;
+
+  const raw = await generateChatReply('You are a concise, neutral review summarizer that outputs strict JSON only.', [
+    { role: 'user', content: prompt },
+  ]);
+
+  try {
+    const cleaned = raw.trim().replace(/^```json\s*|\s*```$/g, '');
+    const parsed = JSON.parse(cleaned);
+    res.json({ success: true, data: { summary: parsed.summary ?? null, positiveTags: parsed.positiveTags ?? [], negativeTags: parsed.negativeTags ?? [] } });
+  } catch {
+    res.json({ success: true, data: { summary: raw, positiveTags: [], negativeTags: [] } });
+  }
 });
 
 // Soft-delete (delist) rather than a hard delete, since bookings reference the car.
@@ -128,6 +191,19 @@ router.delete('/cars/:id', requireAuth, async (req: Request, res: Response) => {
 
   await prisma.car.update({ where: { id }, data: { isAvailable: false } });
   res.json({ success: true, message: 'Listing delisted' });
+});
+
+// Host incentive-plan progress for this car, current month.
+router.get('/cars/:id/incentives', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const car = await prisma.car.findUnique({ where: { id } });
+  if (!car) return res.status(404).json({ error: 'Car not found' });
+  if (car.ownerId !== req.user!.userId && req.user!.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Not your listing' });
+  }
+
+  const progress = await FleetService.getIncentiveProgress(id);
+  res.json({ success: true, data: progress });
 });
 
 export default router;
