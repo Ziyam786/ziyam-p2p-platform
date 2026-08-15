@@ -1,5 +1,10 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { AuthProvider } from '../lib/auth-context';
+import { WishlistProvider } from '../lib/wishlist-context';
+import { ToastProvider } from '../components/Toast';
+import ChatWidget from '../components/ChatWidget';
+import CustomCursor from '../components/CustomCursor';
 
 export const metadata: Metadata = {
   title: "ZiyamSelfDrive — India's P2P Self-Drive Car Rental",
@@ -19,7 +24,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <AuthProvider>
+          <WishlistProvider>
+            <ToastProvider>
+              {children}
+              <ChatWidget />
+              <CustomCursor />
+            </ToastProvider>
+          </WishlistProvider>
+        </AuthProvider>
+      </body>
     </html>
   );
 }

@@ -6,46 +6,43 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/backend/server.ts",
     "build": "tsc -p tsconfig.json",
-    "frontend:dev": "next dev src/frontend",
-    "frontend:build": "next build src/frontend",
-    "frontend:start": "next start src/frontend",
     "start": "node dist/backend/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "ts-node --transpile-only prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "ts-node --transpile-only prisma/seed.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
     "@prisma/client": "^5.18.0",
     "axios": "^1.7.4",
     "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "node-cron": "^3.0.3",
-    "uuid": "^9.0.1",
-    "next": "14.2.35",
-    "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.7",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
-    "@types/jsonwebtoken": "^9.0.7",
+    "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20.14.9",
     "@types/node-cron": "^3.0.11",
     "@types/uuid": "^9.0.8",
     "prisma": "^5.18.0",
+    "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.5.3",
-    "@types/react": "18.3.12",
-    "@types/react-dom": "18.3.1",
-    "autoprefixer": "10.4.20",
-    "postcss": "8.4.47",
-    "tailwindcss": "3.4.17"
+    "typescript": "^5.5.3"
   },
   "engines": {
     "node": ">=20.0.0"

@@ -9,14 +9,18 @@ function requireEnv(name: string, fallback?: string): string {
   return value;
 }
 
-if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
-  throw new Error('JWT_SECRET must be set in production');
-}
-
 export const config = {
   port: Number(process.env.PORT ?? 5000),
   clientUrl: process.env.CLIENT_URL ?? '*',
+  adminUrl: process.env.ADMIN_URL ?? 'http://localhost:3002',
+  serverUrl: process.env.SERVER_URL ?? `http://localhost:${Number(process.env.PORT ?? 5000)}`,
   nodeEnv: process.env.NODE_ENV ?? 'development',
+
+  auth: {
+    jwtSecret: process.env.JWT_SECRET ?? 'dev_insecure_secret_change_me',
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '30d',
+    cookieName: 'ziyam_session',
+  },
 
   payout: {
     platformCommission: Number(process.env.PLATFORM_COMMISSION_PERCENTAGE ?? 0.3),
@@ -31,11 +35,15 @@ export const config = {
     webhookSecret: process.env.PAYMENT_WEBHOOK_SECRET ?? '',
   },
 
-  auth: {
-    jwtSecret: process.env.JWT_SECRET ?? 'dev-only-insecure-secret-change-me',
-    jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '15m',
-    refreshTokenExpiresInDays: Number(process.env.REFRESH_TOKEN_EXPIRES_IN_DAYS ?? 30),
-    bcryptSaltRounds: Number(process.env.BCRYPT_SALT_ROUNDS ?? 12),
+  payu: {
+    mode: process.env.PAYU_MODE ?? 'test', // 'test' | 'live'
+    key: process.env.PAYU_KEY ?? '',
+    salt: process.env.PAYU_SALT ?? '',
+    clientId: process.env.PAYU_CLIENT_ID ?? '',
+    clientSecret: process.env.PAYU_CLIENT_SECRET ?? '',
+    get checkoutUrl() {
+      return this.mode === 'live' ? 'https://secure.payu.in/_payment' : 'https://test.payu.in/_payment';
+    },
   },
 
   telematics: {
@@ -46,6 +54,11 @@ export const config = {
   kyc: {
     provider: process.env.KYC_PROVIDER ?? 'digilocker',
     apiKey: process.env.KYC_API_KEY ?? '',
+  },
+
+  ai: {
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? '',
+    model: process.env.AI_MODEL ?? 'claude-haiku-4-5-20251001',
   },
 };
 

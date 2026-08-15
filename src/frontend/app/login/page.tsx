@@ -1,93 +1,96 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
-import { login } from '../../lib/auth';
+import { useAuth } from '../../lib/auth-context';
+import { ApiError } from '../../lib/api';
 
-export default function LoginPage() {
+function LoginInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { login } = useAuth();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
-      window.location.href = '/user/dashboard';
-    } catch (err: any) {
-      setError(err.message || 'Login failed. Please try again.');
+      const user = await login(email, password);
+      const redirect = searchParams.get('redirect');
+      if (redirect) router.push(redirect);
+      else if (user.role === 'SELF_HOST' || user.role === 'FLEET_OPERATOR') router.push('/host/dashboard');
+      else if (user.role === 'ADMIN') router.push('/admin/dashboard');
+      else router.push('/account');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+    <div className="min-h-screen bg-gray-50 font-sans">
       <Navbar />
-      
-      <main className="flex-1 flex items-center justify-center pt-24 pb-16 px-4">
-        <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100 max-w-md w-full">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-extrabold text-gray-900 mb-2">Welcome Back</h1>
-            <p className="text-sm text-gray-500">Log in to access your bookings and trips.</p>
-          </div>
-          
-          <form onSubmit={handleLogin} className="space-y-5">
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
-                {error}
-              </div>
-            )}
+      <div className="max-w-md mx-auto px-4 pt-32 pb-24">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+          <h1 className="text-2xl font-extrabold text-gray-900 mb-1">Welcome back</h1>
+          <p className="text-gray-500 text-sm mb-6">Log in to book cars or manage your listings</p>
+
+          {error && <div className="bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 mb-4">{error}</div>}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase mb-2">Email Address</label>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Email</label>
               <input
                 type="email"
+                required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500 bg-gray-50 text-sm"
-                placeholder="name@example.com"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                placeholder="you@example.com"
               />
             </div>
-            
             <div>
-              <div className="flex justify-between mb-2">
-                <label className="block text-xs font-semibold text-gray-700 uppercase">Password</label>
-                <a href="#" className="text-xs text-amber-600 hover:underline">Forgot password?</a>
-              </div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Password</label>
               <input
                 type="password"
+                required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500 bg-gray-50 text-sm"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
                 placeholder="••••••••"
               />
             </div>
-            
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white font-bold py-3.5 rounded-xl transition text-base"
+              className="w-full btn-gradient disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none text-white font-bold py-3 rounded-xl transition"
             >
-              {loading ? 'Logging in...' : 'Log In'}
+              {loading ? 'Logging in…' : 'Log In'}
             </button>
           </form>
-          
-          <div className="mt-8 pt-6 border-t border-gray-100 text-center">
-            <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
-              <a href="/signup" className="text-amber-600 font-bold hover:underline">Sign up</a>
-            </p>
-          </div>
+
+          <p className="text-center text-sm text-gray-500 mt-6">
+            New to Ziyam? <a href="/signup" className="text-amber-500 font-semibold hover:underline">Create an account</a>
+          </p>
         </div>
-      </main>
-      
+      </div>
       <Footer />
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginInner />
+    </Suspense>
   );
 }

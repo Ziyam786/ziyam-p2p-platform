@@ -1,27 +1,13 @@
-import React from 'react';
+'use client';
 
-export interface Car {
-  id: string;
-  make: string;
-  model: string;
-  year: number;
-  category: 'Hatchback' | 'Sedan' | 'SUV' | 'Luxury' | 'EV' | 'MUV';
-  transmission: 'Manual' | 'Automatic';
-  fuelType: 'Petrol' | 'Diesel' | 'Electric' | 'CNG';
-  seats: number;
-  pricePerDay: number;
-  rating: number;
-  reviewCount: number;
-  imageUrl: string;
-  city: string;
-  available: boolean;
-  kmIncluded: number;
-  extraKmCharge: number;
-}
+import React from 'react';
+import Rating from './Rating';
+import { useAuth } from '../lib/auth-context';
+import { useWishlist } from '../lib/wishlist-context';
+import type { Car } from '../lib/types';
 
 interface CarCardProps {
   car: Car;
-  onBook?: (carId: string) => void;
 }
 
 const FUEL_ICONS: Record<string, string> = {
@@ -31,18 +17,36 @@ const FUEL_ICONS: Record<string, string> = {
   CNG: '💨',
 };
 
-export default function CarCard({ car, onBook }: CarCardProps) {
-  const stars = Math.round(car.rating);
+export default function CarCard({ car }: CarCardProps) {
+  const image = car.images?.[0] ?? '/placeholder-car.jpg';
+  const { user } = useAuth();
+  const { isWishlisted, toggle } = useWishlist();
+  const wishlisted = isWishlisted(car.id);
+
+  async function handleWishlist(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user) {
+      window.location.href = `/login?redirect=/cars/${car.id}`;
+      return;
+    }
+    toggle(car.id).catch(() => {});
+  }
+
   return (
-    <div className="bg-white rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden flex flex-col border border-gray-100">
+    <div className="card-elevated group bg-white rounded-2xl overflow-hidden flex flex-col border border-gray-100">
       {/* Image */}
       <div className="relative h-44 bg-gray-100 overflow-hidden">
         <img
-          src={car.imageUrl || '/placeholder-car.jpg'}
+          src={image}
           alt={`${car.make} ${car.model}`}
-          className="w-full h-full object-cover"
+          loading="lazy"
+          decoding="async"
+          width={400}
+          height={280}
+          className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 will-change-transform"
         />
-        {!car.available && (
+        {!car.isAvailable && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
             <span className="text-white font-bold text-sm bg-red-500 px-3 py-1 rounded-full">Booked</span>
           </div>
@@ -50,6 +54,18 @@ export default function CarCard({ car, onBook }: CarCardProps) {
         <span className="absolute top-3 left-3 bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
           {car.category}
         </span>
+        {car.instantBook && (
+          <span className="absolute top-3 right-3 bg-emerald-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            ⚡ Instant Book
+          </span>
+        )}
+        <button
+          onClick={handleWishlist}
+          aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+          className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-white/90 hover:bg-white shadow flex items-center justify-center transition"
+        >
+          <span className={wishlisted ? 'text-red-500' : 'text-gray-400'}>{wishlisted ? '♥' : '♡'}</span>
+        </button>
       </div>
 
       {/* Info */}
@@ -60,37 +76,33 @@ export default function CarCard({ car, onBook }: CarCardProps) {
             <p className="text-xs text-gray-500">{car.year} · {car.city}</p>
           </div>
           <div className="text-right">
-            <span className="text-amber-500 font-extrabold text-lg">₹{car.pricePerDay.toLocaleString()}</span>
+            <span className="text-amber-500 font-extrabold text-lg">₹{car.dailyRate.toLocaleString()}</span>
             <p className="text-xs text-gray-400">/day</p>
           </div>
         </div>
 
         {/* Specs row */}
         <div className="flex items-center gap-3 text-xs text-gray-600 mt-2 mb-3 flex-wrap">
-          <span>{FUEL_ICONS[car.fuelType]} {car.fuelType}</span>
+          <span>{FUEL_ICONS[car.fuelType] ?? '⛽'} {car.fuelType}</span>
           <span>•</span>
           <span>🔧 {car.transmission}</span>
           <span>•</span>
           <span>💺 {car.seats} Seats</span>
           <span>•</span>
-          <span>🛣️ {car.kmIncluded} km/day</span>
+          <span>🛣️ {car.kmIncludedPerDay} km/day</span>
         </div>
 
-        {/* Rating */}
-        <div className="flex items-center gap-1 mb-4">
-          <div className="flex">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <svg
-                key={i}
-                className={`w-3.5 h-3.5 ${i < stars ? 'text-amber-400' : 'text-gray-200'}`}
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
-            ))}
-          </div>
-          <span className="text-xs text-gray-500 ml-1">{car.rating.toFixed(1)} ({car.reviewCount})</span>
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          {car.securityDeposit === 0 && (
+            <span className="bg-blue-50 text-blue-600 text-[10px] font-bold px-2 py-0.5 rounded-full">💰 Zero Deposit</span>
+          )}
+          {car.offersDelivery && (
+            <span className="bg-purple-50 text-purple-600 text-[10px] font-bold px-2 py-0.5 rounded-full">🚚 Delivery Available</span>
+          )}
+        </div>
+
+        <div className="mb-4">
+          <Rating value={car.rating} count={car.reviewCount} />
         </div>
 
         <div className="mt-auto flex items-center gap-2">
@@ -100,26 +112,17 @@ export default function CarCard({ car, onBook }: CarCardProps) {
           >
             View Details
           </a>
-          {onBook ? (
-            <button
-              disabled={!car.available}
-              onClick={() => onBook(car.id)}
-              className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white text-sm font-bold py-2 rounded-xl transition"
-            >
-              Book Now
-            </button>
-          ) : car.available ? (
-            <a
-              href={`/cars/${car.id}`}
-              className="flex-1 bg-amber-500 hover:bg-amber-600 text-center text-white text-sm font-bold py-2 rounded-xl transition"
-            >
-              Book Now
-            </a>
-          ) : (
-            <span className="flex-1 bg-gray-200 text-center text-gray-400 text-sm font-bold py-2 rounded-xl cursor-not-allowed">
-              Unavailable
-            </span>
-          )}
+          <a
+            href={`/cars/${car.id}`}
+            aria-disabled={!car.isAvailable}
+            className={`flex-1 text-center text-sm font-bold py-2 rounded-xl ${
+              car.isAvailable
+                ? 'btn-gradient text-white'
+                : 'bg-gray-200 text-gray-400 pointer-events-none transition'
+            }`}
+          >
+            Book Now
+          </a>
         </div>
       </div>
     </div>

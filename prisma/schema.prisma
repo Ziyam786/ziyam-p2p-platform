@@ -36,45 +36,94 @@ model User {
   email           String         @unique
   phoneNumber     String         @unique
   passwordHash    String
+  avatarUrl       String?
+  bio             String?
   role            Role           @default(CUSTOMER)
   isKycVerified   Boolean        @default(false)
+  isSuspended     Boolean        @default(false)
   kycDocUrl       String?
   payoutAccountId String?        // Linked Razorpay Route / Stripe Connect sub-account
   cars            Car[]
   bookings        Booking[]      @relation("CustomerBookings")
   payouts         PayoutLedger[]
-  refreshTokens   RefreshToken[]
+  reviewsWritten  Review[]       @relation("ReviewAuthor")
+  reviewsReceived Review[]       @relation("ReviewTarget")
+  wishlist        Wishlist[]
+  notifications   Notification[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
 
-model RefreshToken {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String   @unique
-  expiresAt DateTime
-  revokedAt DateTime?
-  createdAt DateTime @default(now())
+model Car {
+  id               String    @id @default(uuid())
+  ownerId          String
+  owner            User      @relation(fields: [ownerId], references: [id])
+  make             String
+  model            String
+  registrationNo   String    @unique
+  year             Int
+  category         String    // Hatchback, Sedan, SUV, Luxury, EV, MUV
+  fuelType         String    // PETROL, DIESEL, EV
+  transmission     String    // MANUAL, AUTOMATIC
+  seats            Int       @default(5)
+  dailyRate        Float
+  securityDeposit  Float     @default(3000)
+  kmIncludedPerDay Int       @default(300)
+  extraKmCharge    Float     @default(10)
+  description      String?
+  images           String[]  @default([])
+  features         String[]  @default([])
+  city             String
+  isAvailable      Boolean   @default(true)
+  instantBook      Boolean   @default(true)
+  featured         Boolean   @default(false)
+  offersDelivery   Boolean   @default(false)
+  deliveryFee      Float     @default(0)
+  telematicsImei   String?
+  bookings         Booking[]
+  reviews          Review[]
+  blackouts        Blackout[]
+  wishlistedBy     Wishlist[]
+  createdAt        DateTime  @default(now())
 }
 
-model Car {
-  id              String    @id @default(uuid())
-  ownerId         String
-  owner           User      @relation(fields: [ownerId], references: [id])
-  make            String
-  model           String
-  registrationNo  String    @unique
-  year            Int
-  fuelType        String    // PETROL, DIESEL, EV
-  transmission    String    // MANUAL, AUTOMATIC
-  dailyRate       Float
-  securityDeposit Float     @default(3000)
-  city            String
-  isAvailable     Boolean   @default(true)
-  telematicsImei  String?
-  bookings        Booking[]
-  createdAt       DateTime  @default(now())
+// Date ranges a host manually blocks off (maintenance, personal use, etc.) —
+// checked alongside existing bookings when validating a new booking's dates.
+model Blackout {
+  id        String   @id @default(uuid())
+  carId     String
+  car       Car      @relation(fields: [carId], references: [id])
+  startDate DateTime
+  endDate   DateTime
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([carId])
+}
+
+model Wishlist {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  carId     String
+  car       Car      @relation(fields: [carId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, carId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String   // BOOKING_CONFIRMED | TRIP_STARTED | REVIEW_RECEIVED | KYC_VERIFIED | PAYOUT_SETTLED | PROMO | GENERIC
+  title     String
+  body      String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
 }
 
 model Booking {
@@ -88,9 +137,13 @@ model Booking {
   totalAmount      Float
   platformFee      Float
   hostPayoutAmount Float
+  protectionPlan   String         @default("BASIC") // BASIC, STANDARD, PREMIUM
+  deliveryRequested Boolean       @default(false)
+  promoCode        String?
   status           BookingStatus  @default(PENDING)
   paymentIntentId  String?
   payoutLedger     PayoutLedger?
+  review           Review?
   createdAt        DateTime       @default(now())
 }
 
@@ -108,4 +161,63 @@ model PayoutLedger {
   payoutTxnId   String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+}
+
+model Review {
+  id           String   @id @default(uuid())
+  bookingId    String   @unique
+  booking      Booking  @relation(fields: [bookingId], references: [id])
+  carId        String
+  car          Car      @relation(fields: [carId], references: [id])
+  authorId     String
+  author       User     @relation("ReviewAuthor", fields: [authorId], references: [id])
+  targetHostId String
+  targetHost   User     @relation("ReviewTarget", fields: [targetHostId], references: [id])
+  rating       Int
+  comment      String?
+  createdAt    DateTime @default(now())
+}
+
+// Admin-managed discount codes, applied by renters at checkout.
+model PromoCode {
+  code            String    @id
+  discountPercent Float?    // e.g. 0.10 for 10% off
+  discountFlat    Float?    // flat rupee amount off, alternative to percent
+  maxUses         Int?      // null = unlimited
+  usedCount       Int       @default(0)
+  active          Boolean   @default(true)
+  expiresAt       DateTime?
+  createdAt       DateTime  @default(now())
+}
+
+// Generic key/value CMS + platform-config store, edited from the admin app.
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+// AI support chatbot transcript, keyed by a client-generated session id.
+model ChatLog {
+  id        String   @id @default(uuid())
+  sessionId String
+  userId    String?
+  role      String   // 'user' | 'assistant'
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([sessionId])
+}
+
+// Traceability for admin mutations (suspend, feature, refund, etc).
+model AuditLog {
+  id         String   @id @default(uuid())
+  adminId    String
+  action     String
+  targetType String
+  targetId   String
+  meta       Json?
+  createdAt  DateTime @default(now())
+
+  @@index([targetType, targetId])
 }

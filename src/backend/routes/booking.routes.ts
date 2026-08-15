@@ -4,25 +4,28 @@ import { v4 as uuidv4 } from 'uuid';
 import paymentGateway from '../services/paymentGateway';
 import { PayoutEngine } from '../services/payoutEngine';
 import { TelematicsService } from '../services/telematicsService';
-import { requireAuth, AuthenticatedRequest } from '../middleware/auth.middleware';
+import { requireAuth } from '../middleware/auth';
+import { notify } from '../services/notificationService';
 
 const router = Router();
 const prisma = new PrismaClient();
 
-// Search available cars by city
-router.get('/cars/search', async (req: Request, res: Response) => {
-  const { city } = req.query;
-  const cars = await prisma.car.findMany({
-    where: { city: String(city ?? ''), isAvailable: true },
-    include: { owner: { select: { fullName: true, role: true } } },
-  });
-  res.json({ success: true, count: cars.length, data: cars });
-});
+const VALID_PLANS = ['BASIC', 'STANDARD', 'PREMIUM'];
 
-// Create a booking + split payment intent
-router.post('/booking', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-  const customerId = req.user!.sub;
-  const { carId, startTime, endTime, totalAmount } = req.body;
+// Create a booking (no payment yet — the checkout page starts a PayU session separately)
+router.post('/booking', requireAuth, async (req: Request, res: Response) => {
+  const { carId, startTime, endTime, totalAmount, protectionPlan, deliveryRequested, promoCode } = req.body;
+  const customerId = req.user!.userId;
+
+  if (!carId || !startTime || !endTime || !totalAmount) {
+    return res.status(400).json({ error: 'carId, startTime, endTime, and totalAmount are required' });
+  }
+
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  if (end <= start) {
+    return res.status(400).json({ error: 'endTime must be after startTime' });
+  }
 
   try {
     const car = await prisma.car.findUnique({ where: { id: carId }, include: { owner: true } });
@@ -31,42 +34,131 @@ router.post('/booking', requireAuth, async (req: AuthenticatedRequest, res: Resp
     if (!car.owner.payoutAccountId) {
       return res.status(422).json({ error: 'Host payout account not configured' });
     }
+    if (deliveryRequested && !car.offersDelivery) {
+      return res.status(400).json({ error: 'This host does not offer delivery' });
+    }
 
-    const { platformFee, hostPayout } = PayoutEngine.splitAmount(totalAmount);
-
-    const paymentIntent = await paymentGateway.createSplitPayment({
-      amount: totalAmount,
-      currency: 'INR',
-      destinationAccountId: car.owner.payoutAccountId,
-      platformFeeAmount: platformFee,
-      metadata: { carId, customerId },
+    // Reject overlapping bookings for the same car. PENDING_PAYMENT counts as
+    // holding the slot (prevents a race where two renters both start checkout
+    // for the same dates) — in production these should also auto-expire after
+    // a short window so an abandoned checkout doesn't permanently lock dates.
+    const conflictingBooking = await prisma.booking.findFirst({
+      where: {
+        carId,
+        status: { notIn: [BookingStatus.CANCELLED] },
+        startTime: { lt: end },
+        endTime: { gt: start },
+      },
     });
+    if (conflictingBooking) {
+      return res.status(409).json({ error: 'This car is already booked for part of the selected dates' });
+    }
+
+    const conflictingBlackout = await prisma.blackout.findFirst({
+      where: { carId, startDate: { lt: end }, endDate: { gt: start } },
+    });
+    if (conflictingBlackout) {
+      return res.status(409).json({ error: 'The host has blocked out part of the selected dates' });
+    }
+
+    let normalizedPromo: string | null = null;
+    if (promoCode) {
+      const promo = await prisma.promoCode.findUnique({ where: { code: String(promoCode).toUpperCase() } });
+      if (!promo || !promo.active || (promo.expiresAt && promo.expiresAt < new Date()) || (promo.maxUses !== null && promo.usedCount >= promo.maxUses)) {
+        return res.status(400).json({ error: 'Promo code is no longer valid' });
+      }
+      normalizedPromo = promo.code;
+    }
+
+    const { platformFee, hostPayout } = await PayoutEngine.splitAmount(totalAmount);
 
     const booking = await prisma.booking.create({
       data: {
         id: uuidv4(),
         carId,
         customerId,
-        startTime: new Date(startTime),
-        endTime: new Date(endTime),
+        startTime: start,
+        endTime: end,
         totalAmount,
         platformFee,
         hostPayoutAmount: hostPayout,
-        paymentIntentId: paymentIntent.id,
+        protectionPlan: VALID_PLANS.includes(protectionPlan) ? protectionPlan : 'BASIC',
+        deliveryRequested: Boolean(deliveryRequested),
+        promoCode: normalizedPromo,
         status: BookingStatus.PENDING_PAYMENT,
       },
     });
 
-    res.status(201).json({ success: true, clientSecret: paymentIntent.clientSecret, bookingId: booking.id });
+    res.status(201).json({ success: true, bookingId: booking.id });
   } catch (error: any) {
     res.status(500).json({ error: `Booking failed: ${error.message}` });
   }
 });
 
+// Starts (or restarts) a PayU Hosted Checkout session for a pending booking.
+// The checkout page POSTs the returned {url, fields} straight to PayU — real
+// confirmation only ever happens via the hash-verified callback in
+// payuCallback.routes.ts, never from this endpoint.
+router.post('/booking/:id/checkout-session', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true, customer: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  if (booking.customerId !== req.user!.userId) return res.status(403).json({ error: 'Not your booking' });
+  if (booking.status !== BookingStatus.PENDING_PAYMENT) {
+    return res.status(400).json({ error: `Cannot start checkout from status ${booking.status}` });
+  }
+
+  try {
+    const checkout = await paymentGateway.initiateCheckout({
+      bookingId: booking.id,
+      amount: booking.totalAmount,
+      customerName: booking.customer.fullName,
+      customerEmail: booking.customer.email,
+      productInfo: `${booking.car.make} ${booking.car.model} — ${booking.car.city}`,
+    });
+
+    await prisma.booking.update({ where: { id }, data: { paymentIntentId: checkout.txnid } });
+
+    res.json({ success: true, data: { url: checkout.checkoutUrl, fields: checkout.fields } });
+  } catch (error: any) {
+    res.status(502).json({ error: `Could not start payment: ${error.message}` });
+  }
+});
+
+// Start a confirmed trip (pickup)
+router.post('/booking/:id/start', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  if (booking.customerId !== req.user!.userId) return res.status(403).json({ error: 'Not your booking' });
+  if (booking.status !== BookingStatus.CONFIRMED) {
+    return res.status(400).json({ error: `Cannot start trip from status ${booking.status}` });
+  }
+
+  const updated = await prisma.booking.update({ where: { id }, data: { status: BookingStatus.ACTIVE } });
+  await notify(
+    booking.car.ownerId,
+    'TRIP_STARTED',
+    'Trip started',
+    `A renter has picked up your ${booking.car.make} ${booking.car.model}.`,
+    '/host/dashboard'
+  );
+  res.json({ success: true, data: updated });
+});
+
 // Mark a trip completed -> release N+1 payout escrow
-router.post('/booking/:id/complete', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/booking/:id/complete', requireAuth, async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
+    const existing = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+    if (!existing) return res.status(404).json({ error: 'Booking not found' });
+    const isCustomer = existing.customerId === req.user!.userId;
+    const isHost = existing.car.ownerId === req.user!.userId;
+    if (!isCustomer && !isHost) return res.status(403).json({ error: 'Not part of this booking' });
+    if (existing.status !== BookingStatus.ACTIVE) {
+      return res.status(400).json({ error: `Cannot complete trip from status ${existing.status}` });
+    }
+
     const booking = await prisma.booking.update({
       where: { id },
       data: { status: BookingStatus.COMPLETED },
@@ -79,23 +171,24 @@ router.post('/booking/:id/complete', requireAuth, async (req: AuthenticatedReque
 });
 
 // Remote keyless unlock for an active booking
-router.post('/booking/:id/unlock', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/booking/:id/unlock', requireAuth, async (req: Request, res: Response) => {
   const { id } = req.params;
-  const userId = req.user!.sub;
 
   const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
   if (!booking || booking.status !== BookingStatus.ACTIVE) {
     return res.status(400).json({ error: 'Booking is not active' });
   }
-  if (booking.customerId !== userId) {
-    return res.status(403).json({ error: 'You may only unlock a vehicle for your own booking' });
-  }
+  if (booking.customerId !== req.user!.userId) return res.status(403).json({ error: 'Not your booking' });
   if (!booking.car.telematicsImei) {
     return res.status(400).json({ error: 'Vehicle has no keyless IoT hardware' });
   }
 
-  const success = await TelematicsService.unlockVehicle(booking.car.telematicsImei, userId);
-  res.json({ success, message: success ? 'Vehicle unlocked' : 'Unlock failed' });
+  try {
+    const success = await TelematicsService.unlockVehicle(booking.car.telematicsImei, req.user!.userId);
+    res.json({ success, message: success ? 'Vehicle unlocked' : 'Unlock failed' });
+  } catch (error: any) {
+    res.status(502).json({ error: error.message ?? 'Hardware command failed' });
+  }
 });
 
 export default router;
