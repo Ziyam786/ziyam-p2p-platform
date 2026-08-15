@@ -19,6 +19,10 @@ export interface PublicUser {
   avatarUrl?: string | null;
   bio?: string | null;
   payoutAccountId?: string | null;
+  bankAccountNumber?: string | null;
+  bankIfsc?: string | null;
+  bankNameAtBank?: string | null;
+  bankAccountVerified?: boolean;
   createdAt: string;
 }
 
@@ -112,6 +116,29 @@ export interface UtilizationEntry {
   carId: string;
   label: string;
   utilizationPercent: number;
+}
+
+export interface IncentiveTarget {
+  met: boolean;
+  current: number;
+  target: number;
+  unit: string;
+  currentDays?: number;
+  targetDays?: number;
+}
+
+export interface IncentiveProgress {
+  month: string;
+  daysRemaining: number;
+  daysElapsedThisMonth: number;
+  allMet: boolean;
+  bonusPercent: number;
+  targets: {
+    fulfillment: IncentiveTarget;
+    listingDays: IncentiveTarget;
+    rating: IncentiveTarget;
+    bookings: IncentiveTarget;
+  };
 }
 
 export interface TrustBadge { label: string; sub: string; }

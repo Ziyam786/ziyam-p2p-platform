@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, BookingStatus } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
+import { sandboxService } from '../services/sandboxService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -15,6 +16,10 @@ const PUBLIC_USER_SELECT = {
   avatarUrl: true,
   bio: true,
   payoutAccountId: true,
+  bankAccountNumber: true,
+  bankIfsc: true,
+  bankNameAtBank: true,
+  bankAccountVerified: true,
   createdAt: true,
 };
 
@@ -37,6 +42,39 @@ router.patch('/users/me', requireAuth, async (req: Request, res: Response) => {
     select: PUBLIC_USER_SELECT,
   });
   res.json({ success: true, data: user });
+});
+
+// Verify a host's payout bank account via Sandbox's penny-drop API before they
+// can be onboarded as a PayU child merchant (see PayoutEngine / README §2).
+router.post('/users/me/bank/verify', requireAuth, async (req: Request, res: Response) => {
+  const { ifsc, accountNumber } = req.body;
+  if (!/^[A-Za-z]{4}0[A-Z0-9]{6}$/.test(ifsc ?? '')) return res.status(400).json({ error: 'Invalid IFSC code' });
+  if (!accountNumber || String(accountNumber).length < 6) return res.status(400).json({ error: 'Invalid account number' });
+
+  if (!sandboxService.isConfigured()) {
+    return res.status(503).json({ error: 'Bank verification is not configured yet (SANDBOX_API_KEY / SANDBOX_API_SECRET)' });
+  }
+
+  try {
+    const result = await sandboxService.verifyBankAccount(ifsc, accountNumber);
+    if (!result.accountExists) {
+      return res.status(422).json({ error: result.message || 'Bank account could not be verified' });
+    }
+    const user = await prisma.user.update({
+      where: { id: req.user!.userId },
+      data: {
+        bankAccountNumber: accountNumber,
+        bankIfsc: ifsc,
+        bankNameAtBank: result.nameAtBank,
+        bankAccountVerified: true,
+      },
+      select: PUBLIC_USER_SELECT,
+    });
+    res.json({ success: true, data: user });
+  } catch (err: any) {
+    console.error('[BANK VERIFY] failed:', err.response?.data ?? err.message);
+    res.status(502).json({ error: 'Could not verify bank account right now. Please try again shortly.' });
+  }
 });
 
 // Trip history for the logged-in renter

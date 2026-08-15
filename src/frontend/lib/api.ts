@@ -1,5 +1,5 @@
 import type {
-  AdminStats, AppNotification, Blackout, Booking, Car, EarningsOverview, ProtectionPlan, PublicSettings, PublicUser,
+  AdminStats, AppNotification, Blackout, Booking, Car, EarningsOverview, IncentiveProgress, ProtectionPlan, PublicSettings, PublicUser,
   Review, UtilizationEntry,
 } from './types';
 
@@ -80,6 +80,7 @@ export const carsApi = {
   deleteBlackout: (id: string) => del<{ success: true }>(`/blackouts/${id}`),
   reviewSummary: (carId: string) =>
     get<{ success: true; data: { summary: string | null; positiveTags: string[]; negativeTags: string[] } }>(`/cars/${carId}/review-summary`),
+  incentives: (carId: string) => get<{ success: true; data: IncentiveProgress | null }>(`/cars/${carId}/incentives`),
 };
 
 /* ── Bookings ─────────────────────────────────────────────────────── */
@@ -112,6 +113,16 @@ export const usersApi = {
 /* ── KYC ──────────────────────────────────────────────────────────── */
 export const kycApi = {
   submit: (docUrl: string) => post<{ success: true; message: string; data: { isKycVerified: boolean } }>('/kyc/submit', { docUrl }),
+  sendAadhaarOtp: (aadhaarNumber: string) =>
+    post<{ success: true; stubbed: boolean; referenceId?: string | number; message: string }>('/kyc/aadhaar/otp', { aadhaarNumber }),
+  verifyAadhaarOtp: (referenceId: string | number | undefined, otp: string | undefined) =>
+    post<{ success: true; message: string; data: { isKycVerified: boolean; aadhaarVerifiedName?: string } }>('/kyc/aadhaar/verify', { referenceId, otp }),
+};
+
+/* ── Bank account verification ───────────────────────────────────── */
+export const bankApi = {
+  verify: (ifsc: string, accountNumber: string) =>
+    post<{ success: true; data: PublicUser }>('/users/me/bank/verify', { ifsc, accountNumber }),
 };
 
 /* ── Reviews ──────────────────────────────────────────────────────── */

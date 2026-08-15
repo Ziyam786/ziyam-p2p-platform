@@ -56,6 +56,16 @@ export const config = {
     apiKey: process.env.KYC_API_KEY ?? '',
   },
 
+  // Sandbox (sandbox.co.in) — Aadhaar eKYC + bank account penny-drop verification.
+  sandbox: {
+    mode: process.env.SANDBOX_MODE ?? 'test', // 'test' | 'live'
+    apiKey: process.env.SANDBOX_API_KEY ?? '',
+    apiSecret: process.env.SANDBOX_API_SECRET ?? '',
+    get baseUrl() {
+      return this.mode === 'live' ? 'https://api.sandbox.co.in' : 'https://test-api.sandbox.co.in';
+    },
+  },
+
   ai: {
     anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? '',
     model: process.env.AI_MODEL ?? 'claude-haiku-4-5-20251001',

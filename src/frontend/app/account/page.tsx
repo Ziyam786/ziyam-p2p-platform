@@ -6,6 +6,7 @@ import Footer from '../../components/Footer';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { useAuth } from '../../lib/auth-context';
 import { useToast } from '../../components/Toast';
+import BankVerification from '../../components/BankVerification';
 import { usersApi } from '../../lib/api';
 
 function AccountInner() {
@@ -100,6 +101,12 @@ function AccountInner() {
             </button>
           </form>
         </div>
+
+        {(user.role === 'SELF_HOST' || user.role === 'FLEET_OPERATOR') && (
+          <div className="mt-6">
+            <BankVerification />
+          </div>
+        )}
       </div>
       <Footer />
     </div>

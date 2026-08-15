@@ -9,6 +9,7 @@ import Tabs from '../../../../../components/Tabs';
 import BlackoutManager from '../../../../../components/BlackoutManager';
 import BookingPreferences from '../../../../../components/BookingPreferences';
 import RatingsPanel from '../../../../../components/RatingsPanel';
+import IncentivesPanel from '../../../../../components/IncentivesPanel';
 import { useAuth } from '../../../../../lib/auth-context';
 import { useToast } from '../../../../../components/Toast';
 import { carsApi } from '../../../../../lib/api';
@@ -89,6 +90,7 @@ function ManageCarInner() {
         tabs={[
           { key: 'controls', label: 'Controls' },
           { key: 'preferences', label: 'Booking Preferences' },
+          { key: 'incentives', label: 'Incentives' },
           { key: 'ratings', label: 'Ratings & Reviews' },
         ]}
       />
@@ -109,6 +111,8 @@ function ManageCarInner() {
         )}
 
         {tab === 'preferences' && <BookingPreferences car={car} onUpdated={setCar} />}
+
+        {tab === 'incentives' && <IncentivesPanel car={car} />}
 
         {tab === 'ratings' && <RatingsPanel car={car} />}
       </div>

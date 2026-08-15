@@ -36,6 +36,39 @@ enum CarVerificationStatus {
   REJECTED
 }
 
+// --- Fleet Financial Dashboard & Ledger System (see PRD: fleet_dashboard_tech_spec_v2) ---
+
+enum RentalPlatform {
+  ZOOMCAR
+  REVV
+  BHARAT
+  MARC8
+}
+
+enum LedgerCategory {
+  FASTAG
+  FUEL
+  INSTANCES
+  WASHING
+  DAMAGE
+}
+
+enum FleetExpenseType {
+  ROUTINE_MAINTENANCE
+  INSURANCE_PREMIUMS
+  STATE_PERMITS
+  ROAD_TAX
+  DRIVER_SALARIES
+  GENERAL_ADMIN
+}
+
+enum PaymentMode {
+  CASH
+  UPI
+  CORPORATE_CARD
+  FLEET_FUEL_CARD
+}
+
 model User {
   id              String         @id @default(uuid())
   fullName        String
@@ -49,6 +82,13 @@ model User {
   isSuspended     Boolean        @default(false)
   kycDocUrl       String?
   payoutAccountId String?        // Linked Razorpay Route / Stripe Connect sub-account
+
+  // Sandbox (sandbox.co.in) Aadhaar eKYC + bank penny-drop verification
+  aadhaarVerifiedName String?
+  bankAccountNumber   String?
+  bankIfsc            String?
+  bankNameAtBank      String?
+  bankAccountVerified Boolean @default(false)
   cars            Car[]
   bookings        Booking[]      @relation("CustomerBookings")
   payouts         PayoutLedger[]
@@ -56,6 +96,9 @@ model User {
   reviewsReceived Review[]       @relation("ReviewTarget")
   wishlist        Wishlist[]
   notifications   Notification[]
+  loggedPlatformBookings PlatformBooking[]
+  loggedJournalEntries   JournalEntry[]
+  loggedFleetExpenses    FleetExpense[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -108,6 +151,9 @@ model Car {
   reviews          Review[]
   blackouts        Blackout[]
   wishlistedBy     Wishlist[]
+  platformBookings PlatformBooking[]
+  journalEntries   JournalEntry[]
+  fleetExpenses    FleetExpense[]
   createdAt        DateTime  @default(now())
 }
 
@@ -231,6 +277,65 @@ model ChatLog {
   createdAt DateTime @default(now())
 
   @@index([sessionId])
+}
+
+// Revenue log for a trip booked through an external rental channel (or Marc8
+// itself) rather than through this platform's own Booking flow — lets a fleet
+// operator reconcile earnings across every platform their cars are listed on.
+model PlatformBooking {
+  id                 String          @id @default(uuid())
+  carId              String
+  car                Car             @relation(fields: [carId], references: [id])
+  platform           RentalPlatform
+  externalBookingId  String          @unique
+  bookedAt           DateTime
+  totalFare          Float
+  doorstepCharges    Float           @default(0)
+  platformCommission Float?
+  createdById        String
+  createdBy          User            @relation(fields: [createdById], references: [id])
+  createdAt          DateTime        @default(now())
+
+  @@index([carId])
+  @@index([platform])
+}
+
+// Offline reconciliation / settlement voucher (cash collected on the ground,
+// toll top-ups, damage recovery, etc.) — the "Journal Entry" ledger.
+model JournalEntry {
+  id             String         @id @default(uuid())
+  collectionDate DateTime
+  carId          String
+  car            Car            @relation(fields: [carId], references: [id])
+  amountCollected Float
+  totalAmount    Float
+  category       LedgerCategory
+  remarks        String?
+  createdById    String
+  createdBy      User           @relation(fields: [createdById], references: [id])
+  createdAt      DateTime       @default(now())
+
+  @@index([carId])
+  @@index([category])
+}
+
+// General fleet overhead (maintenance, insurance, permits, salaries, etc.).
+// carId is nullable — null means "Fleet-Wide" per the PRD.
+model FleetExpense {
+  id          String            @id @default(uuid())
+  expenseType FleetExpenseType
+  carId       String?
+  car         Car?              @relation(fields: [carId], references: [id])
+  paymentMode PaymentMode
+  amount      Float
+  date        DateTime
+  description String?
+  createdById String
+  createdBy   User              @relation(fields: [createdById], references: [id])
+  createdAt   DateTime          @default(now())
+
+  @@index([carId])
+  @@index([expenseType])
 }
 
 // Traceability for admin mutations (suspend, feature, refund, etc).

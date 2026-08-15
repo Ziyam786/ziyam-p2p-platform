@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
 import { generateChatReply } from '../services/aiService';
+import { FleetService } from '../services/fleetService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -187,6 +188,19 @@ router.delete('/cars/:id', requireAuth, async (req: Request, res: Response) => {
 
   await prisma.car.update({ where: { id }, data: { isAvailable: false } });
   res.json({ success: true, message: 'Listing delisted' });
+});
+
+// Host incentive-plan progress for this car, current month.
+router.get('/cars/:id/incentives', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const car = await prisma.car.findUnique({ where: { id } });
+  if (!car) return res.status(404).json({ error: 'Car not found' });
+  if (car.ownerId !== req.user!.userId && req.user!.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Not your listing' });
+  }
+
+  const progress = await FleetService.getIncentiveProgress(id);
+  res.json({ success: true, data: progress });
 });
 
 export default router;
