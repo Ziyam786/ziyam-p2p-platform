@@ -1,28 +1,48 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const config_1 = require("../config");
+const payuHash_1 = require("../utils/payuHash");
 /**
- * Thin abstraction over the split-payment provider so routes/services
- * don't depend on a specific SDK. Implement the marked methods against
- * Razorpay Route, Stripe Connect, or Cashfree.
+ * PayU Hosted Checkout integration (https://docs.payu.in/docs/generate-hash-payu-hosted).
+ *
+ * We collect the FULL booking amount into our own (aggregator) PayU merchant
+ * account here — hosts are paid out later on the existing N+1 escrow schedule
+ * via PayoutEngine, which calls PayU's Split After Transaction API. This
+ * matches our escrow/hold-then-release model; PayU's split-at-checkout
+ * feature (splitRequest) would send the host's cut instantly and bypass N+1,
+ * so we intentionally don't use it here.
  */
 class PaymentGateway {
-    async createSplitPayment(params) {
-        if (config_1.config.nodeEnv === 'production' && !config_1.config.payments.apiKey) {
-            throw new Error(`${config_1.config.payments.provider} API key is not configured`);
+    async initiateCheckout(params) {
+        if (config_1.config.nodeEnv === 'production' && (!config_1.config.payu.key || !config_1.config.payu.salt)) {
+            throw new Error('PayU key/salt are not configured');
         }
-        // TODO: call the real provider, e.g. Razorpay Route:
-        // const order = await razorpay.orders.create({
-        //   amount: params.amount * 100,
-        //   currency: params.currency,
-        //   transfers: [{ account: params.destinationAccountId, amount: (params.amount - params.platformFeeAmount) * 100 }],
-        // });
-        const id = `pi_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
-        return { id, clientSecret: `${id}_secret` };
-    }
-    async releaseFunds(paymentIntentId) {
-        // TODO: call provider's transfer/payout release for the given payment intent.
-        console.log(`[PAYMENT GATEWAY] Released funds for ${paymentIntentId}`);
+        const txnid = `ziyam_${params.bookingId.slice(0, 8)}_${Date.now()}`;
+        const amount = params.amount.toFixed(2);
+        const [firstname, ...rest] = params.customerName.trim().split(' ');
+        const hash = (0, payuHash_1.generatePayuHash)({
+            txnid,
+            amount,
+            productinfo: params.productInfo,
+            firstname: firstname || params.customerName,
+            email: params.customerEmail,
+            udf1: params.bookingId,
+        });
+        const fields = {
+            key: config_1.config.payu.key,
+            txnid,
+            amount,
+            productinfo: params.productInfo,
+            firstname: firstname || params.customerName,
+            lastname: rest.join(' '),
+            email: params.customerEmail,
+            phone: '',
+            udf1: params.bookingId,
+            surl: `${config_1.config.serverUrl}/api/payments/payu/callback`,
+            furl: `${config_1.config.serverUrl}/api/payments/payu/callback`,
+            hash,
+        };
+        return { txnid, checkoutUrl: config_1.config.payu.checkoutUrl, fields };
     }
 }
 exports.default = new PaymentGateway();
