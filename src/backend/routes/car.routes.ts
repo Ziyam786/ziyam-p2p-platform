@@ -249,6 +249,7 @@ router.get('/cars/:id/fleet-onboarding', requireAuth, async (req: Request, res: 
     where: { id },
     select: {
       fleetOnboardingStep: true, fleetManaged: true, telematicsImei: true,
+      fleetAgreementWetSignedUrl: true, fleetAgreementWetSignedAt: true, fleetAgreementEsignStatus: true,
       fleetOperator: { select: { fullName: true, phoneNumber: true, email: true } },
     },
   });
@@ -294,6 +295,30 @@ router.patch('/cars/:id/fleet-onboarding/security', requireAuth, async (req: Req
   res.json({ success: true, data: car });
 });
 
+// Step 3 — Agreement: wet-signature upload works today (a fleet operator
+// hands the host a physical/printed agreement to sign and photograph); e-sign
+// intentionally returns 503 rather than faking a Setu flow around content
+// that doesn't exist yet (mirrors /users/me/partner-agreement/esign/start —
+// see that route's comment for why).
+router.patch('/cars/:id/fleet-onboarding/agreement/wet-signature', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const check = await assertOwnsCarForOnboarding(req, id);
+  if (!check.ok) return res.status(check.status).json({ error: check.error });
+  if (check.car.fleetOnboardingStep !== 2) return res.status(409).json({ error: 'Complete the Audit and Security steps first' });
+
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'url is required' });
+  const car = await prisma.car.update({
+    where: { id },
+    data: { fleetAgreementWetSignedUrl: url, fleetAgreementWetSignedAt: new Date() },
+  });
+  res.json({ success: true, data: car, message: 'Wet-signed agreement received — a fleet admin will review and confirm Go Live.' });
+});
+
+router.post('/cars/:id/fleet-onboarding/agreement/esign/start', requireAuth, async (_req: Request, res: Response) => {
+  res.status(503).json({ error: 'E-signing for the Fleet Partner Agreement is not available yet — the official agreement text is still being finalized. Upload a wet-signed copy in the meantime.' });
+});
+
 // Step 3->4 — Agreement & Go Live: no self-service completion (no real
 // partnership agreement content exists yet) — a fleet admin manually confirms
 // once it's actually been executed with the host.
@@ -302,6 +327,7 @@ router.post('/admin/cars/:id/fleet-onboarding/go-live', requireAuth, requireRole
   const car = await prisma.car.findUnique({ where: { id } });
   if (!car) return res.status(404).json({ error: 'Car not found' });
   if (car.fleetOnboardingStep < 2) return res.status(409).json({ error: 'Host has not completed the Audit and Security steps yet' });
+  if (!car.fleetAgreementWetSignedUrl) return res.status(409).json({ error: 'No wet-signed Fleet Partner Agreement is on file for this car yet' });
 
   const updated = await prisma.car.update({
     where: { id },

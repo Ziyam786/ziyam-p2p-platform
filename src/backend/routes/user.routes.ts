@@ -28,6 +28,11 @@ const PUBLIC_USER_SELECT = {
   alternatePhoneNumber: true,
   referralCode: true,
   creditsBalance: true,
+  payoutFrequency: true,
+  partnerAgreementWetSignedUrl: true,
+  partnerAgreementWetSignedAt: true,
+  partnerAgreementEsignStatus: true,
+  partnerAgreementEsignDownloadUrl: true,
   createdAt: true,
 };
 
@@ -90,6 +95,29 @@ router.post('/users/me/bank/verify', requireAuth, async (req: Request, res: Resp
     console.error('[BANK VERIFY] failed:', err.response?.data ?? err.message);
     res.status(502).json({ error: 'Could not verify bank account right now. Please try again shortly.' });
   }
+});
+
+// Host Onboarding Agreement — the one-time, per-host agreement gating N+1
+// payout eligibility (Aug-2024 policy, see PayoutEngine.assertPayoutEligible).
+// Wet-signature upload works today (the host photographs/scans a physically-
+// signed copy); e-sign is intentionally NOT wired to Setu yet — doing so
+// would mean actually signing a document with no real, finalized legal text,
+// which is worse than no e-sign flow at all. This returns 503 rather than
+// silently succeeding, so the frontend can show an honest "coming soon"
+// state instead of a fake success.
+router.patch('/users/me/partner-agreement/wet-signature', requireAuth, async (req: Request, res: Response) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'url is required' });
+  const user = await prisma.user.update({
+    where: { id: req.user!.userId },
+    data: { partnerAgreementWetSignedUrl: url, partnerAgreementWetSignedAt: new Date() },
+    select: PUBLIC_USER_SELECT,
+  });
+  res.json({ success: true, data: user });
+});
+
+router.post('/users/me/partner-agreement/esign/start', requireAuth, async (_req: Request, res: Response) => {
+  res.status(503).json({ error: 'E-signing for the Host Onboarding Agreement is not available yet — the official agreement text is still being finalized. Upload a wet-signed copy in the meantime.' });
 });
 
 // Trip history for the logged-in renter

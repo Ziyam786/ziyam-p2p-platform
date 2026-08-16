@@ -67,7 +67,7 @@ export default function EarningsCalculatorPage() {
             </div>
             <p className="text-xs text-gray-400 text-center mt-6">
               Gross monthly revenue: ₹{monthlyGross.toLocaleString()} · You keep 70%, Ziyam retains 30% for
-              marketing, insurance, and platform operations.
+              marketing, guest verification, and platform operations.
             </p>
           </div>
 

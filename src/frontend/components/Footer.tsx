@@ -14,6 +14,7 @@ const links = {
   ],
   Rentals: [
     { label: 'Browse Cars', href: '/cars' },
+    { label: 'Guest Policy', href: '/guest/policy' },
     { label: 'Cities', href: '/cities' },
     { label: 'Subscription Plans', href: '/subscription' },
     { label: 'Corporate Rentals', href: '/corporate' },

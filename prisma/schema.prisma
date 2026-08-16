@@ -209,10 +209,18 @@ model Car {
   // Go Live). 0 = not started/opted in. 1 = audit submitted, fleet operator
   // assigned via random "finger-crossed" shuffle. 2 = security/telematics
   // confirmed (Car.telematicsImei set). 3 = awaiting partnership agreement —
-  // this step has no self-service completion since no real agreement content
-  // exists yet (see leaseAgreementPdf.ts's doc comment); an admin/fleet_admin
-  // manually advances to Go Live (fleetManaged=true) once it's actually signed.
+  // an admin/fleet_admin manually advances to Go Live (fleetManaged=true)
+  // once it's actually signed. Per-car (not per-User like
+  // partnerAgreementWetSignedUrl below) since a host can have some
+  // fleet-managed and some self-hosted cars — this is the *additional*
+  // fleet-specific agreement layered on top of every host's one-time
+  // Host Onboarding Agreement, not a replacement for it.
   fleetOnboardingStep Int @default(0)
+  fleetAgreementWetSignedUrl   String?
+  fleetAgreementWetSignedAt    DateTime?
+  fleetAgreementEsignRequestId String?
+  fleetAgreementEsignStatus    String? // sign_initiated | sign_pending | sign_in_progress | sign_complete
+  fleetAgreementEsignDownloadUrl String?
 
   // Onboarding / verification (RC, pollution cert, insurance) — see host/onboarding/car wizard
   verificationStatus CarVerificationStatus @default(PENDING)

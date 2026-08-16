@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { carsApi, ApiError, type FleetOnboardingStatus } from '../lib/api';
 import { useToast } from './Toast';
+import FileUploadField from './FileUploadField';
 import type { Car } from '../lib/types';
 
 const STEPS = ['Audit', 'Security', 'Agreement', 'Go Live'];
@@ -134,13 +135,30 @@ export default function FleetOnboardingPanel({ car }: { car: Car }) {
         </div>
       ) : (
         <div className="bg-amber-50 border border-amber-100 rounded-2xl p-6">
-          <p className="font-bold text-gray-900 mb-1">Step 3 — Awaiting partnership agreement</p>
-          <p className="text-sm text-gray-600">
+          <p className="font-bold text-gray-900 mb-1">Step 3 — Fleet Partner Agreement</p>
+          <p className="text-sm text-gray-600 mb-4">
             {status.fleetOperator
-              ? `${status.fleetOperator.fullName} will reach out at ${status.fleetOperator.phoneNumber} to complete the Fleet Partner Agreement with you.`
-              : 'Your fleet operator will reach out to complete the Fleet Partner Agreement with you.'}
-            {' '}Your car goes live under fleet management as soon as that's signed — no action needed from you right now.
+              ? `${status.fleetOperator.fullName} (${status.fleetOperator.phoneNumber}) will hand you the Fleet Partner Agreement to sign.`
+              : 'Your fleet operator will hand you the Fleet Partner Agreement to sign.'}
+            {' '}Photograph or scan the signed copy and upload it below — your car goes live once a fleet admin reviews and confirms it.
           </p>
+          <FileUploadField
+            label="Signed Fleet Partner Agreement"
+            value={status.fleetAgreementWetSignedUrl ?? ''}
+            onChange={async (url) => {
+              try {
+                await carsApi.uploadFleetAgreementWetSignature(car.id, url);
+                show('Signed agreement uploaded — awaiting admin review', 'success');
+                load();
+              } catch (err) {
+                show(err instanceof ApiError ? err.message : 'Upload failed', 'error');
+              }
+            }}
+            kind="document"
+          />
+          {status.fleetAgreementWetSignedUrl && (
+            <p className="text-xs text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2 mt-3">✓ Signed agreement received — awaiting admin confirmation to go live.</p>
+          )}
         </div>
       )}
     </div>

@@ -113,12 +113,18 @@ export const carsApi = {
     post<{ success: true; data: Car }>(`/cars/${carId}/fleet-onboarding/audit`, { confirmedEligible: true }),
   submitFleetSecurity: (carId: string, telematicsImei: string) =>
     patch<{ success: true; data: Car }>(`/cars/${carId}/fleet-onboarding/security`, { telematicsImei }),
+  uploadFleetAgreementWetSignature: (carId: string, url: string) =>
+    patch<{ success: true; data: Car; message: string }>(`/cars/${carId}/fleet-onboarding/agreement/wet-signature`, { url }),
+  startFleetAgreementEsign: (carId: string) => post<{ success: true }>(`/cars/${carId}/fleet-onboarding/agreement/esign/start`),
 };
 
 export interface FleetOnboardingStatus {
   fleetOnboardingStep: number;
   fleetManaged: boolean;
   telematicsImei: string | null;
+  fleetAgreementWetSignedUrl?: string | null;
+  fleetAgreementWetSignedAt?: string | null;
+  fleetAgreementEsignStatus?: string | null;
   fleetOperator: { fullName: string; phoneNumber: string; email: string } | null;
 }
 
@@ -171,6 +177,9 @@ export const usersApi = {
   me: () => get<{ success: true; data: PublicUser }>('/users/me'),
   update: (data: Partial<Pick<PublicUser, 'fullName' | 'bio' | 'avatarUrl' | 'payoutAccountId' | 'signatureUrl' | 'selfieUrl' | 'alternatePhoneNumber'>>) =>
     patch<{ success: true; data: PublicUser }>('/users/me', data),
+  uploadPartnerAgreementWetSignature: (url: string) =>
+    patch<{ success: true; data: PublicUser }>('/users/me/partner-agreement/wet-signature', { url }),
+  startPartnerAgreementEsign: () => post<{ success: true }>('/users/me/partner-agreement/esign/start'),
 };
 
 /* ── KYC ──────────────────────────────────────────────────────────── */

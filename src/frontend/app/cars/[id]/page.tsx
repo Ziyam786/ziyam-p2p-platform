@@ -628,7 +628,7 @@ export default function CarDetailPage() {
               <div className="flex items-center justify-center gap-4 text-xs text-gray-400">
                 <span>🔒 Secure Payment</span>
                 <span>·</span>
-                <span>🛡️ Insurance Covered</span>
+                <span>🪪 KYC-Verified Host</span>
               </div>
             </div>
           </div>

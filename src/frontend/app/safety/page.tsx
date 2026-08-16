@@ -5,7 +5,7 @@ import PageHero from '../../components/PageHero';
 
 const PILLARS = [
   { icon: '🪪', title: 'Verified Identities', desc: 'Every renter and host completes DigiLocker-based KYC before their first trip.' },
-  { icon: '🛡️', title: 'Insurance on Every Trip', desc: 'Basic third-party coverage is included by default, with Standard and Premium protection plans available.' },
+  { icon: '🛡️', title: 'Insurance-Verified Vehicles', desc: 'Every host must carry active comprehensive insurance, checked before their listing goes live — see our Insurance & Damage Policy.' },
   { icon: '📸', title: 'Digital Handover Logs', desc: 'Photo-documented pickup and drop-off protects both renters and hosts from disputes.' },
   { icon: '💰', title: 'Escrowed Deposits', desc: 'Security deposits are held separately and only released after a clean vehicle return.' },
   { icon: '📍', title: 'Live Vehicle Telemetry', desc: 'Keyless-enabled vehicles report live location and status for faster roadside response.' },

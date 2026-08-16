@@ -32,6 +32,10 @@ export interface PublicUser {
   referralCode?: string | null;
   creditsBalance?: number;
   payoutFrequency?: 'STANDARD' | 'WEEKLY';
+  partnerAgreementWetSignedUrl?: string | null;
+  partnerAgreementWetSignedAt?: string | null;
+  partnerAgreementEsignStatus?: string | null;
+  partnerAgreementEsignDownloadUrl?: string | null;
   createdAt: string;
 }
 
