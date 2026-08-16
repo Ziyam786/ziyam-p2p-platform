@@ -16,6 +16,7 @@ const PUBLIC_KEYS = [
   'testimonials',
   'company_info',
   'smart_pricing',
+  'demand_pricing',
 ] as const;
 
 export const DEFAULT_SETTINGS: Record<string, unknown> = {
@@ -123,6 +124,27 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
   fleet_ledger_categories: ['FASTAG', 'FUEL', 'INSTANCES', 'WASHING', 'DAMAGE'],
   fleet_expense_types: ['ROUTINE_MAINTENANCE', 'INSURANCE_PREMIUMS', 'STATE_PERMITS', 'ROAD_TAX', 'DRIVER_SALARIES', 'GENERAL_ADMIN'],
   fleet_payment_modes: ['CASH', 'UPI', 'CORPORATE_CARD', 'FLEET_FUEL_CARD'],
+
+  // Demand-based dynamic pricing — additive "bumps" on top of the base
+  // category+city market rate (see SmartPriceSlider / smart_pricing above),
+  // stacked and capped at maxMultiplier. Keyed off the trip's pickup time.
+  // Renter-facing (affects what a booking costs), unlike smart_pricing which
+  // is host-facing (affects what a host is allowed to list at) — the two are
+  // deliberately separate: a host's listed rate is a stable reference price,
+  // not something that should silently change trip-to-trip.
+  demand_pricing: {
+    weekendBump: 0.15, // Fri 6pm - Sun 11:59pm
+    peakHourBump: 0.10,
+    peakHours: [[7, 10], [17, 21]] as [number, number][], // 7-10am, 5-9pm
+    holidayBump: 0.25,
+    maxMultiplier: 1.5,
+    // 2026 Indian public holidays (admin-editable — extend/replace per year)
+    publicHolidays: [
+      '2026-01-01', '2026-01-14', '2026-01-26', '2026-03-04', '2026-03-21',
+      '2026-04-03', '2026-04-14', '2026-05-01', '2026-08-15', '2026-08-28',
+      '2026-10-02', '2026-10-20', '2026-11-08', '2026-12-25',
+    ],
+  },
 
   // Financial ERP Command Center — admin-only. Starting cash injection the
   // cumulative cash-position/balance-sheet math builds on top of (see

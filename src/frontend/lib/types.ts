@@ -180,6 +180,15 @@ export interface SmartPricing {
   defaultCityMultiplier: number;
 }
 
+export interface DemandPricing {
+  weekendBump: number;
+  peakHourBump: number;
+  peakHours: [number, number][];
+  holidayBump: number;
+  maxMultiplier: number;
+  publicHolidays: string[];
+}
+
 export interface PublicSettings {
   hero_title: string;
   hero_subtitle: string;
@@ -192,6 +201,7 @@ export interface PublicSettings {
   testimonials: Testimonial[];
   company_info: CompanyInfo;
   smart_pricing: SmartPricing;
+  demand_pricing: DemandPricing;
 }
 
 export interface PromoCode {
