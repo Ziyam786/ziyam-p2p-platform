@@ -1,0 +1,78 @@
+name: Deploy to AWS ECS
+
+# Manual trigger only, on purpose — this pushes real images to ECR and
+# updates live ECS services. Auto-deploying on every push to main is a
+# reasonable next step once the pipeline itself has been proven out once
+# manually, but starting there risks accidentally shipping a broken build
+# to a service nobody's watching.
+on:
+  workflow_dispatch: {}
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+  ECS_CLUSTER: ${{ vars.ECS_CLUSTER_NAME || 'ziyam-cluster' }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - name: backend
+            dockerfile: devops/Dockerfile
+            ecs-service: ziyam-backend-service
+            task-def: devops/ecs/backend-task-def.json
+          - name: frontend
+            dockerfile: devops/Dockerfile.frontend
+            ecs-service: ziyam-frontend-service
+            task-def: devops/ecs/frontend-task-def.json
+          - name: admin
+            dockerfile: devops/Dockerfile.admin
+            ecs-service: ziyam-admin-service
+            task-def: devops/ecs/admin-task-def.json
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push ${{ matrix.name }} image
+        env:
+          IMAGE_URI: ${{ env.ECR_REGISTRY }}/ziyam-${{ matrix.name }}:${{ github.sha }}
+          IMAGE_LATEST: ${{ env.ECR_REGISTRY }}/ziyam-${{ matrix.name }}:latest
+        run: |
+          docker build \
+            -f ${{ matrix.dockerfile }} \
+            --build-arg NEXT_PUBLIC_API_URL="${{ secrets.NEXT_PUBLIC_API_URL }}" \
+            --build-arg NEXT_PUBLIC_GOOGLE_MAPS_API_KEY="${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}" \
+            -t "$IMAGE_URI" -t "$IMAGE_LATEST" .
+          docker push "$IMAGE_URI"
+          docker push "$IMAGE_LATEST"
+
+      - name: Render new task definition
+        id: render-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ matrix.task-def }}
+          container-name: ${{ matrix.name }}
+          image: ${{ env.ECR_REGISTRY }}/ziyam-${{ matrix.name }}:${{ github.sha }}
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-task-def.outputs.task-definition }}
+          service: ${{ matrix.ecs-service }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true

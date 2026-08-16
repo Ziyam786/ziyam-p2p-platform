@@ -1,0 +1,26 @@
+# Multi-stage production build for the admin Next.js app (src/admin).
+# Build context is the repo root (matches devops/Dockerfile's convention) so
+# this can be built the same way from docker-compose or CI either way.
+# NEXT_PUBLIC_* vars are baked into the client bundle at build time, not read
+# at container start — must be passed as --build-arg, not just env_file.
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY src/admin/package*.json ./
+RUN npm ci
+COPY src/admin/ .
+
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+RUN npm run build
+
+# next.config.js has output: 'standalone', so the runner only needs the
+# traced standalone server + static assets — not the full node_modules tree.
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+EXPOSE 3000
+CMD ["node", "server.js"]

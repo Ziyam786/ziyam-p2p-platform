@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  ziyam-app:
+  backend:
     build:
       context: ..
       dockerfile: devops/Dockerfile
@@ -15,6 +15,31 @@ services:
     depends_on:
       - postgres
       - redis
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: devops/Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5000/api}
+        NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY:-}
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+  admin:
+    build:
+      context: ..
+      dockerfile: devops/Dockerfile.admin
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5000/api}
+    restart: always
+    ports:
+      - "3001:3000"
+    depends_on:
+      - backend
 
   postgres:
     image: postgres:16-alpine

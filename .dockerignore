@@ -1,0 +1,11 @@
+node_modules
+src/frontend/node_modules
+src/frontend/.next
+src/admin/node_modules
+src/admin/.next
+.git
+.env
+.env.*
+!.env.example
+dist
+npm-debug.log
