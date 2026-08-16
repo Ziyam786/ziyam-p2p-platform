@@ -31,5 +31,5 @@ jobs:
             cd /var/www/ziyam
             git pull origin main
             cd devops
-            sudo docker-compose up -d --build
+            sudo docker compose up -d --build
             sudo docker exec -i devops-backend-1 npx prisma migrate deploy
