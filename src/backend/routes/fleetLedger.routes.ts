@@ -44,7 +44,7 @@ router.get('/fleet/bookings', async (req: Request, res: Response) => {
 });
 
 router.post('/fleet/bookings', async (req: Request, res: Response) => {
-  const { carId, platform, externalBookingId, bookedAt, totalFare, doorstepCharges, platformCommission } = req.body;
+  const { carId, platform, externalBookingId, bookedAt, totalFare, doorstepCharges, platformCommission, expectedCreditDate } = req.body;
   if (!carId || !platform || !externalBookingId || !bookedAt || totalFare === undefined) {
     return res.status(400).json({ error: 'carId, platform, externalBookingId, bookedAt, and totalFare are required' });
   }
@@ -57,6 +57,7 @@ router.post('/fleet/bookings', async (req: Request, res: Response) => {
         carId, platform, externalBookingId, bookedAt: new Date(bookedAt),
         totalFare: Number(totalFare), doorstepCharges: Number(doorstepCharges ?? 0),
         platformCommission: platformCommission !== undefined ? Number(platformCommission) : undefined,
+        expectedCreditDate: expectedCreditDate ? new Date(expectedCreditDate) : undefined,
         createdById: req.user!.userId,
       },
     });
@@ -65,6 +66,17 @@ router.post('/fleet/bookings', async (req: Request, res: Response) => {
     if (err.code === 'P2002') return res.status(409).json({ error: 'A booking with this Booking ID already exists for this platform' });
     throw err;
   }
+});
+
+// Marks a platform booking's revenue as actually credited/received — gates
+// Command Center cash-position math (see ground-truthed tripCredited() logic).
+router.patch('/fleet/bookings/:id/received', async (req: Request, res: Response) => {
+  const entry = await prisma.platformBooking.findUnique({ where: { id: req.params.id } });
+  if (!entry) return res.status(404).json({ error: 'Not found' });
+  const ownIds = await ownedCarIds(req);
+  if (ownIds && !ownIds.includes(entry.carId)) return res.status(403).json({ error: 'Not your vehicle' });
+  const updated = await prisma.platformBooking.update({ where: { id: req.params.id }, data: { received: true } });
+  res.json({ success: true, data: updated });
 });
 
 router.delete('/fleet/bookings/:id', async (req: Request, res: Response) => {
@@ -134,7 +146,7 @@ router.get('/fleet/expenses', async (req: Request, res: Response) => {
 });
 
 router.post('/fleet/expenses', async (req: Request, res: Response) => {
-  const { expenseType, carId, paymentMode, amount, date, description } = req.body;
+  const { expenseType, carId, paymentMode, paidTo, amount, date, description } = req.body;
   if (!expenseType || !paymentMode || amount === undefined || !date) {
     return res.status(400).json({ error: 'expenseType, paymentMode, amount, and date are required' });
   }
@@ -145,7 +157,7 @@ router.post('/fleet/expenses', async (req: Request, res: Response) => {
 
   const entry = await prisma.fleetExpense.create({
     data: {
-      expenseType, carId: carId || undefined, paymentMode, amount: Number(amount),
+      expenseType, carId: carId || undefined, paymentMode, paidTo, amount: Number(amount),
       date: new Date(date), description, createdById: req.user!.userId,
     },
   });

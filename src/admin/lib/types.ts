@@ -148,10 +148,13 @@ export interface ChatMessageRow {
 }
 
 /* ── Fleet Financial Dashboard & Ledger System ───────────────────────── */
-export type RentalPlatform = 'ZOOMCAR' | 'REVV' | 'BHARAT' | 'MARC8';
-export type LedgerCategory = 'FASTAG' | 'FUEL' | 'INSTANCES' | 'WASHING' | 'DAMAGE';
-export type FleetExpenseType = 'ROUTINE_MAINTENANCE' | 'INSURANCE_PREMIUMS' | 'STATE_PERMITS' | 'ROAD_TAX' | 'DRIVER_SALARIES' | 'GENERAL_ADMIN';
-export type PaymentMode = 'CASH' | 'UPI' | 'CORPORATE_CARD' | 'FLEET_FUEL_CARD';
+// Admin-configurable lists now (fleet_platforms/fleet_ledger_categories/
+// fleet_expense_types/fleet_payment_modes Settings), not fixed enums — plain
+// string aliases kept only so call sites read clearly.
+export type RentalPlatform = string;
+export type LedgerCategory = string;
+export type FleetExpenseType = string;
+export type PaymentMode = string;
 
 export interface PlatformBookingEntry {
   id: string;
@@ -163,6 +166,8 @@ export interface PlatformBookingEntry {
   totalFare: number;
   doorstepCharges: number;
   platformCommission?: number | null;
+  received: boolean;
+  expectedCreditDate?: string | null;
   createdAt: string;
 }
 
@@ -184,6 +189,7 @@ export interface FleetExpenseRow {
   carId?: string | null;
   car?: { make: string; model: string; registrationNo: string } | null;
   paymentMode: PaymentMode;
+  paidTo?: string | null;
   amount: number;
   date: string;
   description?: string | null;

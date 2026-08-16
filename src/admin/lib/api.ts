@@ -86,8 +86,9 @@ export const fleetApi = {
   summary: (f: FleetFilters = {}) => get<{ success: true; data: FleetSummary }>(`/fleet/summary${toQuery(f)}`),
 
   bookings: (f: FleetFilters = {}) => get<{ success: true; count: number; data: PlatformBookingEntry[] }>(`/fleet/bookings${toQuery(f)}`),
-  addBooking: (data: { carId: string; platform: string; externalBookingId: string; bookedAt: string; totalFare: number; doorstepCharges?: number; platformCommission?: number }) =>
+  addBooking: (data: { carId: string; platform: string; externalBookingId: string; bookedAt: string; totalFare: number; doorstepCharges?: number; platformCommission?: number; expectedCreditDate?: string }) =>
     post<{ success: true; data: PlatformBookingEntry }>('/fleet/bookings', data),
+  markBookingReceived: (id: string) => patch<{ success: true; data: PlatformBookingEntry }>(`/fleet/bookings/${id}/received`),
   deleteBooking: (id: string) => del<{ success: true }>(`/fleet/bookings/${id}`),
 
   journalEntries: (f: FleetFilters = {}) => get<{ success: true; count: number; data: JournalEntryRow[] }>(`/fleet/journal-entries${toQuery(f)}`),
@@ -96,7 +97,7 @@ export const fleetApi = {
   deleteJournalEntry: (id: string) => del<{ success: true }>(`/fleet/journal-entries/${id}`),
 
   expenses: (f: FleetFilters = {}) => get<{ success: true; count: number; data: FleetExpenseRow[] }>(`/fleet/expenses${toQuery(f)}`),
-  addExpense: (data: { expenseType: string; carId?: string; paymentMode: string; amount: number; date: string; description?: string }) =>
+  addExpense: (data: { expenseType: string; carId?: string; paymentMode: string; paidTo?: string; amount: number; date: string; description?: string }) =>
     post<{ success: true; data: FleetExpenseRow }>('/fleet/expenses', data),
   deleteExpense: (id: string) => del<{ success: true }>(`/fleet/expenses/${id}`),
 };

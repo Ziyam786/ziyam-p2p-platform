@@ -114,6 +114,15 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
   // creation time so later config changes don't retroactively alter
   // already-issued invoices. Default matches the real system's default.
   fleet_facilitation_fee_pct: 20,
+
+  // Admin-configurable lookup lists (all admin-only, not in PUBLIC_KEYS) —
+  // replace what used to be fixed Postgres enums on PlatformBooking/
+  // JournalEntry/FleetExpense. Defaults below are exactly the original enum
+  // values, so nothing changes for existing usage until an admin edits them.
+  fleet_platforms: ['ZOOMCAR', 'REVV', 'BHARAT', 'MARC8'],
+  fleet_ledger_categories: ['FASTAG', 'FUEL', 'INSTANCES', 'WASHING', 'DAMAGE'],
+  fleet_expense_types: ['ROUTINE_MAINTENANCE', 'INSURANCE_PREMIUMS', 'STATE_PERMITS', 'ROAD_TAX', 'DRIVER_SALARIES', 'GENERAL_ADMIN'],
+  fleet_payment_modes: ['CASH', 'UPI', 'CORPORATE_CARD', 'FLEET_FUEL_CARD'],
 };
 
 export async function getSetting<T = unknown>(key: string, fallback?: T): Promise<T> {

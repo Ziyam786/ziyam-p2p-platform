@@ -68,37 +68,13 @@ enum CarVerificationStatus {
 }
 
 // --- Fleet Financial Dashboard & Ledger System (see PRD: fleet_dashboard_tech_spec_v2) ---
-
-enum RentalPlatform {
-  ZOOMCAR
-  REVV
-  BHARAT
-  MARC8
-}
-
-enum LedgerCategory {
-  FASTAG
-  FUEL
-  INSTANCES
-  WASHING
-  DAMAGE
-}
-
-enum FleetExpenseType {
-  ROUTINE_MAINTENANCE
-  INSURANCE_PREMIUMS
-  STATE_PERMITS
-  ROAD_TAX
-  DRIVER_SALARIES
-  GENERAL_ADMIN
-}
-
-enum PaymentMode {
-  CASH
-  UPI
-  CORPORATE_CARD
-  FLEET_FUEL_CARD
-}
+// platform/category/expenseType/paymentMode on PlatformBooking/JournalEntry/
+// FleetExpense are plain Strings, not enums — admin-configurable via the
+// fleet_platforms/fleet_ledger_categories/fleet_expense_types/fleet_payment_modes
+// Settings (same row-editor pattern as protection_plans), matching the real
+// Financial ERP's "configurable, add/remove" categories requirement. The
+// values below (originally this Postgres enum's values) seed those Settings'
+// defaults in settingsService.ts.
 
 enum ServiceRequestStatus {
   REQUESTED
@@ -184,6 +160,7 @@ model User {
   loggedOpsTrips         OpsTrip[]
   loggedOpsInvoices      OpsInvoice[]
   loggedOpsPayments      OpsPayment[]
+  loggedOutstandings     Outstanding[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -429,12 +406,16 @@ model PlatformBooking {
   id                 String          @id @default(uuid())
   carId              String
   car                Car             @relation(fields: [carId], references: [id])
-  platform           RentalPlatform
+  platform           String          // Zoomcar | Revv | Bharat | Marc8 | etc — see fleet_platforms Setting
   externalBookingId  String          @unique
   bookedAt           DateTime
   totalFare          Float
   doorstepCharges    Float           @default(0)
   platformCommission Float?
+  // Ground-truthed parity fields from the real "earnings" table — gates when a
+  // booking counts as credited revenue for Command Center cash-position math.
+  received           Boolean         @default(false)
+  expectedCreditDate DateTime?
   createdById        String
   createdBy          User            @relation(fields: [createdById], references: [id])
   createdAt          DateTime        @default(now())
@@ -452,7 +433,7 @@ model JournalEntry {
   car            Car            @relation(fields: [carId], references: [id])
   amountCollected Float
   totalAmount    Float
-  category       LedgerCategory
+  category       String         // see fleet_ledger_categories Setting
   remarks        String?
   createdById    String
   createdBy      User           @relation(fields: [createdById], references: [id])
@@ -466,10 +447,11 @@ model JournalEntry {
 // carId is nullable — null means "Fleet-Wide" per the PRD.
 model FleetExpense {
   id          String            @id @default(uuid())
-  expenseType FleetExpenseType
+  expenseType String            // see fleet_expense_types Setting
   carId       String?
   car         Car?              @relation(fields: [carId], references: [id])
-  paymentMode PaymentMode
+  paymentMode String            // see fleet_payment_modes Setting
+  paidTo      String?
   amount      Float
   date        DateTime
   description String?
@@ -480,6 +462,64 @@ model FleetExpense {
 
   @@index([carId])
   @@index([expenseType])
+}
+
+enum OutstandingType {
+  RECEIVABLE // owed TO the platform (e.g. a platform hasn't yet paid out a trip)
+  PAYABLE    // owed BY the platform (e.g. an owner payout not yet transferred)
+}
+
+enum OutstandingStatus {
+  PENDING
+  PAID
+}
+
+// Ground-truthed exact cadence options from the real Financial ERP's recurring-
+// entry UI copy.
+enum OutstandingFrequency {
+  ONCE
+  EVERY_TRIP
+  EVERY_MONTH
+  EVERY_DUE
+  EVERY_PAYMENT
+  EVERY_COLLECTION
+}
+
+// Receivables & Payables ledger — merged in from the Financial ERP's
+// "outstandings" table. sourceType is free-text descriptive copy (e.g. "A
+// Trip", "A Direct Collection", "A Due We Owe", "A Payment We Made" in the
+// real app) rather than a rigid enum, since it's UI classification text, not
+// something the app branches on structurally — type/status/frequency are the
+// fields that actually drive balance-sheet math and are real enums.
+model Outstanding {
+  id             String               @id @default(uuid())
+  expectedDate   DateTime
+  paymentTo      String
+  amountOwed     Float
+  outstandingType OutstandingType
+  sourceType     String?
+  frequency      OutstandingFrequency @default(ONCE)
+  recurringGroup String?
+  status         OutstandingStatus    @default(PENDING)
+  paidDate       DateTime?
+  createdById    String
+  createdBy      User                 @relation(fields: [createdById], references: [id])
+  createdAt      DateTime             @default(now())
+
+  @@index([outstandingType])
+  @@index([status])
+}
+
+// Monthly opening/closing cash balance roll-up for the Command Center /
+// Monthly Cash Ledger view. month is a "YYYY-MM" string key, matching the real
+// system's PK exactly — this is a computed/scheduled roll-up rather than a
+// manually-entered transaction, so (unlike every other ledger model here) it
+// has no createdById attribution field.
+model MonthlyBalance {
+  month          String    @id
+  openingBalance Float
+  closingBalance Float?
+  createdAt      DateTime  @default(now())
 }
 
 // Host-requested vehicle maintenance/servicing (matches the "Vehicle Services"
