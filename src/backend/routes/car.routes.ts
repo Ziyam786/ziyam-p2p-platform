@@ -46,7 +46,7 @@ router.get('/cars', async (req: Request, res: Response) => {
   const cars = await prisma.car.findMany({
     where,
     orderBy,
-    include: { reviews: { select: { rating: true } }, owner: { select: { fullName: true } } },
+    include: { reviews: { where: { hidden: false }, select: { rating: true } }, owner: { select: { fullName: true } } },
   });
 
   const data = cars.map(withRatingSummary);
@@ -60,7 +60,7 @@ router.get('/cars/search', async (req: Request, res: Response) => {
   const { city } = req.query;
   const cars = await prisma.car.findMany({
     where: { city: String(city ?? ''), isAvailable: true },
-    include: { reviews: { select: { rating: true } }, owner: { select: { fullName: true, role: true } } },
+    include: { reviews: { where: { hidden: false }, select: { rating: true } }, owner: { select: { fullName: true, role: true } } },
   });
   res.json({ success: true, count: cars.length, data: cars.map(withRatingSummary) });
 });
@@ -72,6 +72,7 @@ router.get('/cars/:id', async (req: Request, res: Response) => {
     include: {
       owner: { select: { id: true, fullName: true, avatarUrl: true, bio: true, createdAt: true } },
       reviews: {
+        where: { hidden: false },
         include: { author: { select: { fullName: true, avatarUrl: true } } },
         orderBy: { createdAt: 'desc' },
       },
@@ -180,7 +181,7 @@ router.patch('/cars/:id', requireAuth, async (req: Request, res: Response) => {
 router.get('/cars/:id/review-summary', async (req: Request, res: Response) => {
   const { id } = req.params;
   const reviews = await prisma.review.findMany({
-    where: { carId: id, comment: { not: null } },
+    where: { carId: id, comment: { not: null }, hidden: false },
     orderBy: { createdAt: 'desc' },
     take: 30,
   });

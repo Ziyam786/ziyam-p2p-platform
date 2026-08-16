@@ -80,7 +80,7 @@ router.get('/host/:hostId/cars', requireAuth, async (req: Request, res: Response
 
   const cars = await prisma.car.findMany({
     where: { ownerId: hostId },
-    include: { reviews: { select: { rating: true } }, _count: { select: { bookings: true } } },
+    include: { reviews: { where: { hidden: false }, select: { rating: true } }, _count: { select: { bookings: true } } },
     orderBy: { createdAt: 'desc' },
   });
   const data = cars.map((c) => {

@@ -86,6 +86,33 @@ router.patch('/fleet/bookings/:id/received', async (req: Request, res: Response)
   res.json({ success: true, data: updated });
 });
 
+router.patch('/fleet/bookings/:id', async (req: Request, res: Response) => {
+  const existing = await prisma.platformBooking.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+  const ownIds = await ownedCarIds(req);
+  if (ownIds && !ownIds.includes(existing.carId)) return res.status(403).json({ error: 'Not your vehicle' });
+
+  const { platform, externalBookingId, bookedAt, totalFare, doorstepCharges, platformCommission, expectedCreditDate } = req.body;
+  try {
+    const updated = await prisma.platformBooking.update({
+      where: { id: req.params.id },
+      data: {
+        ...(platform !== undefined && { platform }),
+        ...(externalBookingId !== undefined && { externalBookingId }),
+        ...(bookedAt !== undefined && { bookedAt: new Date(bookedAt) }),
+        ...(totalFare !== undefined && { totalFare: Number(totalFare) }),
+        ...(doorstepCharges !== undefined && { doorstepCharges: Number(doorstepCharges) }),
+        ...(platformCommission !== undefined && { platformCommission: platformCommission === null ? null : Number(platformCommission) }),
+        ...(expectedCreditDate !== undefined && { expectedCreditDate: expectedCreditDate ? new Date(expectedCreditDate) : null }),
+      },
+    });
+    res.json({ success: true, data: updated });
+  } catch (err: any) {
+    if (err.code === 'P2002') return res.status(409).json({ error: 'A booking with this Booking ID already exists for this platform' });
+    throw err;
+  }
+});
+
 router.delete('/fleet/bookings/:id', async (req: Request, res: Response) => {
   const entry = await prisma.platformBooking.findUnique({ where: { id: req.params.id } });
   if (!entry) return res.status(404).json({ error: 'Not found' });
@@ -125,6 +152,26 @@ router.post('/fleet/journal-entries', async (req: Request, res: Response) => {
     },
   });
   res.status(201).json({ success: true, data: entry });
+});
+
+router.patch('/fleet/journal-entries/:id', async (req: Request, res: Response) => {
+  const existing = await prisma.journalEntry.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+  const ownIds = await ownedCarIds(req);
+  if (ownIds && !ownIds.includes(existing.carId)) return res.status(403).json({ error: 'Not your vehicle' });
+
+  const { collectionDate, amountCollected, totalAmount, category, remarks } = req.body;
+  const updated = await prisma.journalEntry.update({
+    where: { id: req.params.id },
+    data: {
+      ...(collectionDate !== undefined && { collectionDate: new Date(collectionDate) }),
+      ...(amountCollected !== undefined && { amountCollected: Number(amountCollected) }),
+      ...(totalAmount !== undefined && { totalAmount: Number(totalAmount) }),
+      ...(category !== undefined && { category }),
+      ...(remarks !== undefined && { remarks }),
+    },
+  });
+  res.json({ success: true, data: updated });
 });
 
 router.delete('/fleet/journal-entries/:id', async (req: Request, res: Response) => {
@@ -169,6 +216,34 @@ router.post('/fleet/expenses', async (req: Request, res: Response) => {
     },
   });
   res.status(201).json({ success: true, data: entry });
+});
+
+router.patch('/fleet/expenses/:id', async (req: Request, res: Response) => {
+  const existing = await prisma.fleetExpense.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+  if (existing.carId) {
+    const ownIds = await ownedCarIds(req);
+    if (ownIds && !ownIds.includes(existing.carId)) return res.status(403).json({ error: 'Not your vehicle' });
+  }
+
+  const { expenseType, carId, paymentMode, paidTo, amount, date, description } = req.body;
+  if (carId) {
+    const ownIds = await ownedCarIds(req);
+    if (ownIds && !ownIds.includes(carId)) return res.status(403).json({ error: 'Not your vehicle' });
+  }
+  const updated = await prisma.fleetExpense.update({
+    where: { id: req.params.id },
+    data: {
+      ...(expenseType !== undefined && { expenseType }),
+      ...(carId !== undefined && { carId: carId || null }),
+      ...(paymentMode !== undefined && { paymentMode }),
+      ...(paidTo !== undefined && { paidTo }),
+      ...(amount !== undefined && { amount: Number(amount) }),
+      ...(date !== undefined && { date: new Date(date) }),
+      ...(description !== undefined && { description }),
+    },
+  });
+  res.json({ success: true, data: updated });
 });
 
 router.delete('/fleet/expenses/:id', async (req: Request, res: Response) => {

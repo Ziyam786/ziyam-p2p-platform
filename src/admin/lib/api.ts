@@ -70,6 +70,7 @@ export const adminApi = {
   }) => post<{ success: true; data: AdminBooking }>('/admin/bookings', data),
 
   reviews: () => get<{ success: true; data: AdminReview[] }>('/admin/reviews'),
+  setReviewHidden: (id: string, hidden: boolean) => patch<{ success: true; data: AdminReview }>(`/admin/reviews/${id}`, { hidden }),
   deleteReview: (id: string) => del<{ success: true }>(`/admin/reviews/${id}`),
 
   payouts: (status?: string) => get<{ success: true; data: AdminPayout[] }>(`/admin/payouts${status ? `?status=${status}` : ''}`),
@@ -107,17 +108,23 @@ export const fleetApi = {
   bookings: (f: FleetFilters = {}) => get<{ success: true; count: number; data: PlatformBookingEntry[] }>(`/fleet/bookings${toQuery(f)}`),
   addBooking: (data: { carId: string; platform: string; externalBookingId: string; bookedAt: string; totalFare: number; doorstepCharges?: number; platformCommission?: number; expectedCreditDate?: string }) =>
     post<{ success: true; data: PlatformBookingEntry }>('/fleet/bookings', data),
+  updateBooking: (id: string, data: Partial<{ platform: string; externalBookingId: string; bookedAt: string; totalFare: number; doorstepCharges: number; platformCommission: number | null; expectedCreditDate: string | null }>) =>
+    patch<{ success: true; data: PlatformBookingEntry }>(`/fleet/bookings/${id}`, data),
   markBookingReceived: (id: string) => patch<{ success: true; data: PlatformBookingEntry }>(`/fleet/bookings/${id}/received`),
   deleteBooking: (id: string) => del<{ success: true }>(`/fleet/bookings/${id}`),
 
   journalEntries: (f: FleetFilters = {}) => get<{ success: true; count: number; data: JournalEntryRow[] }>(`/fleet/journal-entries${toQuery(f)}`),
   addJournalEntry: (data: { carId: string; collectionDate: string; amountCollected: number; totalAmount: number; category: string; remarks?: string }) =>
     post<{ success: true; data: JournalEntryRow }>('/fleet/journal-entries', data),
+  updateJournalEntry: (id: string, data: Partial<{ collectionDate: string; amountCollected: number; totalAmount: number; category: string; remarks: string }>) =>
+    patch<{ success: true; data: JournalEntryRow }>(`/fleet/journal-entries/${id}`, data),
   deleteJournalEntry: (id: string) => del<{ success: true }>(`/fleet/journal-entries/${id}`),
 
   expenses: (f: FleetFilters = {}) => get<{ success: true; count: number; data: FleetExpenseRow[] }>(`/fleet/expenses${toQuery(f)}`),
   addExpense: (data: { expenseType: string; carId?: string; paymentMode: string; paidTo?: string; amount: number; date: string; description?: string }) =>
     post<{ success: true; data: FleetExpenseRow }>('/fleet/expenses', data),
+  updateExpense: (id: string, data: Partial<{ expenseType: string; carId: string | null; paymentMode: string; paidTo: string; amount: number; date: string; description: string }>) =>
+    patch<{ success: true; data: FleetExpenseRow }>(`/fleet/expenses/${id}`, data),
   deleteExpense: (id: string) => del<{ success: true }>(`/fleet/expenses/${id}`),
 };
 

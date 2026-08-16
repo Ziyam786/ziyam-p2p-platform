@@ -106,6 +106,7 @@ export interface AdminReview {
   author?: { fullName: string };
   rating: number;
   comment?: string | null;
+  hidden: boolean;
   createdAt: string;
 }
 

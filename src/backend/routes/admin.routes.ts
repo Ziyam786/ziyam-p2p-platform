@@ -333,6 +333,20 @@ router.get('/admin/reviews', async (_req: Request, res: Response) => {
   res.json({ success: true, count: reviews.length, data: reviews });
 });
 
+// Soft-moderation: hides the review from all public listings (car detail,
+// search rating aggregation, host profile, AI review-summary) without
+// destroying it — preferred over delete for a disputed/reported review so
+// there's still a record if it's contested later. Delete remains for
+// genuinely bogus/spam reviews that don't need to be kept around.
+router.patch('/admin/reviews/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { hidden } = req.body;
+  if (typeof hidden !== 'boolean') return res.status(400).json({ error: 'hidden must be a boolean' });
+  const review = await prisma.review.update({ where: { id }, data: { hidden } });
+  await recordAudit(req.user!.userId, hidden ? 'HIDE_REVIEW' : 'UNHIDE_REVIEW', 'Review', id);
+  res.json({ success: true, data: review });
+});
+
 router.delete('/admin/reviews/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
   await prisma.review.delete({ where: { id } });
