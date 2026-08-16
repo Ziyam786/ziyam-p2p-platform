@@ -65,9 +65,9 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     team: [
       { name: 'Syed Fardeen', role: 'Founder & Director' },
       { name: 'Junaid Khan', role: 'Co-founder & Director' },
-      { name: 'Numer Saqlain M', role: 'Director' },
-      { name: 'Mohammed Azam A', role: 'Managing Director' },
-      { name: 'Shaik Afnan Sabil', role: 'VP, Operations' },
+      { name: 'Numer Saqlain M', role: 'Co-founder & Director' },
+      { name: 'Mohammed Azam A', role: 'Co-founder & Managing Director' },
+      { name: 'Shaik Afnan Sabil', role: 'Co-founder & VP Operations' },
     ],
   },
   commission_percentage: config.payout.platformCommission,
