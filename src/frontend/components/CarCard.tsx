@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import Rating from './Rating';
 import { useAuth } from '../lib/auth-context';
 import { useWishlist } from '../lib/wishlist-context';
@@ -37,14 +38,12 @@ export default function CarCard({ car }: CarCardProps) {
     <div className="card-elevated group bg-white rounded-2xl overflow-hidden flex flex-col border border-gray-100">
       {/* Image */}
       <div className="relative h-44 bg-gray-100 overflow-hidden">
-        <img
+        <Image
           src={image}
           alt={`${car.make} ${car.model}`}
-          loading="lazy"
-          decoding="async"
-          width={400}
-          height={280}
-          className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 will-change-transform"
+          fill
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          className="object-cover transition-transform duration-500 ease-out group-hover:scale-110 will-change-transform"
         />
         {!car.isAvailable && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
