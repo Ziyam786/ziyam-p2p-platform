@@ -106,7 +106,15 @@ export const carsApi = {
   reviewSummary: (carId: string) =>
     get<{ success: true; data: { summary: string | null; positiveTags: string[]; negativeTags: string[] } }>(`/cars/${carId}/review-summary`),
   incentives: (carId: string) => get<{ success: true; data: IncentiveProgress | null }>(`/cars/${carId}/incentives`),
+  availability: (carId: string) => get<{ success: true; data: AvailabilityRange[] }>(`/cars/${carId}/availability`),
 };
+
+export interface AvailabilityRange {
+  startDate: string;
+  endDate: string;
+  type: 'BOOKED' | 'PAUSED';
+  reason?: string | null;
+}
 
 /* ── Bookings ─────────────────────────────────────────────────────── */
 export interface PayuCheckoutSession {

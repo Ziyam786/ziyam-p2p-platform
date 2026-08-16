@@ -29,16 +29,22 @@ function buildMonthGrid(year: number, month: number): (Date | null)[][] {
 
 export default function PauseCalendar({
   blackouts,
+  bookedDates,
   rangeStart,
   rangeEnd,
   onPickDate,
   monthsAhead = 3,
+  interactive = true,
 }: {
   blackouts: Blackout[];
+  /** Dates already booked by a guest (read-only info, can't be selected for a new pause). */
+  bookedDates?: Set<string>;
   rangeStart: string | null;
   rangeEnd: string | null;
-  onPickDate: (isoDate: string) => void;
+  onPickDate?: (isoDate: string) => void;
   monthsAhead?: number;
+  /** false = pure display calendar (renter-facing availability view), no click-to-select. */
+  interactive?: boolean;
 }) {
   const today = startOfDay(new Date());
 
@@ -65,9 +71,10 @@ export default function PauseCalendar({
 
   return (
     <div className="space-y-6 max-h-96 overflow-y-auto pr-1">
-      <div className="flex items-center gap-4 text-xs text-gray-500">
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-400 inline-block" /> Your Pause</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> Selected</span>
+      <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-400 inline-block" /> Booked</span>
+        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-400 inline-block" /> {interactive ? 'Your Pause' : 'Unavailable'}</span>
+        {interactive && <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> Selected</span>}
       </div>
 
       {months.map(({ year, month }) => {
@@ -86,26 +93,33 @@ export default function PauseCalendar({
                 const iso = toISODate(date);
                 const isPast = date < today;
                 const isPaused = pausedDates.has(iso);
+                const isBooked = bookedDates?.has(iso) ?? false;
                 const isRangeStart = rangeStart === iso;
                 const isRangeEnd = rangeEnd === iso;
                 const inSelectedRange = rangeStart && rangeEnd && iso >= rangeStart && iso <= rangeEnd;
-                const isSelected = isRangeStart || isRangeEnd || inSelectedRange;
+                const isSelected = interactive && (isRangeStart || isRangeEnd || inSelectedRange);
+                const isDisabled = isPast || !interactive || isBooked;
 
                 return (
                   <button
                     key={iso}
                     type="button"
-                    disabled={isPast}
-                    onClick={() => onPickDate(iso)}
+                    disabled={isDisabled}
+                    onClick={() => onPickDate?.(iso)}
                     className={`relative text-xs py-2 rounded-lg transition ${
                       isPast ? 'text-gray-300 line-through cursor-not-allowed'
+                      : isBooked ? 'text-red-400 font-semibold cursor-not-allowed'
                       : isSelected ? 'bg-amber-400 text-white font-bold'
-                      : 'text-gray-700 hover:bg-amber-50'
+                      : interactive ? 'text-gray-700 hover:bg-amber-50'
+                      : (isPaused ? 'text-gray-400' : 'text-gray-700')
                     }`}
                   >
                     {date.getDate()}
-                    {isPaused && !isSelected && (
+                    {isPaused && !isSelected && !isBooked && (
                       <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-gray-400" />
+                    )}
+                    {isBooked && (
+                      <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-red-400" />
                     )}
                   </button>
                 );

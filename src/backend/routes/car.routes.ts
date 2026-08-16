@@ -81,6 +81,29 @@ router.get('/cars/:id', async (req: Request, res: Response) => {
   res.json({ success: true, data: { ...rest, rating, reviewCount, reviews } });
 });
 
+// Public read-only availability calendar — merged booked + host-paused date
+// ranges, with no booking/customer details exposed, so renters can see which
+// days are unavailable before picking dates (see AvailabilityCalendar.tsx).
+router.get('/cars/:id/availability', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const [bookings, blackouts] = await Promise.all([
+    prisma.booking.findMany({
+      where: { carId: id, status: { notIn: ['CANCELLED'] } },
+      select: { startTime: true, endTime: true },
+    }),
+    prisma.blackout.findMany({
+      where: { carId: id },
+      select: { startDate: true, endDate: true, reason: true },
+    }),
+  ]);
+
+  const ranges = [
+    ...bookings.map((b) => ({ startDate: b.startTime, endDate: b.endTime, type: 'BOOKED' as const })),
+    ...blackouts.map((b) => ({ startDate: b.startDate, endDate: b.endDate, type: 'PAUSED' as const, reason: b.reason })),
+  ];
+  res.json({ success: true, data: ranges });
+});
+
 router.patch('/cars/:id', requireAuth, async (req: Request, res: Response) => {
   const { id } = req.params;
   const car = await prisma.car.findUnique({ where: { id } });

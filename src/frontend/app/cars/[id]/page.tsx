@@ -6,10 +6,12 @@ import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
 import Rating from '../../../components/Rating';
 import CarLocationMap from '../../../components/CarLocationMap';
+import PauseCalendar from '../../../components/PauseCalendar';
 import { useAuth } from '../../../lib/auth-context';
 import { useToast } from '../../../components/Toast';
 import { carsApi, bookingsApi, settingsApi, promoApi, ApiError } from '../../../lib/api';
 import { getStickyDates } from '../../../lib/searchDates';
+import type { AvailabilityRange } from '../../../lib/api';
 import type { Car, LongRentalDiscount, Review } from '../../../lib/types';
 
 const INCLUDED_ITEMS = [
@@ -53,6 +55,8 @@ export default function CarDetailPage() {
   const [appliedPromo, setAppliedPromo] = useState<{ code: string; discount: number } | null>(null);
   const [promoError, setPromoError] = useState('');
   const [promoChecking, setPromoChecking] = useState(false);
+  const [availability, setAvailability] = useState<AvailabilityRange[]>([]);
+  const [showCalendar, setShowCalendar] = useState(false);
 
   // Carry over the dates picked on the homepage/search bar so the renter
   // doesn't have to re-enter them for whichever car they click into.
@@ -75,6 +79,7 @@ export default function CarDetailPage() {
       })
       .catch(() => active && setNotFound(true))
       .finally(() => active && setLoading(false));
+    carsApi.availability(params.id).then((res) => active && setAvailability(res.data)).catch(() => {});
     settingsApi
       .public()
       .then((res) => {
@@ -373,6 +378,37 @@ export default function CarDetailPage() {
               </div>
 
               <hr className="border-gray-100" />
+
+              {/* Availability calendar (read-only) */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowCalendar((s) => !s)}
+                  className="text-xs font-semibold text-amber-500 hover:text-amber-600 flex items-center gap-1"
+                >
+                  📅 {showCalendar ? 'Hide' : 'View'} availability calendar
+                </button>
+                {showCalendar && (
+                  <div className="mt-3 bg-gray-50 rounded-xl p-3">
+                    <PauseCalendar
+                      interactive={false}
+                      blackouts={availability.filter((r) => r.type === 'PAUSED').map((r) => ({ id: r.startDate + r.endDate, carId: car.id, startDate: r.startDate, endDate: r.endDate, reason: r.reason ?? null, createdAt: r.startDate }))}
+                      bookedDates={(() => {
+                        const set = new Set<string>();
+                        availability.filter((r) => r.type === 'BOOKED').forEach((r) => {
+                          for (let d = new Date(r.startDate); d <= new Date(r.endDate); d.setDate(d.getDate() + 1)) {
+                            set.add(new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().slice(0, 10));
+                          }
+                        });
+                        return set;
+                      })()}
+                      rangeStart={null}
+                      rangeEnd={null}
+                      monthsAhead={2}
+                    />
+                  </div>
+                )}
+              </div>
 
               {/* Date pickers */}
               <div>
