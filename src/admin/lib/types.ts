@@ -289,6 +289,7 @@ export interface OpsTripRow {
   status: OpsTripStatus;
   notes?: string | null;
   createdBy?: { fullName: string };
+  agent?: { fullName: string } | null;
   createdAt: string;
 }
 
