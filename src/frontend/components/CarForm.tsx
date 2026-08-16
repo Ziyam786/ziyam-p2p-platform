@@ -6,6 +6,7 @@ import { settingsApi } from '../lib/api';
 import FeaturePicker from './FeaturePicker';
 import AddressAutocomplete from './AddressAutocomplete';
 import FileUploadField from './FileUploadField';
+import SmartPriceSlider from './SmartPriceSlider';
 
 const CATEGORIES_FALLBACK = ['Hatchback', 'Sedan', 'SUV', 'Luxury', 'EV', 'MUV'];
 const FUEL_TYPES = ['Petrol', 'Diesel', 'Electric', 'CNG'];
@@ -18,6 +19,7 @@ export interface CarFormValues {
   kmIncludedPerDay: number; extraKmCharge: number; city: string; address: string;
   latitude: number | null; longitude: number | null; description: string;
   images: string[]; features: string; instantBook: boolean; offersDelivery: boolean; deliveryFee: number;
+  offersPickup: boolean; pickupFee: number;
 }
 
 const DEFAULTS: CarFormValues = {
@@ -25,7 +27,7 @@ const DEFAULTS: CarFormValues = {
   fuelType: 'Petrol', transmission: 'Manual', seats: 5, dailyRate: 1200, securityDeposit: 3000,
   kmIncludedPerDay: 300, extraKmCharge: 10, city: 'Bengaluru', address: '', latitude: null, longitude: null, description: '',
   images: [], features: 'Air Conditioning, Bluetooth / Aux, Power Steering', instantBook: true,
-  offersDelivery: false, deliveryFee: 0,
+  offersDelivery: false, deliveryFee: 0, offersPickup: false, pickupFee: 0,
 };
 
 export function carToFormValues(car: Car): CarFormValues {
@@ -36,6 +38,7 @@ export function carToFormValues(car: Car): CarFormValues {
     city: car.city, address: car.address ?? '', latitude: car.latitude ?? null, longitude: car.longitude ?? null,
     description: car.description ?? '', images: car.images, features: car.features.join(', '),
     instantBook: car.instantBook, offersDelivery: car.offersDelivery, deliveryFee: car.deliveryFee,
+    offersPickup: car.offersPickup, pickupFee: car.pickupFee,
   };
 }
 
@@ -49,6 +52,7 @@ export function formValuesToPayload(v: CarFormValues) {
     images: v.images,
     features: v.features.split(',').map((s) => s.trim()).filter(Boolean),
     instantBook: v.instantBook, offersDelivery: v.offersDelivery, deliveryFee: Number(v.deliveryFee),
+    offersPickup: v.offersPickup, pickupFee: Number(v.pickupFee),
   };
 }
 
@@ -130,10 +134,14 @@ export default function CarForm({
         </Field>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Field label="Daily Rate (₹)">
-          <input required type="number" min={0} value={values.dailyRate} onChange={(e) => set('dailyRate', Number(e.target.value))} className={inputCls} />
-        </Field>
+      <SmartPriceSlider
+        category={values.category}
+        city={values.city}
+        dailyRate={values.dailyRate}
+        onChange={(rate) => set('dailyRate', rate)}
+      />
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <Field label="Security Deposit (₹)">
           <input type="number" min={0} value={values.securityDeposit} onChange={(e) => set('securityDeposit', Number(e.target.value))} className={inputCls} />
         </Field>
@@ -206,8 +214,17 @@ export default function CarForm({
           <span className="text-sm text-gray-700">Allow Instant Book (skip host approval)</span>
         </label>
         <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={values.offersPickup} onChange={(e) => set('offersPickup', e.target.checked)} className="w-4 h-4 accent-amber-500" />
+          <span className="text-sm text-gray-700">Offer to pick up the car from the guest at drop-off</span>
+        </label>
+        {values.offersPickup && (
+          <Field label="Pickup Fee (₹)">
+            <input type="number" min={0} value={values.pickupFee} onChange={(e) => set('pickupFee', Number(e.target.value))} className={`${inputCls} max-w-[200px]`} />
+          </Field>
+        )}
+        <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={values.offersDelivery} onChange={(e) => set('offersDelivery', e.target.checked)} className="w-4 h-4 accent-amber-500" />
-          <span className="text-sm text-gray-700">Offer doorstep delivery</span>
+          <span className="text-sm text-gray-700">Offer doorstep delivery to the guest</span>
         </label>
         {values.offersDelivery && (
           <Field label="Delivery Fee (₹)">

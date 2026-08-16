@@ -126,7 +126,13 @@ function DashboardInner() {
                   />
                   <div className="flex-1 min-w-[180px]">
                     <p className="font-bold">{car.make} {car.model} <span className="text-gray-500 font-normal text-sm">({car.year})</span></p>
-                    <p className="text-xs text-gray-400">{car.registrationNo} · {car.city} · ₹{car.dailyRate}/day</p>
+                    <p className="text-xs text-gray-400">
+                      {car.registrationNo} · {car.city} · ₹{car.dailyRate}/day (₹{Math.round(car.dailyRate / 24)}/hr)
+                      {' · '}
+                      <span className="text-emerald-400 font-semibold">
+                        you earn ≈ ₹{Math.round((car.dailyRate / 24) * (metrics.totalGross > 0 ? metrics.netEarnings / metrics.totalGross : 0.7))}/hr
+                      </span>
+                    </p>
                     <div className="mt-1"><Rating value={car.rating} count={car.reviewCount} /></div>
                   </div>
                   <span className={`text-xs font-semibold px-3 py-1 rounded-full ${car.isAvailable ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>

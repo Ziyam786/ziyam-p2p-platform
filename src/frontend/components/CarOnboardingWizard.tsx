@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import FeaturePicker from './FeaturePicker';
 import AddressAutocomplete from './AddressAutocomplete';
 import FileUploadField from './FileUploadField';
+import SmartPriceSlider from './SmartPriceSlider';
 import { settingsApi } from '../lib/api';
 
 const CATEGORIES_FALLBACK = ['Hatchback', 'Sedan', 'SUV', 'Luxury', 'EV', 'MUV'];
@@ -234,8 +235,13 @@ export default function CarOnboardingWizard({
           <Field label="Description">
             <textarea value={values.description} onChange={(e) => set('description', e.target.value)} rows={3} className={inputCls} placeholder="Car is well maintained..." />
           </Field>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Field label="Daily Rate (₹)"><input required type="number" min={0} value={values.dailyRate} onChange={(e) => set('dailyRate', Number(e.target.value))} className={inputCls} /></Field>
+          <SmartPriceSlider
+            category={values.category}
+            city={values.city}
+            dailyRate={values.dailyRate}
+            onChange={(rate) => set('dailyRate', rate)}
+          />
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <Field label="Security Deposit (₹)"><input type="number" min={0} value={values.securityDeposit} onChange={(e) => set('securityDeposit', Number(e.target.value))} className={inputCls} /></Field>
             <Field label="Km Included/Day"><input type="number" min={0} value={values.kmIncludedPerDay} onChange={(e) => set('kmIncludedPerDay', Number(e.target.value))} className={inputCls} /></Field>
             <Field label="Extra Km Charge (₹)"><input type="number" min={0} value={values.extraKmCharge} onChange={(e) => set('extraKmCharge', Number(e.target.value))} className={inputCls} /></Field>

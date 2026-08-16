@@ -15,6 +15,7 @@ const PUBLIC_KEYS = [
   'long_rental_discounts',
   'testimonials',
   'company_info',
+  'smart_pricing',
 ] as const;
 
 export const DEFAULT_SETTINGS: Record<string, unknown> = {
@@ -43,6 +44,25 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     { value: 'STANDARD', label: 'Standard', ratePerDay: 149, desc: 'Reduced deposit hold + priority roadside assistance.' },
     { value: 'PREMIUM', label: 'Premium', ratePerDay: 349, desc: 'Lowest deposit hold + 24/7 priority support.' },
   ],
+  // Smart pricing baseline — no comparable-listings dataset exists yet (too
+  // few hosts to average against), so this admin-editable formula stands in
+  // for "market value" until real listing data makes an average meaningful.
+  // Hosts can't type a price; they scroll a slider capped between
+  // marketHourlyRate*0.95 and marketHourlyRate (see SmartPriceSlider.tsx).
+  smart_pricing: {
+    categoryHourlyRates: {
+      Hatchback: 50,
+      Sedan: 65,
+      SUV: 85,
+      Luxury: 150,
+      EV: 70,
+      MUV: 90,
+    },
+    cityMultipliers: {
+      Bengaluru: 1,
+    },
+    defaultCityMultiplier: 1,
+  },
   long_rental_discounts: [
     { minDays: 3, percent: 0.05 },
     { minDays: 5, percent: 0.10 },

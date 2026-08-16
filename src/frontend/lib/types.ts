@@ -169,6 +169,12 @@ export interface CompanyInfo {
   scopeNote: string; jurisdiction: string; team: { name: string; role: string }[];
 }
 
+export interface SmartPricing {
+  categoryHourlyRates: Record<string, number>;
+  cityMultipliers: Record<string, number>;
+  defaultCityMultiplier: number;
+}
+
 export interface PublicSettings {
   hero_title: string;
   hero_subtitle: string;
@@ -180,6 +186,7 @@ export interface PublicSettings {
   long_rental_discounts: LongRentalDiscount[];
   testimonials: Testimonial[];
   company_info: CompanyInfo;
+  smart_pricing: SmartPricing;
 }
 
 export interface PromoCode {
