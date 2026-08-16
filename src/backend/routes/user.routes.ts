@@ -38,7 +38,10 @@ router.get('/users/me', requireAuth, async (req: Request, res: Response) => {
 });
 
 router.patch('/users/me', requireAuth, async (req: Request, res: Response) => {
-  const { fullName, bio, avatarUrl, payoutAccountId, signatureUrl, selfieUrl, alternatePhoneNumber } = req.body;
+  const { fullName, bio, avatarUrl, payoutAccountId, signatureUrl, selfieUrl, alternatePhoneNumber, payoutFrequency } = req.body;
+  if (payoutFrequency !== undefined && !['STANDARD', 'WEEKLY'].includes(payoutFrequency)) {
+    return res.status(400).json({ error: 'payoutFrequency must be STANDARD or WEEKLY' });
+  }
   const user = await prisma.user.update({
     where: { id: req.user!.userId },
     data: {
@@ -49,6 +52,7 @@ router.patch('/users/me', requireAuth, async (req: Request, res: Response) => {
       ...(signatureUrl !== undefined && { signatureUrl }),
       ...(selfieUrl !== undefined && { selfieUrl }),
       ...(alternatePhoneNumber !== undefined && { alternatePhoneNumber }),
+      ...(payoutFrequency !== undefined && { payoutFrequency }),
     },
     select: PUBLIC_USER_SELECT,
   });

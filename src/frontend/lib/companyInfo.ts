@@ -16,8 +16,8 @@ export const COMPANY = {
   team: [
     { name: 'Syed Fardeen', role: 'Founder & Director' },
     { name: 'Junaid Khan', role: 'Co-founder & Director' },
-    { name: 'Numer Saqlain M', role: 'Co-founder' },
-    { name: 'Mohammed Azam A', role: 'Co-founder' },
-    { name: 'Shaik Afnan Sabil', role: 'Fleet General Managing Director' },
+    { name: 'Numer Saqlain M', role: 'Director' },
+    { name: 'Mohammed Azam A', role: 'Managing Director' },
+    { name: 'Shaik Afnan Sabil', role: 'VP, Operations' },
   ],
 };

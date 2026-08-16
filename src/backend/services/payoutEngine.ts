@@ -24,8 +24,16 @@ export class PayoutEngine {
   }
 
   /**
-   * Creates an escrow ledger entry with the N+1 settlement timestamp
-   * once a booking is confirmed.
+   * Creates an escrow ledger entry once a trip is complete and eligible for payout scheduling.
+   *
+   * Two payout policies, chosen by whether the car is fleet-operator managed:
+   *  - Self-hosted (Car.fleetManaged = false): scheduled 24-48hrs after trip end
+   *    (settlement_hours, admin-configurable), or bundled into the host's next
+   *    weekly run if they've opted into User.payoutFrequency = 'WEEKLY'.
+   *  - Fleet-managed: NOT called from trip completion at all — see
+   *    confirmFleetReceipt() below, which is the only entry point for those
+   *    bookings and starts a flat 1-day window once the fleet operator
+   *    confirms they've received a clear payout from the platform.
    */
   static async createEscrowLedger(bookingId: string) {
     const booking = await prisma.booking.findUnique({
@@ -33,10 +41,20 @@ export class PayoutEngine {
       include: { car: true },
     });
     if (!booking) throw new Error('Booking not found');
+    if (booking.car.fleetManaged) {
+      throw new Error('Fleet-managed bookings must go through confirmFleetReceipt(), not createEscrowLedger()');
+    }
 
+    const host = await prisma.user.findUnique({ where: { id: booking.car.ownerId } });
     const { platformFee, hostPayout } = await this.splitAmount(booking.totalAmount);
-    const settlementHours = await getSetting<number>('settlement_hours', config.payout.settlementHours);
-    const scheduledFor = new Date(booking.endTime.getTime() + settlementHours * 60 * 60 * 1000);
+
+    let scheduledFor: Date;
+    if (host?.payoutFrequency === 'WEEKLY') {
+      scheduledFor = this.nextWeeklyPayoutRun();
+    } else {
+      const settlementHours = await getSetting<number>('settlement_hours', config.payout.settlementHours);
+      scheduledFor = new Date(booking.endTime.getTime() + settlementHours * 60 * 60 * 1000);
+    }
 
     return prisma.payoutLedger.create({
       data: {
@@ -49,6 +67,53 @@ export class PayoutEngine {
         scheduledFor,
       },
     });
+  }
+
+  /**
+   * Fleet-operator counterpart to createEscrowLedger(): called when the fleet
+   * operator confirms they've received a clear payout from the platform for
+   * this booking. Schedules the host's payout exactly 1 day from now, per the
+   * fleet-managed N+1 policy (distinct from the self-hosted 24-48hr/weekly one).
+   */
+  static async confirmFleetReceipt(bookingId: string, fleetOperatorId: string) {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { car: true },
+    });
+    if (!booking) throw new Error('Booking not found');
+    if (!booking.car.fleetManaged) throw new Error('This car is not fleet-managed');
+    if (booking.car.fleetOperatorId !== fleetOperatorId) throw new Error('You are not the fleet operator for this car');
+    if (booking.fleetReceiptConfirmedAt) throw new Error('Receipt already confirmed for this booking');
+
+    const { platformFee, hostPayout } = await this.splitAmount(booking.totalAmount);
+    const scheduledFor = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await prisma.booking.update({
+      where: { id: bookingId },
+      data: { fleetReceiptConfirmedAt: new Date() },
+    });
+
+    return prisma.payoutLedger.create({
+      data: {
+        bookingId: booking.id,
+        hostId: booking.car.ownerId,
+        grossAmount: booking.totalAmount,
+        ziyamCut: platformFee,
+        netPayout: hostPayout,
+        status: PayoutStatus.HELD_IN_ESCROW,
+        scheduledFor,
+      },
+    });
+  }
+
+  /** Next Monday 09:00 server time — the fixed weekly payout batch run for hosts who opt into it. */
+  private static nextWeeklyPayoutRun(): Date {
+    const now = new Date();
+    const result = new Date(now);
+    const daysUntilMonday = (8 - result.getDay()) % 7 || 7;
+    result.setDate(result.getDate() + daysUntilMonday);
+    result.setHours(9, 0, 0, 0);
+    return result;
   }
 
   /** Runs hourly and releases any payout whose N+1 window has matured. */
