@@ -6,7 +6,11 @@ import { useToast } from '../../components/Toast';
 import { adminApi } from '../../lib/api';
 import type { AdminUser, Role } from '../../lib/types';
 
-const ROLES: Role[] = ['CUSTOMER', 'SELF_HOST', 'FLEET_OPERATOR', 'AGENT', 'ADMIN'];
+const ROLES: Role[] = [
+  'CUSTOMER', 'SELF_HOST', 'FLEET_OPERATOR', 'AGENT',
+  'FLEET_ADMIN', 'OPERATIONS_EXECUTIVE', 'MECHANICAL_EXECUTIVE', 'TECHNICIAN',
+  'ADMIN',
+];
 
 export default function UsersPage() {
   const { show } = useToast();

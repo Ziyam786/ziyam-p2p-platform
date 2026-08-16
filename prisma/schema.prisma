@@ -16,9 +16,33 @@ generator client {
 enum Role {
   CUSTOMER
   SELF_HOST
-  FLEET_OPERATOR
+  FLEET_OPERATOR // external business managing multiple owners' cars; self-signup-able (see signup/page.tsx)
   AGENT
+  // Internal Eightlines ops staff (Fleet Ops Admin Dashboard) — admin-provisioned only,
+  // never in the public signup role picker. Coarse-gated by requireRole(); fine-grained
+  // per-screen access comes from the orthogonal CustomRole.permissions layer below.
+  FLEET_ADMIN
+  OPERATIONS_EXECUTIVE
+  MECHANICAL_EXECUTIVE
+  TECHNICIAN
   ADMIN
+}
+
+// Granular "Who Can Do What" screen-level permissions for internal Ops/Finance staff —
+// orthogonal to the coarse Role enum above. A User optionally has one CustomRole
+// (User.customRoleId); requirePermission(screen) middleware checks
+// user.customRole.permissions[screen] === true, loaded fresh per-request since the JWT
+// itself only carries {userId, role}. ADMIN always passes regardless of CustomRole.
+// The 9 permission keys mirror the real Financial ERP's PERM_LABELS exactly: dashboard,
+// earnings, collections, expenses, outstandings, balanceSheet, plStatement, config, roles.
+model CustomRole {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  permissions Json     // { dashboard: bool, earnings: bool, collections: bool, expenses: bool, outstandings: bool, balanceSheet: bool, plStatement: bool, config: bool, roles: bool }
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 enum BookingStatus {
@@ -125,6 +149,25 @@ model User {
   // see Car.fleetManaged / the N+1 policy split in payoutEngine.ts)
   payoutFrequency String @default("STANDARD") // STANDARD (24-48hr after trip) | WEEKLY
 
+  // Internal Ops/Finance granular permissions (see CustomRole doc comment above)
+  customRoleId String?
+  customRole   CustomRole? @relation(fields: [customRoleId], references: [id])
+
+  // Fleet-partner identity extras (maps the Fleet Ops "owners" table onto this
+  // existing User rather than a separate Owner model — bank fields already exist above)
+  ownerCode String?
+
+  // Aug-2024 policy: payout eligibility requires BOTH signatures on the Partner
+  // Agreement — distinct from signatureUrl (a general reusable lease-agreement
+  // signature) and from Booking's per-trip Setu eSign fields. Computed at
+  // check-time in the Ops payout-release route, never persisted as a boolean:
+  // payoutEligible = Boolean(partnerAgreementWetSignedUrl) && partnerAgreementEsignStatus === 'sign_complete'
+  partnerAgreementWetSignedUrl   String?
+  partnerAgreementWetSignedAt    DateTime?
+  partnerAgreementEsignRequestId String?
+  partnerAgreementEsignStatus    String? // sign_initiated | sign_pending | sign_in_progress | sign_complete
+  partnerAgreementEsignDownloadUrl String?
+
   cars            Car[]
   fleetManagedCars Car[]         @relation("FleetOperatorCars")
   bookings        Booking[]      @relation("CustomerBookings")
@@ -187,6 +230,34 @@ model Car {
   pollutionCertUrl   String?
   insuranceDocUrl    String?
   onboardingStep     Int                   @default(0) // 0-4, drives the "Steps Completed" progress ring
+
+  // Fleet Ops internal asset-record fields (merged in from the standalone Fleet Ops
+  // Admin Dashboard — same physical vehicle, since it earns revenue across multiple
+  // channels including this platform's own "Ziyam Direct" listing).
+  vehicleCode           String?
+  chassis               String?
+  currentOdo            Float?
+  lastServiceOdo        Float?
+  lastServiceDate       DateTime?
+  serviceScheduledDate  DateTime?
+  insuranceExpiry       DateTime?
+  rcExpiry              DateTime?
+  pucExpiry             DateTime?
+  fuelLevel             Float?
+
+  // Ops pause/service state — mirrors the real production system exactly (ground-
+  // truthed from the live app's source, not the marketing doc's richer-sounding
+  // "Awaiting/Pending/Approved/Rejected" 4-state description): fleetStatus is only
+  // ever 'active' or 'paused'; pauseReason disambiguates *why* — 'personal' (owner-
+  // requested, needs admin approval via pauseStatus) or 'service' (ops-initiated,
+  // no approval step, cleared automatically when the mechanic logs the service).
+  // pauseStatus is null once approved (status='paused' IS the "approved" state) —
+  // there's no separate "approved" string in the real system.
+  fleetStatus  String    @default("active") // active | paused
+  pauseReason  String?   // personal | service
+  pauseStatus  String?   // pending | rejected (null once approved, or when not personal)
+  pauseFrom    DateTime?
+  pauseUntil   DateTime?
 
   // Booking preferences (host-controlled)
   noNightBookings       Boolean @default(false)

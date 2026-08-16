@@ -1,4 +1,7 @@
-export type Role = 'CUSTOMER' | 'SELF_HOST' | 'FLEET_OPERATOR' | 'AGENT' | 'ADMIN';
+export type Role =
+  | 'CUSTOMER' | 'SELF_HOST' | 'FLEET_OPERATOR' | 'AGENT'
+  | 'FLEET_ADMIN' | 'OPERATIONS_EXECUTIVE' | 'MECHANICAL_EXECUTIVE' | 'TECHNICIAN'
+  | 'ADMIN';
 
 export type BookingStatus = 'PENDING' | 'PENDING_PAYMENT' | 'CONFIRMED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 
@@ -81,6 +84,8 @@ export interface Car {
 
   fleetManaged: boolean;
   fleetOperatorId?: string | null;
+
+  chassis?: string | null;
 }
 
 export interface Booking {

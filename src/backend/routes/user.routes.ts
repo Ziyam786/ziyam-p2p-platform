@@ -144,7 +144,9 @@ router.post('/bookings/:id/esign/start', requireAuth, async (req: Request, res: 
       createdAt: booking.createdAt,
       hostName: booking.car.owner.fullName,
       guestName: booking.customer.fullName,
+      guestPhone: booking.customer.phoneNumber,
       registrationNo: booking.car.registrationNo,
+      chassisNo: booking.car.chassis,
       make: booking.car.make,
       model: booking.car.model,
       year: booking.car.year,
@@ -152,6 +154,7 @@ router.post('/bookings/:id/esign/start', requireAuth, async (req: Request, res: 
       endTime: booking.endTime,
       protectionPlan: booking.protectionPlan,
       totalAmount: booking.totalAmount,
+      securityDeposit: booking.car.securityDeposit,
     });
     const { documentId } = await esignApi.uploadDocument(pdf, `lease-agreement-${booking.id.slice(0, 8)}`);
     const signature = await esignApi.createSignatureRequest(
