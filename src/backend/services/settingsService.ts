@@ -22,10 +22,10 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
   hero_subtitle:
     'Rent verified self-drive cars from trusted hosts across India. No driver. No restrictions. Just open roads.',
   trust_badges: [
-    { label: '1 Lakh+', sub: 'Happy Renters' },
-    { label: '5,000+', sub: 'Verified Cars' },
-    { label: '30+ Cities', sub: 'Pan-India' },
-    { label: '4.6 ★', sub: 'Average Rating' },
+    { label: 'DigiLocker', sub: 'KYC Verified' },
+    { label: 'Escrow-Held', sub: 'Security Deposits' },
+    { label: 'N+1', sub: 'Guaranteed Payouts' },
+    { label: 'Zero', sub: 'Hidden Fees' },
   ],
   categories: [
     { label: 'Hatchback', icon: '🚘', desc: 'Compact & affordable' },
@@ -37,11 +37,6 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
   ],
   cities: [
     { name: 'Bengaluru', emoji: '🏙️' },
-    { name: 'Mumbai', emoji: '🌊' },
-    { name: 'Delhi NCR', emoji: '🕌' },
-    { name: 'Hyderabad', emoji: '🏯' },
-    { name: 'Chennai', emoji: '🎭' },
-    { name: 'Pune', emoji: '🎓' },
   ],
   protection_plans: [
     { value: 'BASIC', label: 'Basic', ratePerDay: 0, desc: 'Standard third-party coverage, included free.' },
@@ -53,11 +48,7 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     { minDays: 5, percent: 0.10 },
     { minDays: 10, percent: 0.15 },
   ],
-  testimonials: [
-    { name: 'Ananya R.', quote: 'Booked a Creta for a weekend trip to Coorg — spotless car, host was super responsive. Way cheaper than the usual rental chains.', rating: 5 },
-    { name: 'Vikram S.', quote: "I've listed my Swift on Ziyam for 8 months now. The N+1 payouts land like clockwork and support actually picks up the phone.", rating: 5 },
-    { name: 'Fatima K.', quote: 'KYC took two minutes, car was delivered to my apartment. Didn\'t expect that level of convenience from a P2P platform.', rating: 4 },
-  ],
+  testimonials: [],
   company_info: {
     legalName: 'Eightlines Fleet Private Limited',
     brand: 'ZIYAM',
