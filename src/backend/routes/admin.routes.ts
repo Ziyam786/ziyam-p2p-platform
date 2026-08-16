@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from '../middleware/auth';
 import { recordAudit } from '../middleware/auditLog';
 import { PayoutEngine } from '../services/payoutEngine';
 import { hashPassword } from '../utils/password';
+import { notify } from '../services/notificationService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -324,6 +325,35 @@ router.patch('/admin/cars/:id', async (req: Request, res: Response) => {
     },
   });
   await recordAudit(req.user!.userId, 'UPDATE_CAR', 'Car', id, req.body);
+  res.json({ success: true, data: car });
+});
+
+// Manual document review — car.routes.ts auto-marks VERIFIED the moment a
+// host has all three docs on file (self-attested, no review gate), which is
+// enough to unblock listing but not a substitute for someone actually looking
+// at the RC/insurance/PUC. This lets an admin override that to REJECTED (with
+// a reason the host sees) or confirm it back to VERIFIED after review.
+router.patch('/admin/cars/:id/verification', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { verificationStatus, reason } = req.body;
+  if (!['PENDING', 'VERIFIED', 'REJECTED'].includes(verificationStatus)) {
+    return res.status(400).json({ error: 'verificationStatus must be PENDING, VERIFIED, or REJECTED' });
+  }
+  if (verificationStatus === 'REJECTED' && !String(reason ?? '').trim()) {
+    return res.status(400).json({ error: 'A reason is required when rejecting documents' });
+  }
+
+  const car = await prisma.car.update({ where: { id }, data: { verificationStatus } });
+  await recordAudit(req.user!.userId, 'UPDATE_CAR_VERIFICATION', 'Car', id, { verificationStatus, reason });
+
+  await notify(
+    car.ownerId,
+    'GENERIC',
+    verificationStatus === 'VERIFIED' ? 'Your vehicle documents were approved' : verificationStatus === 'REJECTED' ? 'Your vehicle documents were rejected' : 'Your vehicle documents are pending review',
+    verificationStatus === 'REJECTED' ? `Reason: ${reason}. Please re-upload corrected documents from your listing.` : verificationStatus === 'VERIFIED' ? 'Your RC, insurance, and pollution certificate have been verified.' : 'Your vehicle documents are back under review.',
+    '/host/dashboard'
+  );
+
   res.json({ success: true, data: car });
 });
 

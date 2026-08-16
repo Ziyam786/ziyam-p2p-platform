@@ -163,6 +163,8 @@ model User {
   requestedServices      ServiceRequest[]
   assignedServiceRequests ServiceRequest[] @relation("AgentServiceRequests")
   loggedOpsTrips         OpsTrip[]
+  assignedOpsTrips       OpsTrip[]      @relation("AgentOpsTrips")
+  loggedCashLogEntries   CashLogEntry[]
   loggedOpsInvoices      OpsInvoice[]
   loggedOpsPayments      OpsPayment[]
   loggedOutstandings     Outstanding[]
@@ -734,6 +736,38 @@ model OpsTrip {
   status          OpsTripStatus @default(SCHEDULED)
   notes           String?
 
+  // Ground-staff auto-assignment ("finger-cross" round robin — see
+  // pickLeastLoadedOpsAgent in agentAssignment.ts), reassignable by an admin.
+  assignedAgentId String?
+  agent           User?         @relation("AgentOpsTrips", fields: [assignedAgentId], references: [id])
+
+  // Identity verification captured at handover. OpsTrip customers have no User
+  // account (see model doc comment above), so this lives on the trip itself —
+  // mirrors the "Velosta Card" pattern: never store the full Aadhaar number,
+  // only a masked photo the agent captures, or a DigiLocker-verified name/
+  // address/last-4 fetched through the same Setu integration kyc.routes.ts
+  // already uses for renter/host KYC (see setuService.ts).
+  idVerificationMethod   String?   // MASKED_PHOTO | DIGILOCKER
+  maskedIdPhotoUrl       String?
+  dlFrontUrl             String?
+  dlBackUrl              String?
+  dlNumber               String?
+  digilockerRequestId    String?
+  digilockerStatus       String?   // unauthenticated | authenticated
+  digilockerVerifiedName String?
+  digilockerAddress      String?
+  digilockerAadhaarLast4 String?
+  saveIdentityToVault    Boolean   @default(false)
+
+  customerSignatureUrl   String?
+  vehiclePhotoUrls       String[]  @default([])
+  customerDecision       String?
+
+  depositAmount          Float?
+  depositCollected       Float?
+  depositPaymentMode     String?   // CASH | ONLINE
+  depositRefundedAt      DateTime?
+
   createdById     String
   createdBy       User          @relation(fields: [createdById], references: [id])
   createdAt       DateTime      @default(now())
@@ -741,9 +775,54 @@ model OpsTrip {
 
   images          OpsTripImage[]
   invoices        OpsInvoice[]
+  cashLogEntries  CashLogEntry[]
 
   @@index([carId])
   @@index([status])
+  @@index([assignedAgentId])
+}
+
+// Reusable verified-identity cache, keyed by phone number — lets an agent skip
+// re-capturing ID proof for a repeat walk-in customer ("Add to Vault" at
+// checkout below). Deliberately not tied to a User (walk-ins have none); a
+// later real signup can't retroactively claim this record automatically.
+model CustomerVaultEntry {
+  id                     String   @id @default(uuid())
+  phoneNumber            String   @unique
+  fullName               String?
+  idVerificationMethod   String?
+  maskedIdPhotoUrl       String?
+  dlFrontUrl             String?
+  dlBackUrl              String?
+  dlNumber               String?
+  digilockerVerifiedName String?
+  digilockerAddress      String?
+  digilockerAadhaarLast4 String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+enum CashLogType {
+  CASH_IN
+  CASH_OUT
+}
+
+// Ground-staff cash counter — the running cash-in/cash-out ledger an agent
+// reconciles against what's physically in the drawer at end of shift.
+model CashLogEntry {
+  id        String      @id @default(uuid())
+  agentId   String
+  agent     User        @relation(fields: [agentId], references: [id])
+  type      CashLogType
+  amount    Float
+  category  String      // Booking Collection | Deposit Collected | Deposit Refund | Fuel | Maintenance | Salary | Other
+  note      String?
+  tripId    String?
+  trip      OpsTrip?    @relation(fields: [tripId], references: [id])
+  createdAt DateTime    @default(now())
+
+  @@index([agentId, createdAt])
+  @@index([tripId])
 }
 
 model OpsTripImage {

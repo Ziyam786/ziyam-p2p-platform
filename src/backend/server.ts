@@ -40,6 +40,7 @@ app.use('/api', payuCallbackRoutes);
 const allowedOrigins = [
   config.clientUrl,
   config.adminUrl,
+  config.agentUrl,
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:3002',
@@ -60,8 +61,8 @@ app.use(cors({
       return;
     }
     
-    // Allow all Vercel deployments (ziyam-frontend-*.vercel.app, ziyam-admin-*.vercel.app)
-    if (origin.includes('vercel.app') && (origin.includes('ziyam-frontend') || origin.includes('ziyam-admin'))) {
+    // Allow all Vercel deployments (ziyam-frontend-*.vercel.app, ziyam-admin-*.vercel.app, ziyam-agent-*.vercel.app)
+    if (origin.includes('vercel.app') && (origin.includes('ziyam-frontend') || origin.includes('ziyam-admin') || origin.includes('ziyam-agent'))) {
       callback(null, true);
       return;
     }
