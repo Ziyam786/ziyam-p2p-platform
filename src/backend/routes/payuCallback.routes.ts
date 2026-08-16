@@ -3,6 +3,8 @@ import { PrismaClient, BookingStatus } from '@prisma/client';
 import { config } from '../config';
 import { verifyPayuResponseHash } from '../utils/payuHash';
 import { notify } from '../services/notificationService';
+import { startLeaseAgreementEsign } from '../services/leaseAgreementEsign';
+import { isSetuConfigured } from '../services/setuService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -74,6 +76,19 @@ router.post('/payments/payu/callback', async (req: Request, res: Response) => {
       `Your trip in the ${updated.car.make} ${updated.car.model} is booked.`,
       `/account/trips/${updated.id}`
     );
+
+    // Best-effort: kick off Setu eSign for the lease agreement right away so
+    // both host and guest get their signing link immediately, instead of
+    // waiting for either of them to open the agreement page and click "Start
+    // eSign". Never blocks the payment redirect — if Setu is unreachable or
+    // unconfigured, the manual button on /bookings/:id/agreement is still
+    // there as a fallback.
+    if (isSetuConfigured()) {
+      startLeaseAgreementEsign(bookingId).catch((err) => {
+        console.error(`[PAYU CALLBACK] Auto eSign trigger failed for booking ${bookingId}:`, err.response?.data ?? err.message);
+      });
+    }
+
     return res.redirect(303, `${redirectBase}/bookings/${bookingId}/confirmation`);
   }
 

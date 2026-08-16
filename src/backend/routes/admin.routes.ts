@@ -66,6 +66,7 @@ router.get('/admin/users', async (req: Request, res: Response) => {
     select: {
       id: true, fullName: true, email: true, phoneNumber: true, role: true,
       isKycVerified: true, isSuspended: true, createdAt: true,
+      customRoleId: true, customRole: { select: { name: true } },
       _count: { select: { cars: true, bookings: true } },
     },
     orderBy: { createdAt: 'desc' },
@@ -76,7 +77,7 @@ router.get('/admin/users', async (req: Request, res: Response) => {
 
 router.patch('/admin/users/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { isSuspended, isKycVerified, role } = req.body;
+  const { isSuspended, isKycVerified, role, customRoleId } = req.body;
 
   if (role !== undefined && !Object.values(Role).includes(role)) {
     return res.status(400).json({ error: 'Invalid role' });
@@ -88,13 +89,70 @@ router.patch('/admin/users/:id', async (req: Request, res: Response) => {
       ...(isSuspended !== undefined && { isSuspended: Boolean(isSuspended) }),
       ...(isKycVerified !== undefined && { isKycVerified: Boolean(isKycVerified) }),
       ...(role !== undefined && { role }),
+      ...(customRoleId !== undefined && { customRoleId: customRoleId || null }),
     },
     select: {
       id: true, fullName: true, email: true, role: true, isKycVerified: true, isSuspended: true,
+      customRoleId: true, customRole: { select: { name: true } },
     },
   });
   await recordAudit(req.user!.userId, 'UPDATE_USER', 'User', id, req.body);
   res.json({ success: true, data: user });
+});
+
+/* ── Custom Roles ("Who Can Do What" RBAC) ───────────────────────────── */
+// Kept ADMIN-only even though 'roles' is one of the 9 granted permission
+// keys elsewhere — granting a non-admin the power to create/edit permission
+// sets (including their own) is a meaningfully different, higher-stakes
+// capability than granting them read/write on a finance screen.
+const PERMISSION_KEYS = ['dashboard', 'earnings', 'collections', 'expenses', 'outstandings', 'balanceSheet', 'plStatement', 'config', 'roles'];
+
+router.get('/admin/custom-roles', async (_req: Request, res: Response) => {
+  const roles = await prisma.customRole.findMany({
+    include: { _count: { select: { users: true } } },
+    orderBy: { name: 'asc' },
+  });
+  res.json({ success: true, count: roles.length, data: roles });
+});
+
+router.post('/admin/custom-roles', async (req: Request, res: Response) => {
+  const { name, description, permissions } = req.body;
+  if (!name || typeof permissions !== 'object' || permissions === null) {
+    return res.status(400).json({ error: 'name and permissions are required' });
+  }
+  const cleaned = Object.fromEntries(PERMISSION_KEYS.map((k) => [k, Boolean(permissions[k])]));
+  try {
+    const role = await prisma.customRole.create({ data: { name, description, permissions: cleaned } });
+    await recordAudit(req.user!.userId, 'CREATE_CUSTOM_ROLE', 'CustomRole', role.id, req.body);
+    res.status(201).json({ success: true, data: role });
+  } catch (err: any) {
+    if (err.code === 'P2002') return res.status(409).json({ error: 'A role with this name already exists' });
+    throw err;
+  }
+});
+
+router.patch('/admin/custom-roles/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { name, description, permissions } = req.body;
+  const data: any = {};
+  if (name !== undefined) data.name = name;
+  if (description !== undefined) data.description = description;
+  if (permissions !== undefined) data.permissions = Object.fromEntries(PERMISSION_KEYS.map((k) => [k, Boolean(permissions[k])]));
+
+  const role = await prisma.customRole.update({ where: { id }, data });
+  await recordAudit(req.user!.userId, 'UPDATE_CUSTOM_ROLE', 'CustomRole', id, req.body);
+  res.json({ success: true, data: role });
+});
+
+router.delete('/admin/custom-roles/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  // Unassign before deleting rather than leaving users pointed at a dangling
+  // role — they fall back to whatever their base Role enum alone grants
+  // (nothing, for the internal-staff roles, until reassigned).
+  await prisma.user.updateMany({ where: { customRoleId: id }, data: { customRoleId: null } });
+  await prisma.customRole.delete({ where: { id } });
+  await recordAudit(req.user!.userId, 'DELETE_CUSTOM_ROLE', 'CustomRole', id, {});
+  res.json({ success: true });
 });
 
 /* ── Cars ─────────────────────────────────────────────────────────── */

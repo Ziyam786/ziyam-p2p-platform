@@ -88,9 +88,9 @@ const FAQS = [
 ];
 
 const HOST_STEPS = [
-  { icon: '📝', title: 'Register & List', desc: 'Submit your car details, photos, and pricing preferences. Verification takes 24 hours.' },
+  { icon: '📝', title: 'Register & List', desc: 'Submit your car details, photos, and pricing — document verification (RC/insurance/PUC) usually completes within a few hours.' },
   { icon: '📅', title: 'Manage Availability', desc: 'Set your calendar, blackout dates, and pricing per season from the Fleet Control Center.' },
-  { icon: '💰', title: 'Earn 70%', desc: 'You keep 70% of every booking. Ziyam handles payments, insurance, and marketing.' },
+  { icon: '💰', title: 'Earn 70%', desc: 'You keep 70% of every booking. Ziyam handles payments, guest verification, and marketing.' },
   { icon: '🏦', title: 'N+1 Payouts', desc: 'Earnings are settled automatically to your linked bank account on an N+1 cycle.' },
 ];
 

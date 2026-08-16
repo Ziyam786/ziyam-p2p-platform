@@ -14,6 +14,24 @@ const PAYU_COMMAND_URL =
     : 'https://test.payu.in/merchant/postservice.php?form=2';
 
 export class PayoutEngine {
+  /**
+   * Aug-2024 policy: no payout schedules until the host has completed BOTH a
+   * wet (physically-signed, photographed) and an e-signed Host Onboarding
+   * Agreement — "No payouts will be released until documentation is fully
+   * completed." Computed at check-time, matching house style elsewhere
+   * (docsComplete/stepsCompleted in CarOnboardingWizard) — never persisted as
+   * a boolean since the underlying fields can change at any time.
+   */
+  private static assertPayoutEligible(host: { partnerAgreementWetSignedUrl: string | null; partnerAgreementEsignStatus: string | null }) {
+    const eligible = Boolean(host.partnerAgreementWetSignedUrl) && host.partnerAgreementEsignStatus === 'sign_complete';
+    if (!eligible) {
+      throw new Error(
+        'Payout blocked: this host has not completed the Host Onboarding Agreement (both wet and e-signature required). ' +
+        'Ask them to finish it from Account → Host Agreement.'
+      );
+    }
+  }
+
   /** Splits a gross booking amount into platform fee + host payout, using the live (admin-editable) split if set. */
   static async splitAmount(totalAmount: number) {
     const commission = await getSetting<number>('commission_percentage', config.payout.platformCommission);
@@ -46,6 +64,9 @@ export class PayoutEngine {
     }
 
     const host = await prisma.user.findUnique({ where: { id: booking.car.ownerId } });
+    if (!host) throw new Error('Host account not found');
+    this.assertPayoutEligible(host);
+
     const { platformFee, hostPayout } = await this.splitAmount(booking.totalAmount);
 
     let scheduledFor: Date;
@@ -84,6 +105,10 @@ export class PayoutEngine {
     if (!booking.car.fleetManaged) throw new Error('This car is not fleet-managed');
     if (booking.car.fleetOperatorId !== fleetOperatorId) throw new Error('You are not the fleet operator for this car');
     if (booking.fleetReceiptConfirmedAt) throw new Error('Receipt already confirmed for this booking');
+
+    const host = await prisma.user.findUnique({ where: { id: booking.car.ownerId } });
+    if (!host) throw new Error('Host account not found');
+    this.assertPayoutEligible(host);
 
     const { platformFee, hostPayout } = await this.splitAmount(booking.totalAmount);
     const scheduledFor = new Date(Date.now() + 24 * 60 * 60 * 1000);

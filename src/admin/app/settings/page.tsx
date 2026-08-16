@@ -12,6 +12,11 @@ interface CompanyInfo {
   scopeNote: string; jurisdiction: string; team: { name: string; role: string }[];
 }
 
+interface DemandPricing {
+  weekendBump: number; peakHourBump: number; peakHours: [number, number][];
+  holidayBump: number; maxMultiplier: number; publicHolidays: string[];
+}
+
 const rowInput = 'bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500';
 
 export default function SettingsPage() {
@@ -28,6 +33,14 @@ export default function SettingsPage() {
   const [savingAi, setSavingAi] = useState(false);
   const [company, setCompany] = useState<CompanyInfo | null>(null);
   const [savingCompany, setSavingCompany] = useState(false);
+  const [demand, setDemand] = useState<DemandPricing | null>(null);
+  const [holidaysText, setHolidaysText] = useState('');
+  const [savingDemand, setSavingDemand] = useState(false);
+
+  const [gstin, setGstin] = useState('');
+  const [homeState, setHomeState] = useState('Karnataka');
+  const [gstRate, setGstRate] = useState(5);
+  const [savingGst, setSavingGst] = useState(false);
 
   useEffect(() => {
     adminApi
@@ -42,9 +55,33 @@ export default function SettingsPage() {
         setAiEnabled((byKey.get('ai_chat_enabled') as boolean) ?? true);
         setAiPrompt((byKey.get('ai_chat_system_prompt') as string) ?? '');
         setCompany((byKey.get('company_info') as CompanyInfo) ?? null);
+        const d = byKey.get('demand_pricing') as DemandPricing | undefined;
+        if (d) {
+          setDemand(d);
+          setHolidaysText(d.publicHolidays.join('\n'));
+        }
+        setGstin((byKey.get('company_gstin') as string) ?? '');
+        setHomeState((byKey.get('company_home_state') as string) ?? 'Karnataka');
+        setGstRate(Math.round(((byKey.get('default_gst_rate') as number) ?? 0.05) * 100));
       })
       .finally(() => setLoading(false));
   }, []);
+
+  async function saveGstSettings() {
+    setSavingGst(true);
+    try {
+      await Promise.all([
+        adminApi.updateSetting('company_gstin', gstin),
+        adminApi.updateSetting('company_home_state', homeState),
+        adminApi.updateSetting('default_gst_rate', gstRate / 100),
+      ]);
+      show('GST settings updated', 'success');
+    } catch (err: any) {
+      show(err.message ?? 'Failed to save', 'error');
+    } finally {
+      setSavingGst(false);
+    }
+  }
 
   async function saveCompanySettings() {
     if (!company) return;
@@ -56,6 +93,20 @@ export default function SettingsPage() {
       show(err.message ?? 'Failed to save', 'error');
     } finally {
       setSavingCompany(false);
+    }
+  }
+
+  async function saveDemandPricing() {
+    if (!demand) return;
+    setSavingDemand(true);
+    try {
+      const publicHolidays = holidaysText.split('\n').map((s) => s.trim()).filter(Boolean);
+      await adminApi.updateSetting('demand_pricing', { ...demand, publicHolidays });
+      show('Demand pricing updated', 'success');
+    } catch (err: any) {
+      show(err.message ?? 'Failed to save', 'error');
+    } finally {
+      setSavingDemand(false);
     }
   }
 
@@ -231,6 +282,89 @@ export default function SettingsPage() {
 
           <button onClick={savePayoutSettings} disabled={saving} className="bg-brand-600 hover:bg-brand-700 disabled:bg-slate-700 text-white text-sm font-bold px-5 py-2.5 rounded-lg transition">
             {saving ? 'Saving…' : 'Save Payout & Pricing Settings'}
+          </button>
+        </div>
+
+        {demand && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <h2 className="font-bold text-slate-100 mb-1">Demand Pricing</h2>
+            <p className="text-xs text-slate-500 mb-5">
+              Renter-facing surge on top of a car's listed rate — bumps stack additively and are capped at the max
+              multiplier below. Keyed off the trip's pickup time.
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Weekend Bump (%)</label>
+                <input type="number" min={0} max={100} value={Math.round(demand.weekendBump * 100)} onChange={(e) => setDemand({ ...demand, weekendBump: Number(e.target.value) / 100 })} className={`${rowInput} w-full`} />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Peak Hour Bump (%)</label>
+                <input type="number" min={0} max={100} value={Math.round(demand.peakHourBump * 100)} onChange={(e) => setDemand({ ...demand, peakHourBump: Number(e.target.value) / 100 })} className={`${rowInput} w-full`} />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Holiday Bump (%)</label>
+                <input type="number" min={0} max={100} value={Math.round(demand.holidayBump * 100)} onChange={(e) => setDemand({ ...demand, holidayBump: Number(e.target.value) / 100 })} className={`${rowInput} w-full`} />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Max Multiplier (×)</label>
+                <input type="number" min={1} step={0.1} value={demand.maxMultiplier} onChange={(e) => setDemand({ ...demand, maxMultiplier: Number(e.target.value) })} className={`${rowInput} w-full`} />
+              </div>
+            </div>
+
+            <h3 className="text-sm font-semibold text-slate-300 mb-2">Peak Hour Windows</h3>
+            <div className="space-y-2 mb-5">
+              {demand.peakHours.map(([start, end], i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <input type="number" min={0} max={23} value={start} onChange={(e) => setDemand({ ...demand, peakHours: demand.peakHours.map((w, j) => j === i ? [Number(e.target.value), w[1]] : w) as [number, number][] })} className={`${rowInput} w-20`} />
+                  <span className="text-xs text-slate-400">to</span>
+                  <input type="number" min={0} max={23} value={end} onChange={(e) => setDemand({ ...demand, peakHours: demand.peakHours.map((w, j) => j === i ? [w[0], Number(e.target.value)] : w) as [number, number][] })} className={`${rowInput} w-20`} />
+                  <span className="text-xs text-slate-400">(24hr)</span>
+                  <button onClick={() => setDemand({ ...demand, peakHours: demand.peakHours.filter((_, j) => j !== i) })} className="text-red-400 hover:text-red-300 px-2 text-sm ml-auto">✕</button>
+                </div>
+              ))}
+              <button onClick={() => setDemand({ ...demand, peakHours: [...demand.peakHours, [7, 10]] })} className="text-xs text-brand-400 hover:text-brand-300 font-semibold">
+                + Add peak window
+              </button>
+            </div>
+
+            <h3 className="text-sm font-semibold text-slate-300 mb-2">Public Holidays (one date per line, YYYY-MM-DD)</h3>
+            <textarea
+              value={holidaysText}
+              onChange={(e) => setHolidaysText(e.target.value)}
+              rows={5}
+              className={`${rowInput} w-full mb-5 font-mono text-xs`}
+            />
+
+            <button onClick={saveDemandPricing} disabled={savingDemand} className="bg-brand-600 hover:bg-brand-700 disabled:bg-slate-700 text-white text-sm font-bold px-5 py-2.5 rounded-lg transition">
+              {savingDemand ? 'Saving…' : 'Save Demand Pricing'}
+            </button>
+          </div>
+        )}
+
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+          <h2 className="font-bold text-slate-100 mb-1">GST / Invoicing</h2>
+          <p className="text-xs text-slate-500 mb-5">
+            Powers the tax breakdown on generated invoices. GSTIN is empty until you enter the real registered
+            number — the rate below is a placeholder; confirm your actual applicable rate with a tax advisor before
+            relying on invoices for filing.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">Company GSTIN</label>
+              <input value={gstin} onChange={(e) => setGstin(e.target.value)} placeholder="Not yet entered" className={`${rowInput} w-full`} />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">Home State (for CGST+SGST vs IGST)</label>
+              <input value={homeState} onChange={(e) => setHomeState(e.target.value)} className={`${rowInput} w-full`} />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">Default GST Rate (%)</label>
+              <input type="number" min={0} max={28} value={gstRate} onChange={(e) => setGstRate(Number(e.target.value))} className={`${rowInput} w-full`} />
+            </div>
+          </div>
+          <button onClick={saveGstSettings} disabled={savingGst} className="bg-brand-600 hover:bg-brand-700 disabled:bg-slate-700 text-white text-sm font-bold px-5 py-2.5 rounded-lg transition">
+            {savingGst ? 'Saving…' : 'Save GST Settings'}
           </button>
         </div>
 

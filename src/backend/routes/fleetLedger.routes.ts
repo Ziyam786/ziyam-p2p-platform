@@ -1,16 +1,23 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, Prisma } from '@prisma/client';
-import { requireAuth, requireRole } from '../middleware/auth';
+import { requireAuth, requireRole, requirePermission } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
 
-// Fleet-financial data is internal ops tooling: fleet operators see only their
-// own cars' entries, admins see everything.
-router.use('/fleet', requireAuth, requireRole('FLEET_OPERATOR', 'ADMIN'));
+// Fleet-financial data is internal ops tooling: fleet operators see only
+// their own cars' entries (row-level scoping via ownedCarIds below); internal
+// FLEET_ADMIN staff see everything but are further gated per-screen by
+// requirePermission below (earnings/collections/expenses are 3 of the real
+// ERP's 9 "Who Can Do What" permission keys — a FLEET_ADMIN might be granted
+// only some of them); admins see and can do everything.
+router.use('/fleet', requireAuth, requireRole('FLEET_OPERATOR', 'FLEET_ADMIN', 'ADMIN'));
+router.use('/fleet/bookings', requirePermission('earnings'));
+router.use('/fleet/journal-entries', requirePermission('collections'));
+router.use('/fleet/expenses', requirePermission('expenses'));
 
 async function ownedCarIds(req: Request): Promise<string[] | undefined> {
-  if (req.user!.role === 'ADMIN') return undefined; // no restriction
+  if (req.user!.role === 'ADMIN' || req.user!.role === 'FLEET_ADMIN') return undefined; // no restriction — internal staff, not a car owner
   const cars = await prisma.car.findMany({ where: { ownerId: req.user!.userId }, select: { id: true } });
   return cars.map((c) => c.id);
 }
@@ -44,7 +51,7 @@ router.get('/fleet/bookings', async (req: Request, res: Response) => {
 });
 
 router.post('/fleet/bookings', async (req: Request, res: Response) => {
-  const { carId, platform, externalBookingId, bookedAt, totalFare, doorstepCharges, platformCommission } = req.body;
+  const { carId, platform, externalBookingId, bookedAt, totalFare, doorstepCharges, platformCommission, expectedCreditDate } = req.body;
   if (!carId || !platform || !externalBookingId || !bookedAt || totalFare === undefined) {
     return res.status(400).json({ error: 'carId, platform, externalBookingId, bookedAt, and totalFare are required' });
   }
@@ -57,6 +64,7 @@ router.post('/fleet/bookings', async (req: Request, res: Response) => {
         carId, platform, externalBookingId, bookedAt: new Date(bookedAt),
         totalFare: Number(totalFare), doorstepCharges: Number(doorstepCharges ?? 0),
         platformCommission: platformCommission !== undefined ? Number(platformCommission) : undefined,
+        expectedCreditDate: expectedCreditDate ? new Date(expectedCreditDate) : undefined,
         createdById: req.user!.userId,
       },
     });
@@ -65,6 +73,17 @@ router.post('/fleet/bookings', async (req: Request, res: Response) => {
     if (err.code === 'P2002') return res.status(409).json({ error: 'A booking with this Booking ID already exists for this platform' });
     throw err;
   }
+});
+
+// Marks a platform booking's revenue as actually credited/received — gates
+// Command Center cash-position math (see ground-truthed tripCredited() logic).
+router.patch('/fleet/bookings/:id/received', async (req: Request, res: Response) => {
+  const entry = await prisma.platformBooking.findUnique({ where: { id: req.params.id } });
+  if (!entry) return res.status(404).json({ error: 'Not found' });
+  const ownIds = await ownedCarIds(req);
+  if (ownIds && !ownIds.includes(entry.carId)) return res.status(403).json({ error: 'Not your vehicle' });
+  const updated = await prisma.platformBooking.update({ where: { id: req.params.id }, data: { received: true } });
+  res.json({ success: true, data: updated });
 });
 
 router.delete('/fleet/bookings/:id', async (req: Request, res: Response) => {
@@ -134,7 +153,7 @@ router.get('/fleet/expenses', async (req: Request, res: Response) => {
 });
 
 router.post('/fleet/expenses', async (req: Request, res: Response) => {
-  const { expenseType, carId, paymentMode, amount, date, description } = req.body;
+  const { expenseType, carId, paymentMode, paidTo, amount, date, description } = req.body;
   if (!expenseType || !paymentMode || amount === undefined || !date) {
     return res.status(400).json({ error: 'expenseType, paymentMode, amount, and date are required' });
   }
@@ -145,7 +164,7 @@ router.post('/fleet/expenses', async (req: Request, res: Response) => {
 
   const entry = await prisma.fleetExpense.create({
     data: {
-      expenseType, carId: carId || undefined, paymentMode, amount: Number(amount),
+      expenseType, carId: carId || undefined, paymentMode, paidTo, amount: Number(amount),
       date: new Date(date), description, createdById: req.user!.userId,
     },
   });

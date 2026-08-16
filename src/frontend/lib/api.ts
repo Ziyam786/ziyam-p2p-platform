@@ -4,6 +4,8 @@ import type {
 } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api';
+// Uploaded files are served from the API's root (/uploads/...), not under /api.
+export const API_ORIGIN = API_URL.replace(/\/api\/?$/, '');
 
 export class ApiError extends Error {
   status: number;
@@ -38,6 +40,27 @@ const get = <T>(path: string) => request<T>(path);
 const post = <T>(path: string, data?: unknown) => request<T>(path, { method: 'POST', body: data ? JSON.stringify(data) : undefined });
 const patch = <T>(path: string, data?: unknown) => request<T>(path, { method: 'PATCH', body: data ? JSON.stringify(data) : undefined });
 const del = <T>(path: string) => request<T>(path, { method: 'DELETE' });
+
+/* ── Uploads ──────────────────────────────────────────────────────── */
+// Car photos, RC/insurance/PUC documents, selfies, and signatures are
+// uploaded as actual files (not pasted URLs) — see backend upload.routes.ts.
+export const uploadsApi = {
+  upload: async (file: File): Promise<{ url: string }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_URL}/uploads`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+    const isJson = res.headers.get('content-type')?.includes('application/json');
+    const body = isJson ? await res.json().catch(() => ({})) : undefined;
+    if (!res.ok) {
+      throw new ApiError(body?.error ?? `Upload failed with status ${res.status}`, res.status);
+    }
+    return { url: `${API_ORIGIN}${body.data.url}` };
+  },
+};
 
 /* ── Auth ─────────────────────────────────────────────────────────── */
 export const authApi = {
@@ -83,7 +106,38 @@ export const carsApi = {
   reviewSummary: (carId: string) =>
     get<{ success: true; data: { summary: string | null; positiveTags: string[]; negativeTags: string[] } }>(`/cars/${carId}/review-summary`),
   incentives: (carId: string) => get<{ success: true; data: IncentiveProgress | null }>(`/cars/${carId}/incentives`),
+  availability: (carId: string) => get<{ success: true; data: AvailabilityRange[] }>(`/cars/${carId}/availability`),
+
+  fleetOnboardingStatus: (carId: string) => get<{ success: true; data: FleetOnboardingStatus }>(`/cars/${carId}/fleet-onboarding`),
+  submitFleetAudit: (carId: string) =>
+    post<{ success: true; data: Car }>(`/cars/${carId}/fleet-onboarding/audit`, { confirmedEligible: true }),
+  submitFleetSecurity: (carId: string, telematicsImei: string) =>
+    patch<{ success: true; data: Car }>(`/cars/${carId}/fleet-onboarding/security`, { telematicsImei }),
+  uploadFleetAgreementWetSignature: (carId: string, url: string) =>
+    patch<{ success: true; data: Car; message: string }>(`/cars/${carId}/fleet-onboarding/agreement/wet-signature`, { url }),
+  startFleetAgreementEsign: (carId: string) =>
+    post<{ success: true; data: { esignRequestId: string } }>(`/cars/${carId}/fleet-onboarding/agreement/esign/start`),
+  fleetAgreementEsignStatus: (carId: string) =>
+    get<{ success: true; data: { status: string | null; downloadUrl?: string } }>(`/cars/${carId}/fleet-onboarding/agreement/esign/status`),
 };
+
+export interface FleetOnboardingStatus {
+  fleetOnboardingStep: number;
+  fleetManaged: boolean;
+  telematicsImei: string | null;
+  fleetAgreementWetSignedUrl?: string | null;
+  fleetAgreementWetSignedAt?: string | null;
+  fleetAgreementEsignStatus?: string | null;
+  fleetAgreementEsignDownloadUrl?: string | null;
+  fleetOperator: { fullName: string; phoneNumber: string; email: string } | null;
+}
+
+export interface AvailabilityRange {
+  startDate: string;
+  endDate: string;
+  type: 'BOOKED' | 'PAUSED';
+  reason?: string | null;
+}
 
 /* ── Bookings ─────────────────────────────────────────────────────── */
 export interface PayuCheckoutSession {
@@ -106,13 +160,33 @@ export const bookingsApi = {
   cancel: (id: string) => post<{ success: true; data: Booking }>(`/bookings/${id}/cancel`),
   get: (id: string) => get<{ success: true; data: Booking }>(`/bookings/${id}`),
   myTrips: () => get<{ success: true; count: number; data: Booking[] }>('/users/me/bookings'),
+  requestWash: (id: string, data?: { serviceLocation?: string; notes?: string }) =>
+    post<{ success: true; message: string }>(`/booking/${id}/wash-service`, data),
+  messages: (id: string) => get<{ success: true; count: number; data: TripMessage[] }>(`/bookings/${id}/messages`),
+  sendMessage: (id: string, body: string) => post<{ success: true; data: TripMessage }>(`/bookings/${id}/messages`, { body }),
 };
+
+export interface TripMessage {
+  id: string;
+  bookingId: string;
+  senderId: string;
+  sender: { id: string; fullName: string; avatarUrl?: string | null };
+  body: string;
+  read: boolean;
+  createdAt: string;
+}
 
 /* ── Users ────────────────────────────────────────────────────────── */
 export const usersApi = {
   me: () => get<{ success: true; data: PublicUser }>('/users/me'),
   update: (data: Partial<Pick<PublicUser, 'fullName' | 'bio' | 'avatarUrl' | 'payoutAccountId' | 'signatureUrl' | 'selfieUrl' | 'alternatePhoneNumber'>>) =>
     patch<{ success: true; data: PublicUser }>('/users/me', data),
+  uploadPartnerAgreementWetSignature: (url: string) =>
+    patch<{ success: true; data: PublicUser }>('/users/me/partner-agreement/wet-signature', { url }),
+  startPartnerAgreementEsign: () =>
+    post<{ success: true; data: { esignRequestId: string } }>('/users/me/partner-agreement/esign/start'),
+  partnerAgreementEsignStatus: () =>
+    get<{ success: true; data: { status: string | null; downloadUrl?: string } }>('/users/me/partner-agreement/esign/status'),
 };
 
 /* ── KYC ──────────────────────────────────────────────────────────── */

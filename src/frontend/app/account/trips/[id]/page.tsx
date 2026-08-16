@@ -8,6 +8,7 @@ import ProtectedRoute from '../../../../components/ProtectedRoute';
 import Rating from '../../../../components/Rating';
 import { useToast } from '../../../../components/Toast';
 import { useAuth } from '../../../../lib/auth-context';
+import TripChat from '../../../../components/TripChat';
 import { bookingsApi, reviewsApi } from '../../../../lib/api';
 import type { Booking } from '../../../../lib/types';
 
@@ -24,6 +25,7 @@ function TripDetailInner() {
   const [comment, setComment] = useState('');
   const [endOtp, setEndOtp] = useState<string | null>(null);
   const [otpInput, setOtpInput] = useState('');
+  const [washRequested, setWashRequested] = useState(false);
 
   const isHost = Boolean(user && trip?.car && trip.car.ownerId === user.id);
 
@@ -69,6 +71,20 @@ function TripDetailInner() {
       load();
     } catch (err: any) {
       show(err.message ?? 'Failed to complete trip', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function requestWash() {
+    if (!trip) return;
+    setBusy(true);
+    try {
+      const res = await bookingsApi.requestWash(trip.id);
+      show(res.message, 'success');
+      setWashRequested(true);
+    } catch (err: any) {
+      show(err.message ?? 'Failed to request wash service', 'error');
     } finally {
       setBusy(false);
     }
@@ -160,6 +176,15 @@ function TripDetailInner() {
                   📄 View Lease Agreement
                 </a>
               )}
+              {['ACTIVE', 'COMPLETED'].includes(trip.status) && !isHost && (
+                <button
+                  disabled={busy || washRequested}
+                  onClick={requestWash}
+                  className="border border-gray-200 text-gray-700 hover:border-amber-400 text-sm font-bold px-5 py-2.5 rounded-xl transition disabled:opacity-50"
+                >
+                  🧼 {washRequested ? 'Wash Requested' : `Request Wash (₹349)`}
+                </button>
+              )}
             </div>
 
             {trip.status === 'ACTIVE' && isHost && (
@@ -201,6 +226,12 @@ function TripDetailInner() {
             )}
           </div>
         </div>
+
+        {['CONFIRMED', 'ACTIVE', 'COMPLETED'].includes(trip.status) && (
+          <div className="mb-6">
+            <TripChat bookingId={trip.id} otherPartyName={isHost ? trip.customer?.fullName : trip.car?.owner?.fullName} />
+          </div>
+        )}
 
         {trip.status === 'COMPLETED' && (
           <div className="bg-white rounded-2xl border border-gray-100 p-6">

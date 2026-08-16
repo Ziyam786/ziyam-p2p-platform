@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import path from 'path';
 dotenv.config();
 
 function requireEnv(name: string, fallback?: string): string {
@@ -15,6 +16,11 @@ export const config = {
   adminUrl: process.env.ADMIN_URL ?? 'http://localhost:3002',
   serverUrl: process.env.SERVER_URL ?? `http://localhost:${Number(process.env.PORT ?? 5000)}`,
   nodeEnv: process.env.NODE_ENV ?? 'development',
+
+  // Where host-uploaded photos/documents (car images, RC/insurance/PUC, KYC
+  // selfies, signatures) are written on disk — mounted as a Docker volume in
+  // production so files survive image rebuilds. Served back out at /uploads.
+  uploadDir: process.env.UPLOAD_DIR ?? path.join(process.cwd(), 'uploads'),
 
   auth: {
     jwtSecret: process.env.JWT_SECRET ?? 'dev_insecure_secret_change_me',

@@ -45,6 +45,20 @@ export default function CarsPage() {
     }
   }
 
+  async function approveGoLive(c: AdminCar) {
+    if (!confirm(`Confirm the Fleet Partner Agreement has actually been signed with the owner of ${c.make} ${c.model}? This makes the car fleet-managed and live immediately.`)) return;
+    setBusyId(c.id);
+    try {
+      await adminApi.approveFleetGoLive(c.id);
+      show('Car is now fleet-managed and live', 'success');
+      load();
+    } catch (err: any) {
+      show(err.message ?? 'Action failed', 'error');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <AdminShell title="Cars" subtitle={`${cars.length} listings across all hosts`}>
       {loading ? (
@@ -95,6 +109,16 @@ export default function CarsPage() {
                     >
                       {c.isAvailable ? 'Delist' : 'Relist'}
                     </button>
+                    {!c.fleetManaged && c.fleetOnboardingStep >= 2 && (
+                      <button
+                        disabled={busyId === c.id}
+                        onClick={() => approveGoLive(c)}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white transition"
+                        title="Confirms the Fleet Partner Agreement was signed and makes this car fleet-managed"
+                      >
+                        Approve Go-Live
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

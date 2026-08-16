@@ -6,11 +6,14 @@ import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
 import Rating from '../../../components/Rating';
 import CarLocationMap from '../../../components/CarLocationMap';
+import PauseCalendar from '../../../components/PauseCalendar';
 import { useAuth } from '../../../lib/auth-context';
 import { useToast } from '../../../components/Toast';
 import { carsApi, bookingsApi, settingsApi, promoApi, ApiError } from '../../../lib/api';
 import { getStickyDates } from '../../../lib/searchDates';
-import type { Car, LongRentalDiscount, Review } from '../../../lib/types';
+import { computeDemandMultiplier, DEMAND_PRICING_FALLBACK } from '../../../lib/demandPricing';
+import type { AvailabilityRange } from '../../../lib/api';
+import type { Car, DemandPricing, LongRentalDiscount, Review } from '../../../lib/types';
 
 const INCLUDED_ITEMS = [
   { icon: '⛽', label: 'Fuel not included' },
@@ -53,6 +56,9 @@ export default function CarDetailPage() {
   const [appliedPromo, setAppliedPromo] = useState<{ code: string; discount: number } | null>(null);
   const [promoError, setPromoError] = useState('');
   const [promoChecking, setPromoChecking] = useState(false);
+  const [availability, setAvailability] = useState<AvailabilityRange[]>([]);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [demandPricing, setDemandPricing] = useState<DemandPricing>(DEMAND_PRICING_FALLBACK);
 
   // Carry over the dates picked on the homepage/search bar so the renter
   // doesn't have to re-enter them for whichever car they click into.
@@ -75,10 +81,13 @@ export default function CarDetailPage() {
       })
       .catch(() => active && setNotFound(true))
       .finally(() => active && setLoading(false));
+    carsApi.availability(params.id).then((res) => active && setAvailability(res.data)).catch(() => {});
     settingsApi
       .public()
       .then((res) => {
-        if (active && res.data.long_rental_discounts?.length) setLongRentalDiscounts(res.data.long_rental_discounts);
+        if (!active) return;
+        if (res.data.long_rental_discounts?.length) setLongRentalDiscounts(res.data.long_rental_discounts);
+        if (res.data.demand_pricing) setDemandPricing(res.data.demand_pricing);
       })
       .catch(() => {});
     return () => {
@@ -92,7 +101,12 @@ export default function CarDetailPage() {
     return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   }, [pickup, dropoff]);
 
-  const baseFareRaw = days * (car?.dailyRate ?? 0);
+  const demand = useMemo(
+    () => (pickup ? computeDemandMultiplier(new Date(pickup), demandPricing) : { multiplier: 1, isWeekend: false, isPeakHour: false, isHoliday: false }),
+    [pickup, demandPricing]
+  );
+  const effectiveDailyRate = (car?.dailyRate ?? 0) * demand.multiplier;
+  const baseFareRaw = days * effectiveDailyRate;
   const longRentalPercent = useMemo(() => {
     const eligible = longRentalDiscounts.filter((d) => days >= d.minDays);
     return eligible.length ? Math.max(...eligible.map((d) => d.percent)) : 0;
@@ -374,6 +388,37 @@ export default function CarDetailPage() {
 
               <hr className="border-gray-100" />
 
+              {/* Availability calendar (read-only) */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowCalendar((s) => !s)}
+                  className="text-xs font-semibold text-amber-500 hover:text-amber-600 flex items-center gap-1"
+                >
+                  📅 {showCalendar ? 'Hide' : 'View'} availability calendar
+                </button>
+                {showCalendar && (
+                  <div className="mt-3 bg-gray-50 rounded-xl p-3">
+                    <PauseCalendar
+                      interactive={false}
+                      blackouts={availability.filter((r) => r.type === 'PAUSED').map((r) => ({ id: r.startDate + r.endDate, carId: car.id, startDate: r.startDate, endDate: r.endDate, reason: r.reason ?? null, createdAt: r.startDate }))}
+                      bookedDates={(() => {
+                        const set = new Set<string>();
+                        availability.filter((r) => r.type === 'BOOKED').forEach((r) => {
+                          for (let d = new Date(r.startDate); d <= new Date(r.endDate); d.setDate(d.getDate() + 1)) {
+                            set.add(new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().slice(0, 10));
+                          }
+                        });
+                        return set;
+                      })()}
+                      rangeStart={null}
+                      rangeEnd={null}
+                      monthsAhead={2}
+                    />
+                  </div>
+                )}
+              </div>
+
               {/* Date pickers */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
@@ -502,8 +547,18 @@ export default function CarDetailPage() {
                 <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
                   <div className="flex justify-between text-gray-700">
                     <span>₹{car.dailyRate.toLocaleString()} × {days} day{days > 1 ? 's' : ''}</span>
-                    <span>₹{baseFareRaw.toLocaleString()}</span>
+                    <span>₹{(days * car.dailyRate).toLocaleString()}</span>
                   </div>
+                  {demand.multiplier > 1 && (
+                    <div className="flex justify-between text-amber-600">
+                      <span>
+                        Demand pricing (+{Math.round((demand.multiplier - 1) * 100)}%
+                        {demand.isHoliday ? ' · holiday' : demand.isWeekend ? ' · weekend' : ''}
+                        {demand.isPeakHour ? ' · peak hours' : ''})
+                      </span>
+                      <span>+₹{Math.round(baseFareRaw - days * car.dailyRate).toLocaleString()}</span>
+                    </div>
+                  )}
                   {longRentalDiscountAmount > 0 && (
                     <div className="flex justify-between text-emerald-600">
                       <span>Long rental discount ({Math.round(longRentalPercent * 100)}%)</span>
@@ -573,7 +628,7 @@ export default function CarDetailPage() {
               <div className="flex items-center justify-center gap-4 text-xs text-gray-400">
                 <span>🔒 Secure Payment</span>
                 <span>·</span>
-                <span>🛡️ Insurance Covered</span>
+                <span>🪪 KYC-Verified Host</span>
               </div>
             </div>
           </div>

@@ -5,6 +5,8 @@ import type { Car } from '../lib/types';
 import { settingsApi } from '../lib/api';
 import FeaturePicker from './FeaturePicker';
 import AddressAutocomplete from './AddressAutocomplete';
+import FileUploadField from './FileUploadField';
+import SmartPriceSlider from './SmartPriceSlider';
 
 const CATEGORIES_FALLBACK = ['Hatchback', 'Sedan', 'SUV', 'Luxury', 'EV', 'MUV'];
 const FUEL_TYPES = ['Petrol', 'Diesel', 'Electric', 'CNG'];
@@ -16,15 +18,16 @@ export interface CarFormValues {
   fuelType: string; transmission: string; seats: number; dailyRate: number; securityDeposit: number;
   kmIncludedPerDay: number; extraKmCharge: number; city: string; address: string;
   latitude: number | null; longitude: number | null; description: string;
-  images: string; features: string; instantBook: boolean; offersDelivery: boolean; deliveryFee: number;
+  images: string[]; features: string; instantBook: boolean; offersDelivery: boolean; deliveryFee: number;
+  offersPickup: boolean; pickupFee: number;
 }
 
 const DEFAULTS: CarFormValues = {
   make: '', model: '', registrationNo: '', year: new Date().getFullYear(), category: 'Hatchback',
   fuelType: 'Petrol', transmission: 'Manual', seats: 5, dailyRate: 1200, securityDeposit: 3000,
   kmIncludedPerDay: 300, extraKmCharge: 10, city: 'Bengaluru', address: '', latitude: null, longitude: null, description: '',
-  images: '', features: 'Air Conditioning, Bluetooth / Aux, Power Steering', instantBook: true,
-  offersDelivery: false, deliveryFee: 0,
+  images: [], features: 'Air Conditioning, Bluetooth / Aux, Power Steering', instantBook: true,
+  offersDelivery: false, deliveryFee: 0, offersPickup: false, pickupFee: 0,
 };
 
 export function carToFormValues(car: Car): CarFormValues {
@@ -33,8 +36,9 @@ export function carToFormValues(car: Car): CarFormValues {
     fuelType: car.fuelType, transmission: car.transmission, seats: car.seats, dailyRate: car.dailyRate,
     securityDeposit: car.securityDeposit, kmIncludedPerDay: car.kmIncludedPerDay, extraKmCharge: car.extraKmCharge,
     city: car.city, address: car.address ?? '', latitude: car.latitude ?? null, longitude: car.longitude ?? null,
-    description: car.description ?? '', images: car.images.join(', '), features: car.features.join(', '),
+    description: car.description ?? '', images: car.images, features: car.features.join(', '),
     instantBook: car.instantBook, offersDelivery: car.offersDelivery, deliveryFee: car.deliveryFee,
+    offersPickup: car.offersPickup, pickupFee: car.pickupFee,
   };
 }
 
@@ -45,9 +49,10 @@ export function formValuesToPayload(v: CarFormValues) {
     securityDeposit: Number(v.securityDeposit), kmIncludedPerDay: Number(v.kmIncludedPerDay),
     extraKmCharge: Number(v.extraKmCharge), city: v.city, description: v.description,
     address: v.address || undefined, latitude: v.latitude ?? undefined, longitude: v.longitude ?? undefined,
-    images: v.images.split(',').map((s) => s.trim()).filter(Boolean),
+    images: v.images,
     features: v.features.split(',').map((s) => s.trim()).filter(Boolean),
     instantBook: v.instantBook, offersDelivery: v.offersDelivery, deliveryFee: Number(v.deliveryFee),
+    offersPickup: v.offersPickup, pickupFee: Number(v.pickupFee),
   };
 }
 
@@ -129,10 +134,14 @@ export default function CarForm({
         </Field>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Field label="Daily Rate (₹)">
-          <input required type="number" min={0} value={values.dailyRate} onChange={(e) => set('dailyRate', Number(e.target.value))} className={inputCls} />
-        </Field>
+      <SmartPriceSlider
+        category={values.category}
+        city={values.city}
+        dailyRate={values.dailyRate}
+        onChange={(rate) => set('dailyRate', rate)}
+      />
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <Field label="Security Deposit (₹)">
           <input type="number" min={0} value={values.securityDeposit} onChange={(e) => set('securityDeposit', Number(e.target.value))} className={inputCls} />
         </Field>
@@ -167,8 +176,29 @@ export default function CarForm({
         <textarea value={values.description} onChange={(e) => set('description', e.target.value)} rows={3} className={inputCls} placeholder="A well-maintained car, perfect for city drives..." />
       </Field>
 
-      <Field label="Image URLs (comma-separated)">
-        <input value={values.images} onChange={(e) => set('images', e.target.value)} className={inputCls} placeholder="https://... , https://..." />
+      <Field label="Photos">
+        <div className="flex flex-wrap gap-3 mb-3">
+          {values.images.map((url, i) => (
+            <div key={url + i} className="relative w-20 h-20">
+              <img src={url} alt={`Car photo ${i + 1}`} className="w-20 h-20 rounded-lg object-cover border border-gray-200" />
+              <button
+                type="button"
+                onClick={() => set('images', values.images.filter((_, j) => j !== i))}
+                className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center"
+                aria-label="Remove photo"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+        <FileUploadField
+          label="Add a photo"
+          value=""
+          onChange={(url) => set('images', [...values.images, url])}
+          accept="image/jpeg,image/png,image/webp"
+          kind="image"
+        />
       </Field>
 
       <Field label="Features">
@@ -184,8 +214,17 @@ export default function CarForm({
           <span className="text-sm text-gray-700">Allow Instant Book (skip host approval)</span>
         </label>
         <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={values.offersPickup} onChange={(e) => set('offersPickup', e.target.checked)} className="w-4 h-4 accent-amber-500" />
+          <span className="text-sm text-gray-700">Offer to pick up the car from the guest at drop-off</span>
+        </label>
+        {values.offersPickup && (
+          <Field label="Pickup Fee (₹)">
+            <input type="number" min={0} value={values.pickupFee} onChange={(e) => set('pickupFee', Number(e.target.value))} className={`${inputCls} max-w-[200px]`} />
+          </Field>
+        )}
+        <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={values.offersDelivery} onChange={(e) => set('offersDelivery', e.target.checked)} className="w-4 h-4 accent-amber-500" />
-          <span className="text-sm text-gray-700">Offer doorstep delivery</span>
+          <span className="text-sm text-gray-700">Offer doorstep delivery to the guest</span>
         </label>
         {values.offersDelivery && (
           <Field label="Delivery Fee (₹)">

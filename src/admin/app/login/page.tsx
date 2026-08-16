@@ -20,6 +20,8 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
+      // Always push '/' — ProtectedRoute immediately redirects restricted
+      // roles (AGENT, OPERATIONS_EXECUTIVE, etc.) to their actual home.
       await login(email, password);
       router.push('/');
     } catch (err) {

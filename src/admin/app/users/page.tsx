@@ -4,13 +4,23 @@ import React, { useEffect, useState } from 'react';
 import AdminShell from '../../components/AdminShell';
 import { useToast } from '../../components/Toast';
 import { adminApi } from '../../lib/api';
-import type { AdminUser, Role } from '../../lib/types';
+import type { AdminUser, CustomRoleRow, Role } from '../../lib/types';
 
-const ROLES: Role[] = ['CUSTOMER', 'SELF_HOST', 'FLEET_OPERATOR', 'ADMIN'];
+const ROLES: Role[] = [
+  'CUSTOMER', 'SELF_HOST', 'FLEET_OPERATOR', 'AGENT',
+  'FLEET_ADMIN', 'OPERATIONS_EXECUTIVE', 'MECHANICAL_EXECUTIVE', 'TECHNICIAN',
+  'ADMIN',
+];
+
+// Roles governed by the Team & Access "Who Can Do What" permission layer —
+// only these get a custom-role assignment control, since it's a no-op for
+// everyone else (see requirePermission()'s CUSTOM_ROLE_GOVERNED list).
+const CUSTOM_ROLE_ELIGIBLE: Role[] = ['FLEET_ADMIN', 'OPERATIONS_EXECUTIVE', 'MECHANICAL_EXECUTIVE', 'TECHNICIAN', 'AGENT'];
 
 export default function UsersPage() {
   const { show } = useToast();
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [customRoles, setCustomRoles] = useState<CustomRoleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [roleFilter, setRoleFilter] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -21,6 +31,7 @@ export default function UsersPage() {
   }
 
   useEffect(load, [roleFilter]);
+  useEffect(() => { adminApi.customRoles().then((res) => setCustomRoles(res.data)).catch(() => {}); }, []);
 
   async function toggleSuspend(u: AdminUser) {
     setBusyId(u.id);
@@ -62,6 +73,19 @@ export default function UsersPage() {
     }
   }
 
+  async function changeCustomRole(u: AdminUser, customRoleId: string) {
+    setBusyId(u.id);
+    try {
+      await adminApi.updateUser(u.id, { customRoleId: customRoleId || null });
+      show(customRoleId ? 'Custom role assigned' : 'Custom role removed', 'success');
+      load();
+    } catch (err: any) {
+      show(err.message ?? 'Action failed', 'error');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <AdminShell
       title="Users"
@@ -87,6 +111,7 @@ export default function UsersPage() {
                 <th className="py-3 px-4">Name</th>
                 <th className="py-3 px-4">Email</th>
                 <th className="py-3 px-4">Role</th>
+                <th className="py-3 px-4">Custom Role</th>
                 <th className="py-3 px-4">KYC</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4">Actions</th>
@@ -106,6 +131,21 @@ export default function UsersPage() {
                     >
                       {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                     </select>
+                  </td>
+                  <td className="py-3 px-4">
+                    {CUSTOM_ROLE_ELIGIBLE.includes(u.role) ? (
+                      <select
+                        value={u.customRoleId ?? ''}
+                        disabled={busyId === u.id}
+                        onChange={(e) => changeCustomRole(u, e.target.value)}
+                        className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-slate-200 max-w-[140px]"
+                      >
+                        <option value="">— None —</option>
+                        {customRoles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                      </select>
+                    ) : (
+                      <span className="text-xs text-slate-600">—</span>
+                    )}
                   </td>
                   <td className="py-3 px-4">
                     <button

@@ -1,4 +1,7 @@
-export type Role = 'CUSTOMER' | 'SELF_HOST' | 'FLEET_OPERATOR' | 'ADMIN';
+export type Role =
+  | 'CUSTOMER' | 'SELF_HOST' | 'FLEET_OPERATOR' | 'AGENT'
+  | 'FLEET_ADMIN' | 'OPERATIONS_EXECUTIVE' | 'MECHANICAL_EXECUTIVE' | 'TECHNICIAN'
+  | 'ADMIN';
 
 export type BookingStatus = 'PENDING' | 'PENDING_PAYMENT' | 'CONFIRMED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 
@@ -29,6 +32,10 @@ export interface PublicUser {
   referralCode?: string | null;
   creditsBalance?: number;
   payoutFrequency?: 'STANDARD' | 'WEEKLY';
+  partnerAgreementWetSignedUrl?: string | null;
+  partnerAgreementWetSignedAt?: string | null;
+  partnerAgreementEsignStatus?: string | null;
+  partnerAgreementEsignDownloadUrl?: string | null;
   createdAt: string;
 }
 
@@ -81,6 +88,10 @@ export interface Car {
 
   fleetManaged: boolean;
   fleetOperatorId?: string | null;
+  fleetOperator?: { fullName: string; phoneNumber: string; email: string } | null;
+  fleetOnboardingStep: number;
+
+  chassis?: string | null;
 }
 
 export interface Booking {
@@ -169,6 +180,21 @@ export interface CompanyInfo {
   scopeNote: string; jurisdiction: string; team: { name: string; role: string }[];
 }
 
+export interface SmartPricing {
+  categoryHourlyRates: Record<string, number>;
+  cityMultipliers: Record<string, number>;
+  defaultCityMultiplier: number;
+}
+
+export interface DemandPricing {
+  weekendBump: number;
+  peakHourBump: number;
+  peakHours: [number, number][];
+  holidayBump: number;
+  maxMultiplier: number;
+  publicHolidays: string[];
+}
+
 export interface PublicSettings {
   hero_title: string;
   hero_subtitle: string;
@@ -180,6 +206,8 @@ export interface PublicSettings {
   long_rental_discounts: LongRentalDiscount[];
   testimonials: Testimonial[];
   company_info: CompanyInfo;
+  smart_pricing: SmartPricing;
+  demand_pricing: DemandPricing;
 }
 
 export interface PromoCode {

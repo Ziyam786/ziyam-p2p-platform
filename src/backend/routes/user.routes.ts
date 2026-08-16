@@ -3,7 +3,8 @@ import { PrismaClient, BookingStatus } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
 import { sandboxService } from '../services/sandboxService';
 import { esignApi, isSetuConfigured } from '../services/setuService';
-import { renderLeaseAgreementPdf } from '../services/leaseAgreementPdf';
+import { renderHostOnboardingAgreementPdf } from '../services/hostOnboardingAgreementPdf';
+import { startLeaseAgreementEsign } from '../services/leaseAgreementEsign';
 import { config } from '../config';
 
 const router = Router();
@@ -28,6 +29,11 @@ const PUBLIC_USER_SELECT = {
   alternatePhoneNumber: true,
   referralCode: true,
   creditsBalance: true,
+  payoutFrequency: true,
+  partnerAgreementWetSignedUrl: true,
+  partnerAgreementWetSignedAt: true,
+  partnerAgreementEsignStatus: true,
+  partnerAgreementEsignDownloadUrl: true,
   createdAt: true,
 };
 
@@ -92,6 +98,80 @@ router.post('/users/me/bank/verify', requireAuth, async (req: Request, res: Resp
   }
 });
 
+// Host Onboarding Agreement — the one-time, per-host agreement gating N+1
+// payout eligibility (Aug-2024 policy, see PayoutEngine.assertPayoutEligible).
+// Wet-signature upload (the host photographs/scans a physically-signed copy)
+// and Aadhaar e-sign via Setu (same integration used for trip lease
+// agreements) are both real — both are required before payouts unblock.
+router.patch('/users/me/partner-agreement/wet-signature', requireAuth, async (req: Request, res: Response) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'url is required' });
+  const user = await prisma.user.update({
+    where: { id: req.user!.userId },
+    data: { partnerAgreementWetSignedUrl: url, partnerAgreementWetSignedAt: new Date() },
+    select: PUBLIC_USER_SELECT,
+  });
+  res.json({ success: true, data: user });
+});
+
+router.post('/users/me/partner-agreement/esign/start', requireAuth, async (req: Request, res: Response) => {
+  const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (!isSetuConfigured()) return res.status(503).json({ error: 'eSign is not configured yet' });
+  if (user.partnerAgreementEsignRequestId) return res.status(409).json({ error: 'An eSign request already exists for this agreement' });
+
+  try {
+    const pdf = await renderHostOnboardingAgreementPdf({
+      hostId: user.id,
+      hostName: user.fullName,
+      hostEmail: user.email,
+      hostPhone: user.phoneNumber,
+      createdAt: new Date(),
+    });
+    const { documentId } = await esignApi.uploadDocument(pdf, `host-onboarding-agreement-${user.id.slice(0, 8)}`);
+    const signature = await esignApi.createSignatureRequest(
+      documentId,
+      [{ identifier: user.email, displayName: user.fullName }],
+      `${config.clientUrl}/host/agreement?esigned=1`
+    );
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { partnerAgreementEsignRequestId: signature.id, partnerAgreementEsignStatus: 'sign_initiated' },
+    });
+    res.json({ success: true, data: { esignRequestId: signature.id } });
+  } catch (err: any) {
+    console.error('[ESIGN] host onboarding agreement start failed:', err.response?.data ?? err.message);
+    res.status(502).json({ error: 'Could not start eSign right now. Please try again shortly.' });
+  }
+});
+
+router.get('/users/me/partner-agreement/esign/status', requireAuth, async (req: Request, res: Response) => {
+  const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (!user.partnerAgreementEsignRequestId) return res.json({ success: true, data: { status: null } });
+
+  if (user.partnerAgreementEsignStatus === 'sign_complete' && user.partnerAgreementEsignDownloadUrl) {
+    return res.json({ success: true, data: { status: user.partnerAgreementEsignStatus, downloadUrl: user.partnerAgreementEsignDownloadUrl } });
+  }
+
+  try {
+    const { status } = await esignApi.getStatus(user.partnerAgreementEsignRequestId);
+    let downloadUrl: string | undefined;
+    if (status === 'sign_complete') {
+      const download = await esignApi.getDownloadUrl(user.partnerAgreementEsignRequestId);
+      downloadUrl = download.downloadUrl;
+    }
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { partnerAgreementEsignStatus: status, ...(downloadUrl && { partnerAgreementEsignDownloadUrl: downloadUrl }) },
+    });
+    res.json({ success: true, data: { status, downloadUrl } });
+  } catch (err: any) {
+    console.error('[ESIGN] host onboarding agreement status check failed:', err.response?.data ?? err.message);
+    res.status(502).json({ error: 'Could not check eSign status right now.' });
+  }
+});
+
 // Trip history for the logged-in renter
 router.get('/users/me/bookings', requireAuth, async (req: Request, res: Response) => {
   const bookings = await prisma.booking.findMany({
@@ -123,48 +203,24 @@ router.get('/bookings/:id', requireAuth, async (req: Request, res: Response) => 
 
 // Real Aadhaar e-signing of the generated lease agreement, via Setu eSign —
 // renders the same content as /bookings/:id/agreement into a PDF, uploads it,
-// and creates a two-signer (host + guest) signature request.
+// and creates a two-signer (host + guest) signature request. This is also
+// triggered automatically right after payment confirms (see
+// payuCallback.routes.ts) — this manual route is the fallback for when that
+// best-effort auto-trigger didn't run (e.g. Setu was briefly unreachable).
 router.post('/bookings/:id/esign/start', requireAuth, async (req: Request, res: Response) => {
   const { id } = req.params;
-  const booking = await prisma.booking.findUnique({
-    where: { id },
-    include: { car: { include: { owner: true } }, customer: true },
-  });
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
   if (!booking) return res.status(404).json({ error: 'Booking not found' });
   const isCustomer = booking.customerId === req.user!.userId;
   const isHost = booking.car.ownerId === req.user!.userId;
   if (!isCustomer && !isHost) return res.status(403).json({ error: 'Not part of this booking' });
 
-  if (!isSetuConfigured()) return res.status(503).json({ error: 'eSign is not configured yet' });
-  if (booking.esignRequestId) return res.status(409).json({ error: 'An eSign request already exists for this booking' });
-
   try {
-    const pdf = await renderLeaseAgreementPdf({
-      bookingId: booking.id,
-      createdAt: booking.createdAt,
-      hostName: booking.car.owner.fullName,
-      guestName: booking.customer.fullName,
-      registrationNo: booking.car.registrationNo,
-      make: booking.car.make,
-      model: booking.car.model,
-      year: booking.car.year,
-      startTime: booking.startTime,
-      endTime: booking.endTime,
-      protectionPlan: booking.protectionPlan,
-      totalAmount: booking.totalAmount,
-    });
-    const { documentId } = await esignApi.uploadDocument(pdf, `lease-agreement-${booking.id.slice(0, 8)}`);
-    const signature = await esignApi.createSignatureRequest(
-      documentId,
-      [
-        { identifier: booking.car.owner.email, displayName: booking.car.owner.fullName },
-        { identifier: booking.customer.email, displayName: booking.customer.fullName },
-      ],
-      `${config.clientUrl}/bookings/${booking.id}/agreement?esigned=1`
-    );
-    await prisma.booking.update({ where: { id }, data: { esignRequestId: signature.id, esignStatus: 'sign_initiated' } });
-    res.json({ success: true, data: { esignRequestId: signature.id } });
+    const result = await startLeaseAgreementEsign(id);
+    res.json({ success: true, data: result });
   } catch (err: any) {
+    if (err.message === 'eSign is not configured yet') return res.status(503).json({ error: err.message });
+    if (err.message === 'An eSign request already exists for this booking') return res.status(409).json({ error: err.message });
     console.error('[ESIGN] start failed:', err.response?.data ?? err.message);
     res.status(502).json({ error: 'Could not start eSign right now. Please try again shortly.' });
   }

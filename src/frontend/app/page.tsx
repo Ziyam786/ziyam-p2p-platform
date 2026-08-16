@@ -336,10 +336,10 @@ export default function HomePage() {
       <section className="py-20 bg-amber-500">
         <ScrollReveal className="max-w-4xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-8">
           <div>
-            <h2 className="text-3xl font-extrabold text-white mb-2">Earn ₹30,000+ a month</h2>
+            <h2 className="text-3xl font-extrabold text-white mb-2">Turn your car into passive income</h2>
             <p className="text-amber-100 max-w-md">
-              List your car on ZiyamSelfDrive and earn passive income. You keep 70% of every booking. We
-              handle marketing, insurance, and payments.
+              List your car on ZiyamSelfDrive and keep 70% of every booking. We handle marketing, guest
+              verification, and payments — try our earnings calculator to estimate what your car could bring in.
             </p>
           </div>
           <MotionButton

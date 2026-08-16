@@ -1,4 +1,7 @@
-export type Role = 'CUSTOMER' | 'SELF_HOST' | 'FLEET_OPERATOR' | 'ADMIN';
+export type Role =
+  | 'CUSTOMER' | 'SELF_HOST' | 'FLEET_OPERATOR' | 'AGENT'
+  | 'FLEET_ADMIN' | 'OPERATIONS_EXECUTIVE' | 'MECHANICAL_EXECUTIVE' | 'TECHNICIAN'
+  | 'ADMIN';
 export type BookingStatus = 'PENDING' | 'PENDING_PAYMENT' | 'CONFIRMED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 export type PayoutStatus = 'HELD_IN_ESCROW' | 'QUEUED_FOR_N1' | 'SETTLED' | 'FAILED';
 
@@ -12,7 +15,22 @@ export interface AdminUser {
   isSuspended: boolean;
   avatarUrl?: string | null;
   bio?: string | null;
+  customRoleId?: string | null;
+  customRole?: { name: string } | null;
   createdAt: string;
+}
+
+export const PERMISSION_KEYS = ['dashboard', 'earnings', 'collections', 'expenses', 'outstandings', 'balanceSheet', 'plStatement', 'config', 'roles'] as const;
+export type PermissionKey = typeof PERMISSION_KEYS[number];
+
+export interface CustomRoleRow {
+  id: string;
+  name: string;
+  description?: string | null;
+  permissions: Record<PermissionKey, boolean>;
+  _count?: { users: number };
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SessionUser {
@@ -38,6 +56,11 @@ export interface AdminCar {
   isAvailable: boolean;
   featured: boolean;
   instantBook: boolean;
+  fleetStatus?: string;
+  pauseReason?: string | null;
+  currentOdo?: number | null;
+  fleetManaged: boolean;
+  fleetOnboardingStep: number;
   createdAt: string;
   _count?: { bookings: number; reviews: number };
 }
@@ -145,10 +168,13 @@ export interface ChatMessageRow {
 }
 
 /* ── Fleet Financial Dashboard & Ledger System ───────────────────────── */
-export type RentalPlatform = 'ZOOMCAR' | 'REVV' | 'BHARAT' | 'MARC8';
-export type LedgerCategory = 'FASTAG' | 'FUEL' | 'INSTANCES' | 'WASHING' | 'DAMAGE';
-export type FleetExpenseType = 'ROUTINE_MAINTENANCE' | 'INSURANCE_PREMIUMS' | 'STATE_PERMITS' | 'ROAD_TAX' | 'DRIVER_SALARIES' | 'GENERAL_ADMIN';
-export type PaymentMode = 'CASH' | 'UPI' | 'CORPORATE_CARD' | 'FLEET_FUEL_CARD';
+// Admin-configurable lists now (fleet_platforms/fleet_ledger_categories/
+// fleet_expense_types/fleet_payment_modes Settings), not fixed enums — plain
+// string aliases kept only so call sites read clearly.
+export type RentalPlatform = string;
+export type LedgerCategory = string;
+export type FleetExpenseType = string;
+export type PaymentMode = string;
 
 export interface PlatformBookingEntry {
   id: string;
@@ -160,6 +186,8 @@ export interface PlatformBookingEntry {
   totalFare: number;
   doorstepCharges: number;
   platformCommission?: number | null;
+  received: boolean;
+  expectedCreditDate?: string | null;
   createdAt: string;
 }
 
@@ -181,6 +209,7 @@ export interface FleetExpenseRow {
   carId?: string | null;
   car?: { make: string; model: string; registrationNo: string } | null;
   paymentMode: PaymentMode;
+  paidTo?: string | null;
   amount: number;
   date: string;
   description?: string | null;
@@ -198,4 +227,120 @@ export interface FleetSummary {
   bookingCount: number;
   journalEntryCount: number;
   expenseCount: number;
+}
+
+/* ── Fleet Ops trip lifecycle ─────────────────────────────────────────── */
+export type OpsTripStatus = 'SCHEDULED' | 'RUNNING' | 'COMPLETED' | 'CANCELLED';
+
+export interface OpsTripRow {
+  id: string;
+  tripCode?: string | null;
+  carId: string;
+  car?: { make: string; model: string; registrationNo: string; images: string[] };
+  bookingPlatform?: string | null;
+  externalBookingId?: string | null;
+  driverRef?: string | null;
+  customerName: string;
+  customerMobile: string;
+  pickupLocation?: string | null;
+  dropLocation?: string | null;
+  pickupType?: string | null;
+  startTime: string;
+  endTime?: string | null;
+  odometerStart?: number | null;
+  odometerEnd?: number | null;
+  rangeKm?: number | null;
+  fastag?: string | null;
+  checkoutFastag?: string | null;
+  fuelEst?: string | null;
+  carWashed: boolean;
+  washingCharges?: number | null;
+  tyreHealth?: string | null;
+  newDamages?: string | null;
+  baseFare?: number | null;
+  addonTotal?: number | null;
+  amount?: number | null;
+  amountCollected?: number | null;
+  amountPaidGuest?: number | null;
+  status: OpsTripStatus;
+  notes?: string | null;
+  createdBy?: { fullName: string };
+  createdAt: string;
+}
+
+/* ── Financial ERP ────────────────────────────────────────────────────── */
+export interface CommandCenterData {
+  cashPosition: number;
+  moneyIn: number;
+  moneyOut: number;
+  bottomLine: number;
+  retainedEarnings: number;
+  openingCapital: number;
+  tripCount: number;
+  collectionCount: number;
+}
+
+export interface BalanceSheetData {
+  openingCapital: number;
+  retainedEarnings: number;
+  cash: number;
+  receivables: number;
+  payables: number;
+  assets: number;
+  liabilities: number;
+  equity: number;
+}
+
+export type OutstandingType = 'RECEIVABLE' | 'PAYABLE';
+export type OutstandingStatus = 'PENDING' | 'PAID';
+export type OutstandingFrequency = 'ONCE' | 'EVERY_TRIP' | 'EVERY_MONTH' | 'EVERY_DUE' | 'EVERY_PAYMENT' | 'EVERY_COLLECTION';
+
+export interface OutstandingRow {
+  id: string;
+  expectedDate: string;
+  paymentTo: string;
+  amountOwed: number;
+  outstandingType: OutstandingType;
+  sourceType?: string | null;
+  frequency: OutstandingFrequency;
+  recurringGroup?: string | null;
+  status: OutstandingStatus;
+  paidDate?: string | null;
+  createdAt: string;
+}
+
+export interface MonthlyBalanceRow {
+  month: string;
+  openingBalance: number;
+  closingBalance?: number | null;
+  createdAt: string;
+}
+
+/* ── Invoicing (GST) ──────────────────────────────────────────────────── */
+export type OpsInvoiceType = 'RENTAL' | 'SERVICE';
+export type OpsInvoiceStatus = 'DRAFT' | 'PENDING' | 'SENT' | 'PAID';
+
+export interface OpsInvoiceRow {
+  id: string;
+  invoiceNumber: string;
+  type: OpsInvoiceType;
+  tripId?: string | null;
+  trip?: (OpsTripRow & { car: AdminCar }) | null;
+  serviceId?: string | null;
+  service?: { serviceType: string; car: AdminCar } | null;
+  amount: number;
+  serviceChargePct: number;
+  serviceCharge: number;
+  netToOwner: number;
+  status: OpsInvoiceStatus;
+  issuedAt: string;
+  placeOfSupply?: string | null;
+  gstRate?: number | null;
+  cgstAmount?: number | null;
+  sgstAmount?: number | null;
+  igstAmount?: number | null;
+  customerName?: string | null;
+  customerMobile?: string | null;
+  payments: { id: string; amount: number; status: string }[];
+  createdAt: string;
 }

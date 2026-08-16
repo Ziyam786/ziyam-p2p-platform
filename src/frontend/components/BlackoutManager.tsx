@@ -7,9 +7,14 @@ import { useToast } from './Toast';
 import { carsApi } from '../lib/api';
 import type { Blackout, Car } from '../lib/types';
 
+function toISODate(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().slice(0, 10);
+}
+
 export default function BlackoutManager({ car, onClose }: { car: Car; onClose: () => void }) {
   const { show } = useToast();
   const [blackouts, setBlackouts] = useState<Blackout[]>([]);
+  const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string | null>(null);
@@ -18,6 +23,15 @@ export default function BlackoutManager({ car, onClose }: { car: Car; onClose: (
 
   function load() {
     carsApi.blackouts(car.id).then((res) => setBlackouts(res.data)).finally(() => setLoading(false));
+    carsApi.availability(car.id).then((res) => {
+      const set = new Set<string>();
+      res.data.filter((r) => r.type === 'BOOKED').forEach((r) => {
+        for (let d = new Date(r.startDate); d <= new Date(r.endDate); d.setDate(d.getDate() + 1)) {
+          set.add(toISODate(d));
+        }
+      });
+      setBookedDates(set);
+    }).catch(() => {});
   }
 
   useEffect(load, [car.id]);
@@ -69,7 +83,7 @@ export default function BlackoutManager({ car, onClose }: { car: Car; onClose: (
       </p>
 
       <form onSubmit={handleAdd} className="mb-6">
-        <PauseCalendar blackouts={blackouts} rangeStart={startDate} rangeEnd={endDate} onPickDate={handlePickDate} />
+        <PauseCalendar blackouts={blackouts} bookedDates={bookedDates} rangeStart={startDate} rangeEnd={endDate} onPickDate={handlePickDate} />
         <div className="mt-4 space-y-3">
           <div className="flex items-center gap-2 text-sm">
             <span className="text-gray-500">Selected:</span>

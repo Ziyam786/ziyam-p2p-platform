@@ -6,6 +6,9 @@ import { PayoutEngine } from '../services/payoutEngine';
 import { TelematicsService } from '../services/telematicsService';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { notify } from '../services/notificationService';
+import { pickLeastLoadedAgent } from '../services/agentAssignment';
+
+const WASH_SERVICE_PRICE = 349;
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -243,6 +246,98 @@ router.post('/booking/:id/fleet-receipt', requireAuth, requireRole('FLEET_OPERAT
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
+});
+
+// Guest opts into a wash service for their booking — pops straight to
+// whichever on-duty agent currently has the fewest open jobs (see
+// agentAssignment.ts), rather than sitting in a queue nobody owns.
+router.post('/booking/:id/wash-service', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { serviceLocation, notes } = req.body;
+  try {
+    const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+    if (booking.customerId !== req.user!.userId) return res.status(403).json({ error: 'Not your booking' });
+    if (!['ACTIVE', 'COMPLETED'].includes(booking.status)) {
+      return res.status(400).json({ error: 'Wash service can only be requested during or after an active trip' });
+    }
+
+    const agentId = await pickLeastLoadedAgent();
+    const request = await prisma.serviceRequest.create({
+      data: {
+        carId: booking.carId,
+        bookingId: booking.id,
+        requestedById: req.user!.userId,
+        serviceType: 'Washing',
+        priceEstimate: WASH_SERVICE_PRICE,
+        scheduledDate: new Date(),
+        serviceLocation: serviceLocation || booking.car.address || booking.car.city,
+        notes,
+        assignedAgentId: agentId,
+        status: agentId ? 'CONFIRMED' : 'REQUESTED',
+      },
+    });
+
+    if (agentId) {
+      await notify(agentId, 'GENERIC', 'New wash service assignment', `${booking.car.make} ${booking.car.model} at ${request.serviceLocation}`, '/agent');
+    }
+    res.status(201).json({ success: true, data: request, message: agentId ? 'An agent has been assigned.' : 'No agents are on duty right now — this will be picked up shortly.' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Guest<->host messaging, scoped to this booking. Either party can read/send;
+// no general DM system, just pickup coordination and pre-trip questions.
+router.get('/bookings/:id/messages', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  const isCustomer = booking.customerId === req.user!.userId;
+  const isHost = booking.car.ownerId === req.user!.userId;
+  if (!isCustomer && !isHost) return res.status(403).json({ error: 'Not part of this booking' });
+
+  const messages = await prisma.message.findMany({
+    where: { bookingId: id },
+    include: { sender: { select: { id: true, fullName: true, avatarUrl: true } } },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  // Mark the other party's messages read now that this party has fetched the thread.
+  await prisma.message.updateMany({
+    where: { bookingId: id, senderId: { not: req.user!.userId }, read: false },
+    data: { read: true },
+  });
+
+  res.json({ success: true, count: messages.length, data: messages });
+});
+
+router.post('/bookings/:id/messages', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { body } = req.body;
+  if (!body || !String(body).trim()) return res.status(400).json({ error: 'Message body is required' });
+
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true, customer: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  const isCustomer = booking.customerId === req.user!.userId;
+  const isHost = booking.car.ownerId === req.user!.userId;
+  if (!isCustomer && !isHost) return res.status(403).json({ error: 'Not part of this booking' });
+
+  const message = await prisma.message.create({
+    data: { bookingId: id, senderId: req.user!.userId, body: String(body).trim() },
+    include: { sender: { select: { id: true, fullName: true, avatarUrl: true } } },
+  });
+
+  const recipientId = isCustomer ? booking.car.ownerId : booking.customerId;
+  await notify(
+    recipientId,
+    'GENERIC',
+    'New message',
+    `${message.sender.fullName}: ${message.body.slice(0, 80)}`,
+    `/account/trips/${id}`
+  );
+
+  res.status(201).json({ success: true, data: message });
 });
 
 // Remote keyless unlock for an active booking

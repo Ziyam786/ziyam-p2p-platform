@@ -85,6 +85,17 @@ function DashboardInner() {
         </a>
       </header>
 
+      {user && !(user.partnerAgreementWetSignedUrl && user.partnerAgreementEsignStatus === 'sign_complete') && (
+        <div className="mx-8 mb-6 bg-amber-500/10 border border-amber-500/30 rounded-xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-amber-300">
+            ⚠ Your Host Onboarding Agreement isn't fully signed yet — payouts are on hold until it is.
+          </p>
+          <a href="/host/agreement" className="text-xs font-bold bg-amber-500 hover:bg-amber-400 text-gray-950 px-4 py-2 rounded-lg transition whitespace-nowrap">
+            Complete Agreement
+          </a>
+        </div>
+      )}
+
       <div className="px-8">
         <Tabs
           variant="dark"
@@ -105,7 +116,7 @@ function DashboardInner() {
         ) : tab === 'overview' ? (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <StatCard label="Total Fleet Revenue" value={metrics.totalGross} sub="Gross rental bookings" />
-            <StatCard label="Ziyam Platform Cut (30%)" value={-metrics.ziyamCut} sub="Platform & insurance share" tone="negative" />
+            <StatCard label="Ziyam Platform Cut (30%)" value={-metrics.ziyamCut} sub="Platform, marketing & support" tone="negative" />
             <StatCard label="Your Net Profit (70%)" value={metrics.netEarnings} sub="Host direct share" tone="positive" />
             <StatCard label="Escrow Queue (N+1)" value={metrics.pendingEscrow} sub="Releasing per settlement policy" tone="warning" />
           </div>
@@ -126,7 +137,13 @@ function DashboardInner() {
                   />
                   <div className="flex-1 min-w-[180px]">
                     <p className="font-bold">{car.make} {car.model} <span className="text-gray-500 font-normal text-sm">({car.year})</span></p>
-                    <p className="text-xs text-gray-400">{car.registrationNo} · {car.city} · ₹{car.dailyRate}/day</p>
+                    <p className="text-xs text-gray-400">
+                      {car.registrationNo} · {car.city} · ₹{car.dailyRate}/day (₹{Math.round(car.dailyRate / 24)}/hr)
+                      {' · '}
+                      <span className="text-emerald-400 font-semibold">
+                        you earn ≈ ₹{Math.round((car.dailyRate / 24) * (metrics.totalGross > 0 ? metrics.netEarnings / metrics.totalGross : 0.7))}/hr
+                      </span>
+                    </p>
                     <div className="mt-1"><Rating value={car.rating} count={car.reviewCount} /></div>
                   </div>
                   <span className={`text-xs font-semibold px-3 py-1 rounded-full ${car.isAvailable ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
@@ -175,9 +192,9 @@ function DashboardInner() {
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
             <h3 className="text-xl font-bold mb-4">Payout Schedule & Settlement Terms</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-300">
-              <Policy title="70/30 Revenue Split" body="You keep 70% of the base fare. Ziyam takes 30% for marketing, insurance, dynamic pricing, and support." />
-              <Policy title="N+1 Settlement Policy" body="Payouts are calculated automatically at trip end and credited to your linked bank account on the N+1 schedule." />
-              <Policy title="Security Deposit Shield" body="User security deposits are held separately to cover fast-track damage claims or toll overages." />
+              <Policy title="70/30 Revenue Split" body="You keep 70% of the base fare. Ziyam takes 30% for marketing, platform tech, dynamic pricing, and support." />
+              <Policy title="N+1 Settlement Policy" body="Self-hosted payouts settle 24-48 hours after trip end (or weekly if you opt in); fleet-managed cars settle within 1 day of receipt confirmation." />
+              <Policy title="Security Deposit" body="Renter security deposits are held in escrow and applied to damage or toll costs first — see the full Insurance & Damage Policy for how recovery beyond the deposit works." />
             </div>
           </div>
         )}

@@ -16,8 +16,33 @@ generator client {
 enum Role {
   CUSTOMER
   SELF_HOST
-  FLEET_OPERATOR
+  FLEET_OPERATOR // external business managing multiple owners' cars; self-signup-able (see signup/page.tsx)
+  AGENT
+  // Internal Eightlines ops staff (Fleet Ops Admin Dashboard) — admin-provisioned only,
+  // never in the public signup role picker. Coarse-gated by requireRole(); fine-grained
+  // per-screen access comes from the orthogonal CustomRole.permissions layer below.
+  FLEET_ADMIN
+  OPERATIONS_EXECUTIVE
+  MECHANICAL_EXECUTIVE
+  TECHNICIAN
   ADMIN
+}
+
+// Granular "Who Can Do What" screen-level permissions for internal Ops/Finance staff —
+// orthogonal to the coarse Role enum above. A User optionally has one CustomRole
+// (User.customRoleId); requirePermission(screen) middleware checks
+// user.customRole.permissions[screen] === true, loaded fresh per-request since the JWT
+// itself only carries {userId, role}. ADMIN always passes regardless of CustomRole.
+// The 9 permission keys mirror the real Financial ERP's PERM_LABELS exactly: dashboard,
+// earnings, collections, expenses, outstandings, balanceSheet, plStatement, config, roles.
+model CustomRole {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  permissions Json     // { dashboard: bool, earnings: bool, collections: bool, expenses: bool, outstandings: bool, balanceSheet: bool, plStatement: bool, config: bool, roles: bool }
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 enum BookingStatus {
@@ -43,37 +68,13 @@ enum CarVerificationStatus {
 }
 
 // --- Fleet Financial Dashboard & Ledger System (see PRD: fleet_dashboard_tech_spec_v2) ---
-
-enum RentalPlatform {
-  ZOOMCAR
-  REVV
-  BHARAT
-  MARC8
-}
-
-enum LedgerCategory {
-  FASTAG
-  FUEL
-  INSTANCES
-  WASHING
-  DAMAGE
-}
-
-enum FleetExpenseType {
-  ROUTINE_MAINTENANCE
-  INSURANCE_PREMIUMS
-  STATE_PERMITS
-  ROAD_TAX
-  DRIVER_SALARIES
-  GENERAL_ADMIN
-}
-
-enum PaymentMode {
-  CASH
-  UPI
-  CORPORATE_CARD
-  FLEET_FUEL_CARD
-}
+// platform/category/expenseType/paymentMode on PlatformBooking/JournalEntry/
+// FleetExpense are plain Strings, not enums — admin-configurable via the
+// fleet_platforms/fleet_ledger_categories/fleet_expense_types/fleet_payment_modes
+// Settings (same row-editor pattern as protection_plans), matching the real
+// Financial ERP's "configurable, add/remove" categories requirement. The
+// values below (originally this Postgres enum's values) seed those Settings'
+// defaults in settingsService.ts.
 
 enum ServiceRequestStatus {
   REQUESTED
@@ -124,6 +125,25 @@ model User {
   // see Car.fleetManaged / the N+1 policy split in payoutEngine.ts)
   payoutFrequency String @default("STANDARD") // STANDARD (24-48hr after trip) | WEEKLY
 
+  // Internal Ops/Finance granular permissions (see CustomRole doc comment above)
+  customRoleId String?
+  customRole   CustomRole? @relation(fields: [customRoleId], references: [id])
+
+  // Fleet-partner identity extras (maps the Fleet Ops "owners" table onto this
+  // existing User rather than a separate Owner model — bank fields already exist above)
+  ownerCode String?
+
+  // Aug-2024 policy: payout eligibility requires BOTH signatures on the Partner
+  // Agreement — distinct from signatureUrl (a general reusable lease-agreement
+  // signature) and from Booking's per-trip Setu eSign fields. Computed at
+  // check-time in the Ops payout-release route, never persisted as a boolean:
+  // payoutEligible = Boolean(partnerAgreementWetSignedUrl) && partnerAgreementEsignStatus === 'sign_complete'
+  partnerAgreementWetSignedUrl   String?
+  partnerAgreementWetSignedAt    DateTime?
+  partnerAgreementEsignRequestId String?
+  partnerAgreementEsignStatus    String? // sign_initiated | sign_pending | sign_in_progress | sign_complete
+  partnerAgreementEsignDownloadUrl String?
+
   cars            Car[]
   fleetManagedCars Car[]         @relation("FleetOperatorCars")
   bookings        Booking[]      @relation("CustomerBookings")
@@ -136,6 +156,12 @@ model User {
   loggedJournalEntries   JournalEntry[]
   loggedFleetExpenses    FleetExpense[]
   requestedServices      ServiceRequest[]
+  assignedServiceRequests ServiceRequest[] @relation("AgentServiceRequests")
+  loggedOpsTrips         OpsTrip[]
+  loggedOpsInvoices      OpsInvoice[]
+  loggedOpsPayments      OpsPayment[]
+  loggedOutstandings     Outstanding[]
+  messagesSent           Message[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -179,12 +205,57 @@ model Car {
   fleetOperatorId  String?
   fleetOperator    User?     @relation("FleetOperatorCars", fields: [fleetOperatorId], references: [id])
 
+  // 4-step Fleet Partner Onboarding journey (Audit -> Security -> Agreement ->
+  // Go Live). 0 = not started/opted in. 1 = audit submitted, fleet operator
+  // assigned via random "finger-crossed" shuffle. 2 = security/telematics
+  // confirmed (Car.telematicsImei set). 3 = awaiting partnership agreement —
+  // an admin/fleet_admin manually advances to Go Live (fleetManaged=true)
+  // once it's actually signed. Per-car (not per-User like
+  // partnerAgreementWetSignedUrl below) since a host can have some
+  // fleet-managed and some self-hosted cars — this is the *additional*
+  // fleet-specific agreement layered on top of every host's one-time
+  // Host Onboarding Agreement, not a replacement for it.
+  fleetOnboardingStep Int @default(0)
+  fleetAgreementWetSignedUrl   String?
+  fleetAgreementWetSignedAt    DateTime?
+  fleetAgreementEsignRequestId String?
+  fleetAgreementEsignStatus    String? // sign_initiated | sign_pending | sign_in_progress | sign_complete
+  fleetAgreementEsignDownloadUrl String?
+
   // Onboarding / verification (RC, pollution cert, insurance) — see host/onboarding/car wizard
   verificationStatus CarVerificationStatus @default(PENDING)
   rcDocUrl           String?
   pollutionCertUrl   String?
   insuranceDocUrl    String?
   onboardingStep     Int                   @default(0) // 0-4, drives the "Steps Completed" progress ring
+
+  // Fleet Ops internal asset-record fields (merged in from the standalone Fleet Ops
+  // Admin Dashboard — same physical vehicle, since it earns revenue across multiple
+  // channels including this platform's own "Ziyam Direct" listing).
+  vehicleCode           String?
+  chassis               String?
+  currentOdo            Float?
+  lastServiceOdo        Float?
+  lastServiceDate       DateTime?
+  serviceScheduledDate  DateTime?
+  insuranceExpiry       DateTime?
+  rcExpiry              DateTime?
+  pucExpiry             DateTime?
+  fuelLevel             Float?
+
+  // Ops pause/service state — mirrors the real production system exactly (ground-
+  // truthed from the live app's source, not the marketing doc's richer-sounding
+  // "Awaiting/Pending/Approved/Rejected" 4-state description): fleetStatus is only
+  // ever 'active' or 'paused'; pauseReason disambiguates *why* — 'personal' (owner-
+  // requested, needs admin approval via pauseStatus) or 'service' (ops-initiated,
+  // no approval step, cleared automatically when the mechanic logs the service).
+  // pauseStatus is null once approved (status='paused' IS the "approved" state) —
+  // there's no separate "approved" string in the real system.
+  fleetStatus  String    @default("active") // active | paused
+  pauseReason  String?   // personal | service
+  pauseStatus  String?   // pending | rejected (null once approved, or when not personal)
+  pauseFrom    DateTime?
+  pauseUntil   DateTime?
 
   // Booking preferences (host-controlled)
   noNightBookings       Boolean @default(false)
@@ -202,6 +273,7 @@ model Car {
   journalEntries   JournalEntry[]
   fleetExpenses    FleetExpense[]
   serviceRequests  ServiceRequest[]
+  opsTrips         OpsTrip[]
   createdAt        DateTime  @default(now())
 
   @@index([fleetOperatorId])
@@ -279,7 +351,26 @@ model Booking {
   paymentIntentId  String?
   payoutLedger     PayoutLedger?
   review           Review?
+  serviceRequests  ServiceRequest[]
+  messages         Message[]
   createdAt        DateTime       @default(now())
+}
+
+// Guest<->host messaging, scoped to a specific booking (not a general DM
+// system) — pickup coordination, pre-trip questions, etc. senderId is
+// whichever of the booking's two parties sent it; the other party is always
+// the recipient, so no separate recipientId column is needed.
+model Message {
+  id        String   @id @default(uuid())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id])
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([bookingId])
 }
 
 model PayoutLedger {
@@ -351,12 +442,16 @@ model PlatformBooking {
   id                 String          @id @default(uuid())
   carId              String
   car                Car             @relation(fields: [carId], references: [id])
-  platform           RentalPlatform
+  platform           String          // Zoomcar | Revv | Bharat | Marc8 | etc — see fleet_platforms Setting
   externalBookingId  String          @unique
   bookedAt           DateTime
   totalFare          Float
   doorstepCharges    Float           @default(0)
   platformCommission Float?
+  // Ground-truthed parity fields from the real "earnings" table — gates when a
+  // booking counts as credited revenue for Command Center cash-position math.
+  received           Boolean         @default(false)
+  expectedCreditDate DateTime?
   createdById        String
   createdBy          User            @relation(fields: [createdById], references: [id])
   createdAt          DateTime        @default(now())
@@ -374,7 +469,7 @@ model JournalEntry {
   car            Car            @relation(fields: [carId], references: [id])
   amountCollected Float
   totalAmount    Float
-  category       LedgerCategory
+  category       String         // see fleet_ledger_categories Setting
   remarks        String?
   createdById    String
   createdBy      User           @relation(fields: [createdById], references: [id])
@@ -388,10 +483,11 @@ model JournalEntry {
 // carId is nullable — null means "Fleet-Wide" per the PRD.
 model FleetExpense {
   id          String            @id @default(uuid())
-  expenseType FleetExpenseType
+  expenseType String            // see fleet_expense_types Setting
   carId       String?
   car         Car?              @relation(fields: [carId], references: [id])
-  paymentMode PaymentMode
+  paymentMode String            // see fleet_payment_modes Setting
+  paidTo      String?
   amount      Float
   date        DateTime
   description String?
@@ -404,6 +500,64 @@ model FleetExpense {
   @@index([expenseType])
 }
 
+enum OutstandingType {
+  RECEIVABLE // owed TO the platform (e.g. a platform hasn't yet paid out a trip)
+  PAYABLE    // owed BY the platform (e.g. an owner payout not yet transferred)
+}
+
+enum OutstandingStatus {
+  PENDING
+  PAID
+}
+
+// Ground-truthed exact cadence options from the real Financial ERP's recurring-
+// entry UI copy.
+enum OutstandingFrequency {
+  ONCE
+  EVERY_TRIP
+  EVERY_MONTH
+  EVERY_DUE
+  EVERY_PAYMENT
+  EVERY_COLLECTION
+}
+
+// Receivables & Payables ledger — merged in from the Financial ERP's
+// "outstandings" table. sourceType is free-text descriptive copy (e.g. "A
+// Trip", "A Direct Collection", "A Due We Owe", "A Payment We Made" in the
+// real app) rather than a rigid enum, since it's UI classification text, not
+// something the app branches on structurally — type/status/frequency are the
+// fields that actually drive balance-sheet math and are real enums.
+model Outstanding {
+  id             String               @id @default(uuid())
+  expectedDate   DateTime
+  paymentTo      String
+  amountOwed     Float
+  outstandingType OutstandingType
+  sourceType     String?
+  frequency      OutstandingFrequency @default(ONCE)
+  recurringGroup String?
+  status         OutstandingStatus    @default(PENDING)
+  paidDate       DateTime?
+  createdById    String
+  createdBy      User                 @relation(fields: [createdById], references: [id])
+  createdAt      DateTime             @default(now())
+
+  @@index([outstandingType])
+  @@index([status])
+}
+
+// Monthly opening/closing cash balance roll-up for the Command Center /
+// Monthly Cash Ledger view. month is a "YYYY-MM" string key, matching the real
+// system's PK exactly — this is a computed/scheduled roll-up rather than a
+// manually-entered transaction, so (unlike every other ledger model here) it
+// has no createdById attribution field.
+model MonthlyBalance {
+  month          String    @id
+  openingBalance Float
+  closingBalance Float?
+  createdAt      DateTime  @default(now())
+}
+
 // Host-requested vehicle maintenance/servicing (matches the "Vehicle Services"
 // booking screen). Completing a request auto-logs a FleetExpense so the
 // financial ledger stays in sync without manual double-entry.
@@ -413,7 +567,7 @@ model ServiceRequest {
   car             Car                 @relation(fields: [carId], references: [id])
   requestedById   String
   requestedBy     User                @relation(fields: [requestedById], references: [id])
-  serviceType     String              // "Basic Service" | "Standard Services" | custom
+  serviceType     String              // "Basic Service" | "Standard Services" | "Washing" | custom
   priceEstimate   Float
   scheduledDate   DateTime
   serviceLocation String
@@ -421,10 +575,219 @@ model ServiceRequest {
   notes           String?
   fleetExpenseId  String?             @unique
   fleetExpense    FleetExpense?       @relation(fields: [fleetExpenseId], references: [id])
+
+  // Guest-initiated add-ons (e.g. washing) tied to a specific trip rather
+  // than a host's own maintenance request — auto-assigned to an agent below.
+  bookingId       String?
+  booking         Booking?            @relation(fields: [bookingId], references: [id])
+  assignedAgentId String?
+  agent           User?               @relation("AgentServiceRequests", fields: [assignedAgentId], references: [id])
+
+  // Fleet Ops Maintenance Hub fields (merged in from the standalone dashboard) —
+  // cost breakdown, technician assignment, and per-job invoice details. The real
+  // production app writes status='completed' on every insert (no scheduling/
+  // in-progress states are actually wired up), so ServiceRequestStatus's
+  // existing REQUESTED/CONFIRMED/COMPLETED/CANCELLED set is left as-is rather
+  // than widened for workflow states nothing currently uses.
+  serviceCategory String?
+  labourCost      Float?
+  partsCost       Float?
+  totalCost       Float?
+  technician      String?
+  mechanicNotes   String?
+  odometer        Float?
+  serviceCode     String?
+  invoiceBillTo   String?
+  invoiceMobile   String?
+  invoiceDate     DateTime?
+  items           ServiceRequestItem[]
+  opsInvoices     OpsInvoice[]
+
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
   @@index([carId])
+  @@index([bookingId])
+  @@index([assignedAgentId])
+}
+
+model ServiceRequestItem {
+  id        String         @id @default(uuid())
+  serviceId String
+  service   ServiceRequest @relation(fields: [serviceId], references: [id])
+  itemName  String
+  price     Float?
+  note      String?
+  createdAt DateTime       @default(now())
+
+  @@index([serviceId])
+}
+
+enum OpsTripStatus {
+  SCHEDULED
+  RUNNING
+  COMPLETED
+  CANCELLED
+}
+
+// Fleet Ops trip check-in/check-out lifecycle, merged in from the standalone
+// Fleet Ops Admin Dashboard — trips sourced from external platforms (Zoomcar,
+// Revv, Bharat) or manually logged by ops staff for a walk-in/direct customer.
+// Deliberately kept separate from Booking: Booking is a renter's own PayU/KYC
+// self-checkout through this platform's own N+1 PayoutLedger engine; OpsTrip is
+// front-desk-staff-logged with no renter account at all (customerName/Mobile
+// are plain strings, no User FK — that's a real data-model incompatibility
+// with Booking.customerId, not just a workflow-preference one). addons /
+// checkoutAddons are stored as JSON to match the real production system
+// exactly (denormalized on the row, not a relational child table) — real addon
+// type literals in use: Toll packages, Co-Driver, Driver, Night Driver, Driver
+// food and accommodation, Unlimited kms, Fuel Package, Airport Pickup, Airport
+// Drop, Waiting Charges, Car doorstep, Full Car Washing, Interior/Exterior
+// Cleaning only, DAMAGES, other.
+model OpsTrip {
+  id              String        @id @default(uuid())
+  tripCode        String?
+  carId           String
+  car             Car           @relation(fields: [carId], references: [id])
+  bookingPlatform String?       // Zoomcar | Revv | Bharat | Ziyam Direct | etc — see fleet_platforms Setting
+  externalBookingId String?     // the source platform's own booking reference, if any
+  driverRef       String?
+
+  customerName    String
+  customerMobile  String
+  pickupLocation  String?
+  dropLocation    String?
+  pickupType      String?       // e.g. Airport Pickup/Drop, Doorstep, Self
+
+  startTime       DateTime
+  endTime         DateTime?
+
+  odometerStart   Float?
+  odometerEnd     Float?
+  rangeKm         Float?
+  fastag          String?
+  checkoutFastag  String?
+  fuelEst         String?
+  carWashed       Boolean       @default(false)
+  washingCharges  Float?
+  tyreHealth      String?
+  newDamages      String?
+
+  baseFare        Float?
+  addonTotal      Float?
+  amount          Float?        // grand total = baseFare + addonTotal, frozen at check-in/out
+  amountCollected Float?
+  amountPaidGuest Float?
+  addons          Json?
+  checkoutAddons  Json?
+
+  status          OpsTripStatus @default(SCHEDULED)
+  notes           String?
+
+  createdById     String
+  createdBy       User          @relation(fields: [createdById], references: [id])
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  images          OpsTripImage[]
+  invoices        OpsInvoice[]
+
+  @@index([carId])
+  @@index([status])
+}
+
+model OpsTripImage {
+  id        String   @id @default(uuid())
+  tripId    String
+  trip      OpsTrip  @relation(fields: [tripId], references: [id])
+  url       String
+  createdAt DateTime @default(now())
+
+  @@index([tripId])
+}
+
+enum OpsInvoiceType {
+  RENTAL
+  SERVICE
+}
+
+enum OpsInvoiceStatus {
+  DRAFT
+  PENDING
+  SENT
+  PAID
+}
+
+// Two invoice types sharing one model (RENTAL ties to an OpsTrip, SERVICE ties
+// to a ServiceRequest) — matches the real system's "same branding/format, two
+// document types" behavior. serviceChargePct/serviceCharge/netToOwner are
+// frozen onto the row at creation from the admin-editable Setting
+// fleet_facilitation_fee_pct — later config changes don't retroactively alter
+// already-issued invoices, matching real production behavior.
+model OpsInvoice {
+  id                String           @id @default(uuid())
+  invoiceNumber     String           @unique
+  type              OpsInvoiceType
+  tripId            String?
+  trip              OpsTrip?         @relation(fields: [tripId], references: [id])
+  serviceId         String?
+  service           ServiceRequest?  @relation(fields: [serviceId], references: [id])
+
+  amount            Float
+  serviceChargePct  Float
+  serviceCharge     Float
+  netToOwner        Float
+  status            OpsInvoiceStatus @default(SENT)
+  issuedAt          DateTime         @default(now())
+
+  // GST — computed at issue time from the admin-configurable company_gstin /
+  // default_gst_rate Settings, frozen onto the row like serviceChargePct
+  // (a later rate change shouldn't alter an already-issued invoice). Split
+  // into CGST+SGST when placeOfSupply matches the company's home state
+  // (intra-state), IGST otherwise — Ziyam is Bengaluru-only today so every
+  // real invoice is intra-state, but the split is modeled correctly for
+  // when that changes.
+  placeOfSupply     String?
+  gstRate           Float?
+  cgstAmount        Float?
+  sgstAmount        Float?
+  igstAmount        Float?
+
+  customerName      String?
+  customerMobile    String?
+
+  createdById       String
+  createdBy         User             @relation(fields: [createdById], references: [id])
+  createdAt         DateTime         @default(now())
+
+  payments          OpsPayment[]
+
+  @@index([tripId])
+  @@index([serviceId])
+}
+
+enum OpsPaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model OpsPayment {
+  id           String           @id @default(uuid())
+  invoiceId    String
+  invoice      OpsInvoice       @relation(fields: [invoiceId], references: [id])
+  method       String?          // Cash | UPI | Card | Bank Transfer — see fleet_payment_modes Setting
+  transferDate DateTime?
+  reference    String?
+  notes        String?
+  amount       Float
+  status       OpsPaymentStatus @default(PENDING)
+
+  createdById  String
+  createdBy    User             @relation(fields: [createdById], references: [id])
+  createdAt    DateTime         @default(now())
+
+  @@index([invoiceId])
 }
 
 // Traceability for admin mutations (suspend, feature, refund, etc).

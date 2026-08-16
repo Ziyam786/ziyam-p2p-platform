@@ -1,8 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, Prisma } from '@prisma/client';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRole } from '../middleware/auth';
 import { generateChatReply } from '../services/aiService';
 import { FleetService } from '../services/fleetService';
+import { pickFleetOperator } from '../services/fleetOperatorAssignment';
+import { esignApi, isSetuConfigured } from '../services/setuService';
+import { renderFleetPartnerAgreementPdf } from '../services/fleetPartnerAgreementPdf';
+import { config } from '../config';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -79,6 +83,29 @@ router.get('/cars/:id', async (req: Request, res: Response) => {
   const reviewCount = reviews.length;
   const rating = reviewCount === 0 ? 0 : Number((reviews.reduce((s, r) => s + r.rating, 0) / reviewCount).toFixed(1));
   res.json({ success: true, data: { ...rest, rating, reviewCount, reviews } });
+});
+
+// Public read-only availability calendar — merged booked + host-paused date
+// ranges, with no booking/customer details exposed, so renters can see which
+// days are unavailable before picking dates (see AvailabilityCalendar.tsx).
+router.get('/cars/:id/availability', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const [bookings, blackouts] = await Promise.all([
+    prisma.booking.findMany({
+      where: { carId: id, status: { notIn: ['CANCELLED'] } },
+      select: { startTime: true, endTime: true },
+    }),
+    prisma.blackout.findMany({
+      where: { carId: id },
+      select: { startDate: true, endDate: true, reason: true },
+    }),
+  ]);
+
+  const ranges = [
+    ...bookings.map((b) => ({ startDate: b.startTime, endDate: b.endTime, type: 'BOOKED' as const })),
+    ...blackouts.map((b) => ({ startDate: b.startDate, endDate: b.endDate, type: 'PAUSED' as const, reason: b.reason })),
+  ];
+  res.json({ success: true, data: ranges });
 });
 
 router.patch('/cars/:id', requireAuth, async (req: Request, res: Response) => {
@@ -204,6 +231,187 @@ router.get('/cars/:id/incentives', requireAuth, async (req: Request, res: Respon
 
   const progress = await FleetService.getIncentiveProgress(id);
   res.json({ success: true, data: progress });
+});
+
+/* ── Fleet Partner Onboarding (Audit -> Security -> Agreement -> Go Live) ── */
+
+async function assertOwnsCarForOnboarding(req: Request, carId: string) {
+  const car = await prisma.car.findUnique({ where: { id: carId } });
+  if (!car) return { ok: false as const, status: 404, error: 'Car not found' };
+  if (car.ownerId !== req.user!.userId) return { ok: false as const, status: 403, error: 'Not your listing' };
+  return { ok: true as const, car };
+}
+
+// Host-only status check (unlike the public GET /cars/:id, this is allowed to
+// include the assigned fleet operator's contact details).
+router.get('/cars/:id/fleet-onboarding', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const check = await assertOwnsCarForOnboarding(req, id);
+  if (!check.ok) return res.status(check.status).json({ error: check.error });
+  const car = await prisma.car.findUnique({
+    where: { id },
+    select: {
+      fleetOnboardingStep: true, fleetManaged: true, telematicsImei: true,
+      fleetAgreementWetSignedUrl: true, fleetAgreementWetSignedAt: true,
+      fleetAgreementEsignStatus: true, fleetAgreementEsignDownloadUrl: true,
+      fleetOperator: { select: { fullName: true, phoneNumber: true, email: true } },
+    },
+  });
+  res.json({ success: true, data: car });
+});
+
+// Step 1 — Audit: host confirms the eligibility checklist and the car is
+// assigned a fleet operator via a random "finger-crossed" shuffle.
+router.post('/cars/:id/fleet-onboarding/audit', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const check = await assertOwnsCarForOnboarding(req, id);
+  if (!check.ok) return res.status(check.status).json({ error: check.error });
+  if (check.car.fleetOnboardingStep > 0) return res.status(409).json({ error: 'Audit already submitted for this car' });
+
+  const { confirmedEligible } = req.body;
+  if (!confirmedEligible) return res.status(400).json({ error: 'You must confirm the eligibility checklist to proceed' });
+
+  const fleetOperatorId = await pickFleetOperator();
+  if (!fleetOperatorId) return res.status(503).json({ error: 'No fleet operators are available to onboard your car right now — please try again shortly.' });
+
+  const car = await prisma.car.update({
+    where: { id },
+    data: { fleetOnboardingStep: 1, fleetOperatorId },
+    include: { fleetOperator: { select: { fullName: true, phoneNumber: true, email: true } } },
+  });
+  res.json({ success: true, data: car });
+});
+
+// Step 2 — Security: GPS/immobilizer install confirmed via the telematics IMEI.
+router.patch('/cars/:id/fleet-onboarding/security', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const check = await assertOwnsCarForOnboarding(req, id);
+  if (!check.ok) return res.status(check.status).json({ error: check.error });
+  if (check.car.fleetOnboardingStep !== 1) return res.status(409).json({ error: 'Complete the audit step first' });
+
+  const { telematicsImei } = req.body;
+  if (!telematicsImei || !String(telematicsImei).trim()) return res.status(400).json({ error: 'telematicsImei is required' });
+
+  const car = await prisma.car.update({
+    where: { id },
+    data: { fleetOnboardingStep: 2, telematicsImei: String(telematicsImei).trim() },
+  });
+  res.json({ success: true, data: car });
+});
+
+// Step 3 — Agreement: wet-signature upload (a fleet operator hands the host a
+// physical/printed agreement to sign and photograph) and Aadhaar e-sign via
+// Setu (same integration used for trip lease agreements and the Host
+// Onboarding Agreement) are both real — Go Live requires both to be complete.
+router.patch('/cars/:id/fleet-onboarding/agreement/wet-signature', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const check = await assertOwnsCarForOnboarding(req, id);
+  if (!check.ok) return res.status(check.status).json({ error: check.error });
+  if (check.car.fleetOnboardingStep !== 2) return res.status(409).json({ error: 'Complete the Audit and Security steps first' });
+
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'url is required' });
+  const car = await prisma.car.update({
+    where: { id },
+    data: { fleetAgreementWetSignedUrl: url, fleetAgreementWetSignedAt: new Date() },
+  });
+  res.json({ success: true, data: car, message: 'Wet-signed agreement received — a fleet admin will review and confirm Go Live.' });
+});
+
+router.post('/cars/:id/fleet-onboarding/agreement/esign/start', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const check = await assertOwnsCarForOnboarding(req, id);
+  if (!check.ok) return res.status(check.status).json({ error: check.error });
+  if (check.car.fleetOnboardingStep !== 2) return res.status(409).json({ error: 'Complete the Audit and Security steps first' });
+  if (!isSetuConfigured()) return res.status(503).json({ error: 'eSign is not configured yet' });
+  if (check.car.fleetAgreementEsignRequestId) return res.status(409).json({ error: 'An eSign request already exists for this agreement' });
+
+  const car = await prisma.car.findUnique({ where: { id }, include: { owner: true, fleetOperator: true } });
+  if (!car || !car.fleetOperator) return res.status(409).json({ error: 'No fleet operator is assigned to this car yet' });
+
+  try {
+    const pdf = await renderFleetPartnerAgreementPdf({
+      carId: car.id,
+      createdAt: new Date(),
+      ownerName: car.owner.fullName,
+      ownerEmail: car.owner.email,
+      ownerPhone: car.owner.phoneNumber,
+      fleetOperatorName: car.fleetOperator.fullName,
+      fleetOperatorEmail: car.fleetOperator.email,
+      fleetOperatorPhone: car.fleetOperator.phoneNumber,
+      make: car.make,
+      model: car.model,
+      year: car.year,
+      registrationNo: car.registrationNo,
+      chassisNo: car.chassis,
+      transmission: car.transmission,
+      fuelType: car.fuelType,
+      hasComprehensiveInsurance: Boolean(car.insuranceDocUrl),
+    });
+    const { documentId } = await esignApi.uploadDocument(pdf, `fleet-partner-agreement-${car.id.slice(0, 8)}`);
+    const signature = await esignApi.createSignatureRequest(
+      documentId,
+      [
+        { identifier: car.owner.email, displayName: car.owner.fullName },
+        { identifier: car.fleetOperator.email, displayName: car.fleetOperator.fullName },
+      ],
+      `${config.clientUrl}/host/cars/${car.id}/manage?esigned=1`
+    );
+    await prisma.car.update({
+      where: { id: car.id },
+      data: { fleetAgreementEsignRequestId: signature.id, fleetAgreementEsignStatus: 'sign_initiated' },
+    });
+    res.json({ success: true, data: { esignRequestId: signature.id } });
+  } catch (err: any) {
+    console.error('[ESIGN] fleet partner agreement start failed:', err.response?.data ?? err.message);
+    res.status(502).json({ error: 'Could not start eSign right now. Please try again shortly.' });
+  }
+});
+
+router.get('/cars/:id/fleet-onboarding/agreement/esign/status', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const check = await assertOwnsCarForOnboarding(req, id);
+  if (!check.ok) return res.status(check.status).json({ error: check.error });
+  if (!check.car.fleetAgreementEsignRequestId) return res.json({ success: true, data: { status: null } });
+
+  if (check.car.fleetAgreementEsignStatus === 'sign_complete' && check.car.fleetAgreementEsignDownloadUrl) {
+    return res.json({ success: true, data: { status: check.car.fleetAgreementEsignStatus, downloadUrl: check.car.fleetAgreementEsignDownloadUrl } });
+  }
+
+  try {
+    const { status } = await esignApi.getStatus(check.car.fleetAgreementEsignRequestId);
+    let downloadUrl: string | undefined;
+    if (status === 'sign_complete') {
+      const download = await esignApi.getDownloadUrl(check.car.fleetAgreementEsignRequestId);
+      downloadUrl = download.downloadUrl;
+    }
+    await prisma.car.update({
+      where: { id },
+      data: { fleetAgreementEsignStatus: status, ...(downloadUrl && { fleetAgreementEsignDownloadUrl: downloadUrl }) },
+    });
+    res.json({ success: true, data: { status, downloadUrl } });
+  } catch (err: any) {
+    console.error('[ESIGN] fleet partner agreement status check failed:', err.response?.data ?? err.message);
+    res.status(502).json({ error: 'Could not check eSign status right now.' });
+  }
+});
+
+// Step 3->4 — Agreement & Go Live: no self-service completion (no real
+// partnership agreement content exists yet) — a fleet admin manually confirms
+// once it's actually been executed with the host.
+router.post('/admin/cars/:id/fleet-onboarding/go-live', requireAuth, requireRole('FLEET_ADMIN', 'ADMIN'), async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const car = await prisma.car.findUnique({ where: { id } });
+  if (!car) return res.status(404).json({ error: 'Car not found' });
+  if (car.fleetOnboardingStep < 2) return res.status(409).json({ error: 'Host has not completed the Audit and Security steps yet' });
+  if (!car.fleetAgreementWetSignedUrl) return res.status(409).json({ error: 'No wet-signed Fleet Partner Agreement is on file for this car yet' });
+  if (car.fleetAgreementEsignStatus !== 'sign_complete') return res.status(409).json({ error: 'The Fleet Partner Agreement has not been e-signed yet' });
+
+  const updated = await prisma.car.update({
+    where: { id },
+    data: { fleetOnboardingStep: 3, fleetManaged: true },
+  });
+  res.json({ success: true, data: updated, message: 'Car is now fleet-managed and live.' });
 });
 
 export default router;

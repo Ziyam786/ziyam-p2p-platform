@@ -14,6 +14,7 @@ const links = {
   ],
   Rentals: [
     { label: 'Browse Cars', href: '/cars' },
+    { label: 'Guest Policy', href: '/guest/policy' },
     { label: 'Cities', href: '/cities' },
     { label: 'Subscription Plans', href: '/subscription' },
     { label: 'Corporate Rentals', href: '/corporate' },
@@ -27,9 +28,10 @@ const links = {
   ],
   'Host Your Car': [
     { label: 'How It Works', href: '/how-it-works' },
+    { label: 'Host Policy', href: '/host/policy' },
+    { label: 'Host FAQ', href: '/host/faq' },
     { label: 'Earnings Calculator', href: '/host/earnings-calculator' },
-    { label: 'Fleet Partners', href: '/host/onboarding' },
-    { label: 'Insurance Coverage', href: '/insurance' },
+    { label: 'Insurance & Damage Policy', href: '/insurance' },
   ],
 };
 

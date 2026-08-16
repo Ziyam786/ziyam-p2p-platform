@@ -20,6 +20,10 @@ import wishlistRoutes from './routes/wishlist.routes';
 import notificationRoutes from './routes/notification.routes';
 import fleetLedgerRoutes from './routes/fleetLedger.routes';
 import serviceRequestRoutes from './routes/serviceRequest.routes';
+import uploadRoutes from './routes/upload.routes';
+import agentRoutes from './routes/agent.routes';
+import opsTripRoutes from './routes/opsTrip.routes';
+import financeErpRoutes from './routes/financeErp.routes';
 
 const app = express();
 
@@ -72,6 +76,18 @@ app.use(cookieParser());
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'ZiyamSelfDrive API' }));
 
+// Uploaded photos/documents are fetched cross-origin by the renter/host/admin
+// apps (each on their own domain), so relax helmet's default same-origin
+// Cross-Origin-Resource-Policy just for this path.
+app.use(
+  '/uploads',
+  (_req, res, next) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  },
+  express.static(config.uploadDir)
+);
+
 app.use('/api', authRoutes);
 app.use('/api', carRoutes);
 app.use('/api', bookingRoutes);
@@ -87,6 +103,10 @@ app.use('/api', wishlistRoutes);
 app.use('/api', notificationRoutes);
 app.use('/api', fleetLedgerRoutes);
 app.use('/api', serviceRequestRoutes);
+app.use('/api', uploadRoutes);
+app.use('/api', agentRoutes);
+app.use('/api', opsTripRoutes);
+app.use('/api', financeErpRoutes);
 
 // 404 handler for unmatched API routes
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
