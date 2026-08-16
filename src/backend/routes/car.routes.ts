@@ -152,7 +152,13 @@ router.patch('/cars/:id', requireAuth, async (req: Request, res: Response) => {
 
   // Documents are self-attested at this stage (no live DigiLocker/RTO integration yet —
   // same "stub as instant pass" pattern as kyc.routes.ts). Once all three are on file we
-  // mark the car verified so the host UI can show the green "Verified" badge.
+  // mark the car verified so the host UI can show the green "Verified" badge. Only
+  // recompute this when the host is actually touching a document field, not on every
+  // unrelated edit (price, description, etc.) — otherwise an admin's manual REJECTED
+  // verdict (see PATCH /admin/cars/:id/verification) would silently flip back to
+  // VERIFIED the next time the host changed anything at all, since all three doc URLs
+  // are still on file from before.
+  const docsTouched = rcDocUrl !== undefined || pollutionCertUrl !== undefined || insuranceDocUrl !== undefined;
   const nextRc = rcDocUrl !== undefined ? rcDocUrl : car.rcDocUrl;
   const nextPollution = pollutionCertUrl !== undefined ? pollutionCertUrl : car.pollutionCertUrl;
   const nextInsurance = insuranceDocUrl !== undefined ? insuranceDocUrl : car.insuranceDocUrl;
@@ -188,7 +194,7 @@ router.patch('/cars/:id', requireAuth, async (req: Request, res: Response) => {
       ...(rcDocUrl !== undefined && { rcDocUrl }),
       ...(pollutionCertUrl !== undefined && { pollutionCertUrl }),
       ...(insuranceDocUrl !== undefined && { insuranceDocUrl }),
-      ...(docsComplete && { verificationStatus: 'VERIFIED' as const }),
+      ...(docsTouched && docsComplete && { verificationStatus: 'VERIFIED' as const }),
       ...(onboardingStep !== undefined && { onboardingStep: Number(onboardingStep) }),
       ...(noNightBookings !== undefined && { noNightBookings }),
       ...(nightBookingStart !== undefined && { nightBookingStart }),
