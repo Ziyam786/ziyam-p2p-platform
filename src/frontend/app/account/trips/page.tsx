@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
 import ProtectedRoute from '../../../components/ProtectedRoute';
@@ -73,11 +74,9 @@ function TripsInner() {
               >
                 <div className="flex flex-wrap items-center gap-4 justify-between">
                   <div className="flex items-center gap-4">
-                    <img
-                      src={trip.car?.images?.[0] ?? '/placeholder-car.jpg'}
-                      alt=""
-                      className="w-20 h-14 rounded-lg object-cover bg-gray-100"
-                    />
+                    <div className="relative w-20 h-14 rounded-lg overflow-hidden bg-gray-100 shrink-0">
+                      <Image src={trip.car?.images?.[0] ?? '/placeholder-car.jpg'} alt="" fill sizes="80px" className="object-cover" />
+                    </div>
                     <div>
                       <p className="font-bold text-gray-900">{trip.car?.make} {trip.car?.model}</p>
                       <p className="text-xs text-gray-500">

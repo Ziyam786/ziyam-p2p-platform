@@ -5,9 +5,14 @@ import ProtectedRoute from '../../components/ProtectedRoute';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/Toast';
 import { useAuth } from '../../lib/auth-context';
-import { agentApi, adminApi } from '../../lib/api';
-import type { AgentServiceRequest } from '../../lib/api';
-import type { AdminUser } from '../../lib/types';
+import { agentApi, adminApi, opsTripApi } from '../../lib/api';
+import type { AgentServiceRequest, OpsTripCheckInPayload } from '../../lib/api';
+import type { AdminUser, AdminCar, OpsTripRow } from '../../lib/types';
+
+const TRIP_STATUS_STYLES: Record<string, string> = {
+  SCHEDULED: 'bg-amber-500/10 text-amber-400',
+  RUNNING: 'bg-blue-500/10 text-blue-400',
+};
 
 const inputCls = 'w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500';
 function toLocalInput(iso: string) {
@@ -41,6 +46,66 @@ function AgentPortalInner() {
   useEffect(() => {
     if (isAdmin) adminApi.users('AGENT').then((res) => setAgents(res.data)).catch(() => {});
   }, [isAdmin]);
+
+  // Quick trip check-in/out — the ground-staff "handover" workflow, kept
+  // deliberately minimal (car + customer name + phone) so it's fast on a
+  // phone at the curb. Full reconciliation (odometer, fastag, damages)
+  // still happens later in the desktop Ops Trips admin page.
+  const [cars, setCars] = useState<AdminCar[]>([]);
+  const [trips, setTrips] = useState<OpsTripRow[]>([]);
+  const [tripsLoading, setTripsLoading] = useState(true);
+  const [showCheckIn, setShowCheckIn] = useState(false);
+  const [checkInForm, setCheckInForm] = useState({ carId: '', customerName: '', customerMobile: '' });
+  const [checkInBusy, setCheckInBusy] = useState(false);
+  const [checkoutBusyId, setCheckoutBusyId] = useState<string | null>(null);
+
+  function loadTrips() {
+    setTripsLoading(true);
+    opsTripApi.list({}).then((res) => setTrips(res.data.filter((t: any) => t.status === 'RUNNING' || t.status === 'SCHEDULED'))).finally(() => setTripsLoading(false));
+  }
+
+  useEffect(() => {
+    adminApi.cars().then((res) => setCars(res.data)).catch(() => {});
+    loadTrips();
+  }, []);
+
+  async function submitCheckIn() {
+    if (!checkInForm.carId || !checkInForm.customerName || !checkInForm.customerMobile) {
+      show('Car, customer name, and phone are required', 'error');
+      return;
+    }
+    setCheckInBusy(true);
+    try {
+      const payload: OpsTripCheckInPayload = {
+        carId: checkInForm.carId,
+        customerName: checkInForm.customerName,
+        customerMobile: checkInForm.customerMobile,
+        startTime: new Date().toISOString(),
+      };
+      await opsTripApi.checkIn(payload);
+      show('Trip checked in', 'success');
+      setShowCheckIn(false);
+      setCheckInForm({ carId: '', customerName: '', customerMobile: '' });
+      loadTrips();
+    } catch (err: any) {
+      show(err.message ?? 'Check-in failed', 'error');
+    } finally {
+      setCheckInBusy(false);
+    }
+  }
+
+  async function quickCheckOut(tripId: string) {
+    setCheckoutBusyId(tripId);
+    try {
+      await opsTripApi.checkOut(tripId, { endTime: new Date().toISOString() });
+      show('Trip checked out', 'success');
+      loadTrips();
+    } catch (err: any) {
+      show(err.message ?? 'Check-out failed', 'error');
+    } finally {
+      setCheckoutBusyId(null);
+    }
+  }
 
   async function updateStatus(id: string, status: 'CONFIRMED' | 'COMPLETED' | 'CANCELLED') {
     setBusyId(id);
@@ -104,6 +169,44 @@ function AgentPortalInner() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-bold text-slate-300">My Trips ({trips.length})</h2>
+          <button
+            onClick={() => setShowCheckIn(true)}
+            className="bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg transition"
+          >
+            + Quick Check-In
+          </button>
+        </div>
+        {tripsLoading ? (
+          <p className="text-slate-600 text-sm mb-10">Loading trips…</p>
+        ) : trips.length === 0 ? (
+          <p className="text-slate-600 text-sm mb-10">No active trips — check a customer in when they arrive.</p>
+        ) : (
+          <div className="space-y-3 mb-10">
+            {trips.map((trip) => (
+              <div key={trip.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-bold">{trip.car?.make} {trip.car?.model} <span className="text-slate-500 font-normal">· {trip.car?.registrationNo}</span></p>
+                    <p className="text-xs text-slate-500 mt-0.5">{trip.customerName} · {trip.customerMobile}</p>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0 ${TRIP_STATUS_STYLES[trip.status] ?? 'bg-slate-800 text-slate-400'}`}>{trip.status}</span>
+                </div>
+                {trip.status === 'RUNNING' && (
+                  <button
+                    disabled={checkoutBusyId === trip.id}
+                    onClick={() => quickCheckOut(trip.id)}
+                    className="mt-4 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg transition disabled:opacity-50"
+                  >
+                    {checkoutBusyId === trip.id ? 'Checking out…' : 'Check Out'}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {loading ? (
           <p className="text-slate-500">Loading your assignments…</p>
         ) : (
@@ -184,6 +287,33 @@ function AgentPortalInner() {
           </>
         )}
       </main>
+
+      <Modal open={showCheckIn} onClose={() => setShowCheckIn(false)} title="Quick Check-In">
+        <div className="space-y-3">
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-400 mb-1 block">Car</span>
+            <select className={inputCls} value={checkInForm.carId} onChange={(e) => setCheckInForm({ ...checkInForm, carId: e.target.value })}>
+              <option value="">Select a car</option>
+              {cars.map((c) => <option key={c.id} value={c.id}>{c.make} {c.model} — {c.registrationNo}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-400 mb-1 block">Customer Name</span>
+            <input className={inputCls} value={checkInForm.customerName} onChange={(e) => setCheckInForm({ ...checkInForm, customerName: e.target.value })} />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-400 mb-1 block">Customer Mobile</span>
+            <input className={inputCls} value={checkInForm.customerMobile} onChange={(e) => setCheckInForm({ ...checkInForm, customerMobile: e.target.value })} />
+          </label>
+          <p className="text-xs text-slate-500">Full trip details (odometer, fastag, fuel) can be filled in later from the desktop Ops Trips page — this just gets the handover started.</p>
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+            <button onClick={() => setShowCheckIn(false)} className="text-sm font-semibold px-4 py-2 rounded-lg text-slate-400 hover:text-white transition">Cancel</button>
+            <button disabled={checkInBusy} onClick={submitCheckIn} className="text-sm font-semibold px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white transition">
+              {checkInBusy ? 'Checking in…' : 'Check In'}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal open={Boolean(editing)} onClose={() => setEditing(null)} title={editing ? `Edit — ${editing.serviceType}` : 'Edit job'}>
         <div className="space-y-3">

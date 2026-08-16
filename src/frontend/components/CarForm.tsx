@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import type { Car } from '../lib/types';
 import { settingsApi } from '../lib/api';
 import FeaturePicker from './FeaturePicker';
@@ -180,7 +181,7 @@ export default function CarForm({
         <div className="flex flex-wrap gap-3 mb-3">
           {values.images.map((url, i) => (
             <div key={url + i} className="relative w-20 h-20">
-              <img src={url} alt={`Car photo ${i + 1}`} className="w-20 h-20 rounded-lg object-cover border border-gray-200" />
+              <Image src={url} alt={`Car photo ${i + 1}`} fill sizes="80px" className="rounded-lg object-cover border border-gray-200" />
               <button
                 type="button"
                 onClick={() => set('images', values.images.filter((_, j) => j !== i))}

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
@@ -49,8 +50,8 @@ export default function HostProfilePage() {
       <Navbar />
       <div className="max-w-5xl mx-auto px-4 pt-28 pb-24">
         <div className="bg-white rounded-2xl border border-gray-100 p-8 flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-10">
-          <div className="w-24 h-24 rounded-full bg-amber-100 flex items-center justify-center text-4xl overflow-hidden shrink-0">
-            {host.avatarUrl ? <img src={host.avatarUrl} alt="" className="w-full h-full object-cover" /> : '👤'}
+          <div className="relative w-24 h-24 rounded-full bg-amber-100 flex items-center justify-center text-4xl overflow-hidden shrink-0">
+            {host.avatarUrl ? <Image src={host.avatarUrl} alt="" fill sizes="96px" className="object-cover" /> : '👤'}
           </div>
           <div className="text-center sm:text-left">
             <div className="flex items-center gap-2 justify-center sm:justify-start flex-wrap">
