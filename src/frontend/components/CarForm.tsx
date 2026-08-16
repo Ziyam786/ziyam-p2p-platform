@@ -5,6 +5,7 @@ import type { Car } from '../lib/types';
 import { settingsApi } from '../lib/api';
 import FeaturePicker from './FeaturePicker';
 import AddressAutocomplete from './AddressAutocomplete';
+import FileUploadField from './FileUploadField';
 
 const CATEGORIES_FALLBACK = ['Hatchback', 'Sedan', 'SUV', 'Luxury', 'EV', 'MUV'];
 const FUEL_TYPES = ['Petrol', 'Diesel', 'Electric', 'CNG'];
@@ -16,14 +17,14 @@ export interface CarFormValues {
   fuelType: string; transmission: string; seats: number; dailyRate: number; securityDeposit: number;
   kmIncludedPerDay: number; extraKmCharge: number; city: string; address: string;
   latitude: number | null; longitude: number | null; description: string;
-  images: string; features: string; instantBook: boolean; offersDelivery: boolean; deliveryFee: number;
+  images: string[]; features: string; instantBook: boolean; offersDelivery: boolean; deliveryFee: number;
 }
 
 const DEFAULTS: CarFormValues = {
   make: '', model: '', registrationNo: '', year: new Date().getFullYear(), category: 'Hatchback',
   fuelType: 'Petrol', transmission: 'Manual', seats: 5, dailyRate: 1200, securityDeposit: 3000,
   kmIncludedPerDay: 300, extraKmCharge: 10, city: 'Bengaluru', address: '', latitude: null, longitude: null, description: '',
-  images: '', features: 'Air Conditioning, Bluetooth / Aux, Power Steering', instantBook: true,
+  images: [], features: 'Air Conditioning, Bluetooth / Aux, Power Steering', instantBook: true,
   offersDelivery: false, deliveryFee: 0,
 };
 
@@ -33,7 +34,7 @@ export function carToFormValues(car: Car): CarFormValues {
     fuelType: car.fuelType, transmission: car.transmission, seats: car.seats, dailyRate: car.dailyRate,
     securityDeposit: car.securityDeposit, kmIncludedPerDay: car.kmIncludedPerDay, extraKmCharge: car.extraKmCharge,
     city: car.city, address: car.address ?? '', latitude: car.latitude ?? null, longitude: car.longitude ?? null,
-    description: car.description ?? '', images: car.images.join(', '), features: car.features.join(', '),
+    description: car.description ?? '', images: car.images, features: car.features.join(', '),
     instantBook: car.instantBook, offersDelivery: car.offersDelivery, deliveryFee: car.deliveryFee,
   };
 }
@@ -45,7 +46,7 @@ export function formValuesToPayload(v: CarFormValues) {
     securityDeposit: Number(v.securityDeposit), kmIncludedPerDay: Number(v.kmIncludedPerDay),
     extraKmCharge: Number(v.extraKmCharge), city: v.city, description: v.description,
     address: v.address || undefined, latitude: v.latitude ?? undefined, longitude: v.longitude ?? undefined,
-    images: v.images.split(',').map((s) => s.trim()).filter(Boolean),
+    images: v.images,
     features: v.features.split(',').map((s) => s.trim()).filter(Boolean),
     instantBook: v.instantBook, offersDelivery: v.offersDelivery, deliveryFee: Number(v.deliveryFee),
   };
@@ -167,8 +168,29 @@ export default function CarForm({
         <textarea value={values.description} onChange={(e) => set('description', e.target.value)} rows={3} className={inputCls} placeholder="A well-maintained car, perfect for city drives..." />
       </Field>
 
-      <Field label="Image URLs (comma-separated)">
-        <input value={values.images} onChange={(e) => set('images', e.target.value)} className={inputCls} placeholder="https://... , https://..." />
+      <Field label="Photos">
+        <div className="flex flex-wrap gap-3 mb-3">
+          {values.images.map((url, i) => (
+            <div key={url + i} className="relative w-20 h-20">
+              <img src={url} alt={`Car photo ${i + 1}`} className="w-20 h-20 rounded-lg object-cover border border-gray-200" />
+              <button
+                type="button"
+                onClick={() => set('images', values.images.filter((_, j) => j !== i))}
+                className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center"
+                aria-label="Remove photo"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+        <FileUploadField
+          label="Add a photo"
+          value=""
+          onChange={(url) => set('images', [...values.images, url])}
+          accept="image/jpeg,image/png,image/webp"
+          kind="image"
+        />
       </Field>
 
       <Field label="Features">

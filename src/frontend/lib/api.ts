@@ -4,6 +4,8 @@ import type {
 } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api';
+// Uploaded files are served from the API's root (/uploads/...), not under /api.
+export const API_ORIGIN = API_URL.replace(/\/api\/?$/, '');
 
 export class ApiError extends Error {
   status: number;
@@ -38,6 +40,27 @@ const get = <T>(path: string) => request<T>(path);
 const post = <T>(path: string, data?: unknown) => request<T>(path, { method: 'POST', body: data ? JSON.stringify(data) : undefined });
 const patch = <T>(path: string, data?: unknown) => request<T>(path, { method: 'PATCH', body: data ? JSON.stringify(data) : undefined });
 const del = <T>(path: string) => request<T>(path, { method: 'DELETE' });
+
+/* ── Uploads ──────────────────────────────────────────────────────── */
+// Car photos, RC/insurance/PUC documents, selfies, and signatures are
+// uploaded as actual files (not pasted URLs) — see backend upload.routes.ts.
+export const uploadsApi = {
+  upload: async (file: File): Promise<{ url: string }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_URL}/uploads`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+    const isJson = res.headers.get('content-type')?.includes('application/json');
+    const body = isJson ? await res.json().catch(() => ({})) : undefined;
+    if (!res.ok) {
+      throw new ApiError(body?.error ?? `Upload failed with status ${res.status}`, res.status);
+    }
+    return { url: `${API_ORIGIN}${body.data.url}` };
+  },
+};
 
 /* ── Auth ─────────────────────────────────────────────────────────── */
 export const authApi = {

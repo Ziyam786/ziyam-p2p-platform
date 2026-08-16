@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import FeaturePicker from './FeaturePicker';
 import AddressAutocomplete from './AddressAutocomplete';
+import FileUploadField from './FileUploadField';
 import { settingsApi } from '../lib/api';
 
 const CATEGORIES_FALLBACK = ['Hatchback', 'Sedan', 'SUV', 'Luxury', 'EV', 'MUV'];
@@ -176,18 +177,28 @@ export default function CarOnboardingWizard({
       {step === 1 && (
         <div className="space-y-5">
           <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-sm text-amber-800">
-            We require your car's documents to verify your listing and prefill the necessary data. Paste a link to a
-            scanned copy or photo of each document — we'll store them against this listing.
+            We require your car's documents to verify your listing and prefill the necessary data. Upload a clear
+            photo or scan of each document — we'll store them against this listing. Active comprehensive insurance
+            coverage is required to list a car.
           </div>
-          <Field label="Registration Certificate (RC)">
-            <input value={values.rcDocUrl} onChange={(e) => set('rcDocUrl', e.target.value)} className={inputCls} placeholder="https://... (RC front & back)" />
-          </Field>
-          <Field label="Pollution Certificate (PUC)">
-            <input value={values.pollutionCertUrl} onChange={(e) => set('pollutionCertUrl', e.target.value)} className={inputCls} placeholder="https://..." />
-          </Field>
-          <Field label="Insurance Document">
-            <input value={values.insuranceDocUrl} onChange={(e) => set('insuranceDocUrl', e.target.value)} className={inputCls} placeholder="https://..." />
-          </Field>
+          <FileUploadField
+            label="Registration Certificate (RC — front & back)"
+            value={values.rcDocUrl}
+            onChange={(url) => set('rcDocUrl', url)}
+            kind="document"
+          />
+          <FileUploadField
+            label="Pollution Certificate (PUC)"
+            value={values.pollutionCertUrl}
+            onChange={(url) => set('pollutionCertUrl', url)}
+            kind="document"
+          />
+          <FileUploadField
+            label="Comprehensive Insurance Document"
+            value={values.insuranceDocUrl}
+            onChange={(url) => set('insuranceDocUrl', url)}
+            kind="document"
+          />
           {docsComplete ? (
             <p className="text-xs text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2">✓ All three documents provided — this car will show as Verified.</p>
           ) : (
@@ -198,20 +209,20 @@ export default function CarOnboardingWizard({
 
       {step === 2 && (
         <div className="space-y-5">
-          <p className="text-sm text-gray-500">Add clear, well-lit photos from each angle. Paste image URLs for now.</p>
+          <p className="text-sm text-gray-500">Add clear, well-lit photos from each angle.</p>
           {PHOTO_SLOTS.map((slot, i) => (
-            <Field key={slot} label={slot}>
-              <input
-                value={values.images[i]}
-                onChange={(e) => {
-                  const next = [...values.images];
-                  next[i] = e.target.value;
-                  set('images', next);
-                }}
-                className={inputCls}
-                placeholder="https://..."
-              />
-            </Field>
+            <FileUploadField
+              key={slot}
+              label={slot}
+              value={values.images[i]}
+              onChange={(url) => {
+                const next = [...values.images];
+                next[i] = url;
+                set('images', next);
+              }}
+              accept="image/jpeg,image/png,image/webp"
+              kind="image"
+            />
           ))}
           <p className="text-xs text-gray-400">{photosCount} of {PHOTO_SLOTS.length} photo slots filled · at least 2 recommended</p>
         </div>
