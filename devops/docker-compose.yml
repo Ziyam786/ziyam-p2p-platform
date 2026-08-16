@@ -35,9 +35,24 @@ services:
       dockerfile: devops/Dockerfile.admin
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5000/api}
+        NEXT_PUBLIC_AGENT_APP_URL: ${NEXT_PUBLIC_AGENT_APP_URL:-http://localhost:3002}
     restart: always
     ports:
       - "3001:3000"
+    depends_on:
+      - backend
+
+  # Standalone ground-staff Agent app (src/agent) — sub-linked from the admin
+  # panel's sidebar, not a page inside it. See devops/Dockerfile.agent.
+  agent:
+    build:
+      context: ..
+      dockerfile: devops/Dockerfile.agent
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5000/api}
+    restart: always
+    ports:
+      - "3002:3000"
     depends_on:
       - backend
 

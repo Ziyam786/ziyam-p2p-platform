@@ -27,7 +27,14 @@ const NAV = [
 // Opens EightLines' existing Marc8 fleet-ops tool (separate Supabase-backed app —
 // maintenance logs, tyre health, cross-platform trip tracking, revenue split) in a
 // new tab. Not merged into this admin's auth/data yet, just linked for now.
+//
+// The Agent App (src/agent) is a wholly separate, sub-linked Next.js app for
+// ground staff — walk-in check-in/handover/return, cash counter, ID
+// verification — not a page inside this admin panel (matches the vendor.
+// velosta.com-style split the platform is modeled on). Same auth cookie
+// domain, its own deployment.
 const EXTERNAL_NAV = [
+  { href: process.env.NEXT_PUBLIC_AGENT_APP_URL ?? 'http://localhost:3002', label: 'Agent App', icon: '🧑‍✈️' },
   { href: 'https://ziyam.in/marc8-dashboard', label: 'Fleet Ops (Marc8)', icon: '🛠️' },
 ];
 
