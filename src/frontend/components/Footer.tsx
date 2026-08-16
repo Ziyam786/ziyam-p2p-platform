@@ -1,5 +1,9 @@
-import React from 'react';
+'use client';
+
+import React, { useEffect, useState } from 'react';
 import { LogoBadge } from './Logo';
+import { COMPANY } from '../lib/companyInfo';
+import { settingsApi } from '../lib/api';
 
 const links = {
   Company: [
@@ -19,6 +23,7 @@ const links = {
     { label: 'Contact Us', href: '/support#contact' },
     { label: 'Safety', href: '/safety' },
     { label: 'Terms & Conditions', href: '/terms' },
+    { label: 'Refund & Cancellation Policy', href: '/refund-policy' },
   ],
   'Host Your Car': [
     { label: 'How It Works', href: '/how-it-works' },
@@ -29,6 +34,19 @@ const links = {
 };
 
 export default function Footer() {
+  // Falls back to the static defaults (COMPANY) until — or if — the admin-editable
+  // Setting loads, so the footer never flashes empty/broken content.
+  const [info, setInfo] = useState(COMPANY);
+
+  useEffect(() => {
+    settingsApi
+      .public()
+      .then((res) => {
+        if (res.data.company_info) setInfo({ ...COMPANY, ...res.data.company_info });
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <footer className="bg-gray-950 text-gray-400 pt-16 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -39,23 +57,26 @@ export default function Footer() {
               <LogoBadge className="w-9 h-9 shrink-0 rounded-xl" />
               <span className="text-lg font-extrabold text-amber-500">Ziyam<span className="text-white font-semibold">SelfDrive</span></span>
             </div>
-            <p className="text-xs text-gray-500 leading-relaxed">
-              India's trusted peer-to-peer self-drive car rental platform. Operated by Eightlines.
+            <p className="text-xs text-gray-500 leading-relaxed mb-3">
+              India's trusted peer-to-peer self-drive car rental platform, operated by {info.legalName}. {info.scopeNote}
             </p>
-            <div className="flex gap-3 mt-4">
-              {['twitter', 'instagram', 'linkedin', 'facebook'].map((s) => (
-                <a
-                  key={s}
-                  href={`https://${s}.com`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-8 h-8 rounded-full bg-gray-800 hover:bg-amber-500 flex items-center justify-center transition"
-                  aria-label={s}
-                >
-                  <span className="text-xs capitalize text-white">{s[0].toUpperCase()}</span>
-                </a>
-              ))}
+            <div className="text-xs text-gray-500 space-y-1 mb-4">
+              <p>{info.address}</p>
+              <p>
+                <a href={`mailto:${info.email}`} className="hover:text-amber-400 transition">{info.email}</a>
+                {' · '}
+                <a href={info.whatsappUrl} target="_blank" rel="noreferrer" className="hover:text-amber-400 transition">{info.phone}</a>
+              </p>
+              <p className="text-gray-600">CIN {info.cin}</p>
             </div>
+            <a
+              href={info.whatsappUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-full transition"
+            >
+              💬 WhatsApp Us
+            </a>
           </div>
 
           {Object.entries(links).map(([heading, items]) => (
@@ -76,10 +97,11 @@ export default function Footer() {
 
         {/* Bottom bar */}
         <div className="border-t border-gray-800 pt-6 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-600">
-          <span>© {new Date().getFullYear()} ZiyamSelfDrive (Eightlines). All rights reserved.</span>
+          <span>© {new Date().getFullYear()} {info.legalName}. All rights reserved.</span>
           <div className="flex gap-6">
             <a href="/privacy" className="hover:text-amber-400 transition">Privacy Policy</a>
             <a href="/terms" className="hover:text-amber-400 transition">Terms of Use</a>
+            <a href="/refund-policy" className="hover:text-amber-400 transition">Refund Policy</a>
             <a href="/cookies" className="hover:text-amber-400 transition">Cookie Policy</a>
           </div>
         </div>

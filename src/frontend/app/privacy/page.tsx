@@ -1,45 +1,59 @@
 import React from 'react';
 import LegalPage from '../../components/LegalPage';
+import { COMPANY } from '../../lib/companyInfo';
 
 export default function PrivacyPage() {
   return (
     <LegalPage
       title="Privacy Policy"
-      updated="August 2026"
+      updated="4 June 2026"
       sections={[
         {
-          heading: '1. What We Collect',
+          heading: '1. Overview',
           body: [
-            'Account details (name, email, phone number), identity documents submitted for KYC verification, booking and payment history, and vehicle telemetry (for keyless-enabled cars during active trips).',
+            `${COMPANY.legalName}, Bengaluru, Karnataka, processes personal data under the Information Technology Act, 2000 and the Digital Personal Data Protection Act, 2023.`,
           ],
         },
         {
-          heading: '2. How We Use Your Data',
+          heading: '2. What We Collect',
           body: [
-            'To operate bookings and payouts, verify identity via our KYC provider, process payments through our payment gateway partner, prevent fraud, and improve the platform.',
+            'Account data: name, date of birth, email, phone, address, and login credentials.',
+            'Identity verification: driving license, Aadhaar (masked only), passport, PAN, other government IDs, and facial verification records.',
+            'Booking information: reservation details, locations, rental duration, and trip history.',
+            'Location & telematics: real-time GPS, speed, acceleration, braking patterns, fuel consumption, and driving behaviour metrics. Vehicles may be monitored in real time during the rental period for safety, theft prevention, legal, and operational purposes.',
+            'Payment information: billing address and transaction records — card details are not stored by the Company.',
+            'Device information: device ID, IP address, browser, and operating system.',
+            'Communications: support interactions, call recordings, chats, feedback, and reviews.',
           ],
         },
         {
-          heading: '3. Data Sharing',
+          heading: '3. How We Use Your Data',
           body: [
-            'We share only what\'s necessary with our payment gateway, KYC provider (DigiLocker), and telematics/IoT partners to complete a booking. We never sell personal data to third parties.',
+            'Service delivery, identity verification, safety and theft prevention, legal compliance, business operations, and marketing (with consent).',
           ],
         },
         {
-          heading: '4. Data Retention',
-          body: ['Booking and payout records are retained as required by Indian tax and financial regulations. KYC documents are stored securely and only accessible for verification purposes.'],
+          heading: '4. Your Rights',
+          body: [
+            'You may request to access, correct, update, or delete your personal data, withdraw consent, and lodge complaints with India\'s Data Protection Board.',
+          ],
         },
         {
-          heading: '5. Your Rights',
-          body: ['You may request a copy of your data or account deletion at any time by contacting privacy@ziyam.in, subject to regulatory retention requirements for financial records.'],
+          heading: '5. Data Security & Breach Response',
+          body: [
+            'We use encryption, access controls, and secure infrastructure — though no system can be guaranteed completely secure. Data breaches trigger investigation, regulator notification, and affected-user notification per legal timelines.',
+          ],
         },
         {
           heading: '6. Cookies',
-          body: ['We use cookies for authentication (session tokens) and basic analytics. See our Cookie Policy for details.'],
+          body: ['We use cookies for authentication (session tokens) and basic analytics.'],
         },
         {
-          heading: '7. Contact',
-          body: ['Questions about this policy can be directed to privacy@ziyam.in.'],
+          heading: '7. Grievance Officer',
+          body: [
+            `Syed Fardeen  ·  ${COMPANY.email}  ·  ${COMPANY.phone}`,
+            'Acknowledgment within 48 hours; resolution within 30 days.',
+          ],
         },
       ]}
     />

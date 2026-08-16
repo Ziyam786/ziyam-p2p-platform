@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../lib/auth-context';
+import LoadingScreen from './LoadingScreen';
 import type { Role } from '../lib/types';
 
 export default function ProtectedRoute({
@@ -25,11 +26,7 @@ export default function ProtectedRoute({
   }, [loading, user, roles, router]);
 
   if (loading || !user || (roles && !roles.includes(user.role))) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-400 text-sm">Loading…</p>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   return <>{children}</>;

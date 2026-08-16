@@ -14,11 +14,6 @@ import type { Car, CategoryDef, CityDef, Testimonial, TrustBadge } from '../lib/
 
 const CITIES_FALLBACK: CityDef[] = [
   { name: 'Bengaluru', emoji: '🏙️' },
-  { name: 'Mumbai', emoji: '🌊' },
-  { name: 'Delhi NCR', emoji: '🕌' },
-  { name: 'Hyderabad', emoji: '🏯' },
-  { name: 'Chennai', emoji: '🎭' },
-  { name: 'Pune', emoji: '🎓' },
 ];
 
 const HOW_STEPS = [
@@ -45,10 +40,10 @@ const HOW_STEPS = [
 ];
 
 const TRUST_BADGES_FALLBACK: TrustBadge[] = [
-  { label: '1 Lakh+', sub: 'Happy Renters' },
-  { label: '5,000+', sub: 'Verified Cars' },
-  { label: '30+ Cities', sub: 'Pan-India' },
-  { label: '4.6 ★', sub: 'Average Rating' },
+  { label: 'DigiLocker', sub: 'KYC Verified' },
+  { label: 'Escrow-Held', sub: 'Security Deposits' },
+  { label: 'N+1', sub: 'Guaranteed Payouts' },
+  { label: 'Zero', sub: 'Hidden Fees' },
 ];
 
 const CATEGORIES_FALLBACK: CategoryDef[] = [
@@ -64,11 +59,7 @@ const HERO_TITLE_FALLBACK = 'Your car.\nYour rules.\nDrive your way.';
 const HERO_SUBTITLE_FALLBACK =
   'Rent verified self-drive cars from trusted hosts across India. No driver. No restrictions. Just open roads.';
 
-const TESTIMONIALS_FALLBACK: Testimonial[] = [
-  { name: 'Ananya R.', quote: 'Booked a Creta for a weekend trip to Coorg — spotless car, host was super responsive.', rating: 5 },
-  { name: 'Vikram S.', quote: "I've listed my Swift on Ziyam for 8 months now. The N+1 payouts land like clockwork.", rating: 5 },
-  { name: 'Fatima K.', quote: 'KYC took two minutes, car was delivered to my apartment. Great experience overall.', rating: 4 },
-];
+const TESTIMONIALS_FALLBACK: Testimonial[] = [];
 
 export default function HomePage() {
   const [cars, setCars] = useState<Car[]>([]);
@@ -218,8 +209,8 @@ export default function HomePage() {
       <section className="py-16 bg-gray-50">
         <div className="max-w-6xl mx-auto px-4">
           <ScrollReveal>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Top Cities</h2>
-            <p className="text-gray-500 text-sm mb-8">Self-drive rentals available across India</p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Where We Operate</h2>
+            <p className="text-gray-500 text-sm mb-8">Now live in Bengaluru — expanding pan-India soon</p>
           </ScrollReveal>
           <StaggerGroup className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
             {cities.map((c) => (
@@ -273,33 +264,36 @@ export default function HomePage() {
       </section>
 
       {/* ── TESTIMONIALS ─────────────────────────────────────────── */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4">
-          <ScrollReveal>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">What Our Community Says</h2>
-            <p className="text-gray-500 text-sm mb-10 text-center">Real feedback from renters and hosts</p>
-          </ScrollReveal>
-          <StaggerGroup className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {testimonials.map((t, i) => (
-              <StaggerItem key={i}>
-                <motion.div
-                  whileHover={{ y: -4, boxShadow: '0 12px 24px -8px rgba(0,0,0,0.12)' }}
-                  className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm h-full"
-                >
-                  <div className="text-amber-400 mb-3">{'★'.repeat(t.rating)}{'☆'.repeat(5 - t.rating)}</div>
-                  <p className="text-sm text-gray-600 leading-relaxed mb-4">&ldquo;{t.quote}&rdquo;</p>
-                  <div className="flex items-center gap-2">
-                    <span className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-xs">
-                      {t.name.slice(0, 1)}
-                    </span>
-                    <span className="text-sm font-semibold text-gray-800">{t.name}</span>
-                  </div>
-                </motion.div>
-              </StaggerItem>
-            ))}
-          </StaggerGroup>
-        </div>
-      </section>
+      {/* Only renders once real reviews are added via the admin Settings CMS — no placeholder quotes. */}
+      {testimonials.length > 0 && (
+        <section className="py-16 bg-gray-50">
+          <div className="max-w-6xl mx-auto px-4">
+            <ScrollReveal>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">What Our Community Says</h2>
+              <p className="text-gray-500 text-sm mb-10 text-center">Real feedback from renters and hosts</p>
+            </ScrollReveal>
+            <StaggerGroup className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {testimonials.map((t, i) => (
+                <StaggerItem key={i}>
+                  <motion.div
+                    whileHover={{ y: -4, boxShadow: '0 12px 24px -8px rgba(0,0,0,0.12)' }}
+                    className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm h-full"
+                  >
+                    <div className="text-amber-400 mb-3">{'★'.repeat(t.rating)}{'☆'.repeat(5 - t.rating)}</div>
+                    <p className="text-sm text-gray-600 leading-relaxed mb-4">&ldquo;{t.quote}&rdquo;</p>
+                    <div className="flex items-center gap-2">
+                      <span className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-xs">
+                        {t.name.slice(0, 1)}
+                      </span>
+                      <span className="text-sm font-semibold text-gray-800">{t.name}</span>
+                    </div>
+                  </motion.div>
+                </StaggerItem>
+              ))}
+            </StaggerGroup>
+          </div>
+        </section>
+      )}
 
       {/* ── HOW IT WORKS ─────────────────────────────────────────── */}
       <section className="py-20 bg-gray-950 text-white">

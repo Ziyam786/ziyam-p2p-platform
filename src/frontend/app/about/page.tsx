@@ -2,30 +2,22 @@ import React from 'react';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import PageHero from '../../components/PageHero';
-import StatsSpeedometer from '../../components/StatsSpeedometer';
 import RoadTimeline from '../../components/RoadTimeline';
 import ScrollReveal, { StaggerGroup, StaggerItem } from '../../components/ScrollReveal';
 import MotionButton from '../../components/MotionButton';
+import { COMPANY } from '../../lib/companyInfo';
 
 const VALUES = [
   { icon: '🤝', title: 'Trust First', desc: 'Every host and renter is KYC-verified. Every car is inspected before it goes live.' },
-  { icon: '⚖️', title: 'Fair Splits', desc: 'Hosts keep 70% of every booking — the highest host share of any major platform in India.' },
-  { icon: '🌱', title: 'Idle Assets, Active Income', desc: 'The average private car sits parked 95% of the time. We help owners put that time to work.' },
-  { icon: '🔐', title: 'Safety by Design', desc: 'Escrowed deposits, N+1 payouts, and 24/7 support protect both sides of every trip.' },
-];
-
-const SPEEDO_STATS = [
-  { value: '5,000+', percent: 0.7, label: 'Verified Cars' },
-  { value: '1 Lakh+', percent: 0.85, label: 'Happy Renters' },
-  { value: '4.6 / 5', percent: 0.92, label: 'Average Rating' },
-  { value: '30+', percent: 0.5, label: 'Cities Covered' },
+  { icon: '⚖️', title: 'Fair Splits', desc: 'Hosts keep 70% of every booking — one of the highest host shares of any platform in India.' },
+  { icon: '🌱', title: 'Idle Assets, Active Income', desc: 'The average private car sits parked most of the day. We help owners put that time to work.' },
+  { icon: '🔐', title: 'Safety by Design', desc: 'Escrowed deposits, N+1 payouts, mandatory KYC, and dedicated support protect both sides of every trip.' },
 ];
 
 const TIMELINE = [
-  { year: '2023', title: 'The Inception', desc: 'Eightlines starts building ZiyamSelfDrive after struggling to find affordable, driver-free rentals while travelling.' },
-  { year: '2024', title: 'Bengaluru Launch', desc: 'Launched in Bengaluru with 50 host-listed cars and a keyless-entry pilot.' },
-  { year: '2025', title: 'Pan-India Expansion', desc: 'Expanded to 30+ cities across India with fleet-operator partnerships.' },
-  { year: '2026', title: 'Scale', desc: 'Crossed 1 lakh completed trips and 5,000 verified vehicles on the platform.' },
+  { year: 'Mar 2026', title: 'Incorporated', desc: `${COMPANY.legalName} was registered (CIN ${COMPANY.cin}) to build ZiyamSelfDrive.` },
+  { year: '2026', title: 'Bengaluru Launch', desc: `Live in ${COMPANY.operatingCity}, onboarding our first verified hosts and fleet partners.` },
+  { year: 'Next', title: 'Pan-India Expansion', desc: 'Scaling city by city as our host and fleet network grows beyond Bengaluru.' },
 ];
 
 export default function AboutPage() {
@@ -35,17 +27,20 @@ export default function AboutPage() {
       <PageHero
         eyebrow="Our Story"
         title="Making every car a shared asset"
-        subtitle="ZiyamSelfDrive is India's peer-to-peer self-drive marketplace — connecting car owners with renters who just want the keys, not the driver."
+        subtitle="ZiyamSelfDrive is a peer-to-peer self-drive marketplace — connecting car owners with renters who just want the keys, not the driver."
       />
 
-      <section className="py-16 bg-white">
-        <ScrollReveal className="max-w-3xl mx-auto px-4 text-center mb-10">
+      <section className="py-14 bg-white">
+        <ScrollReveal className="max-w-2xl mx-auto px-4 text-center">
+          <p className="inline-block text-xs font-semibold bg-amber-50 text-amber-600 px-3 py-1.5 rounded-full mb-4">
+            📍 {COMPANY.scopeNote}
+          </p>
           <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900">
-            Our <span className="text-amber-500">proven record</span> speaks for itself
+            A young company, <span className="text-amber-500">built to move fast</span>
           </h2>
-        </ScrollReveal>
-        <ScrollReveal delay={0.15} className="max-w-4xl mx-auto px-4">
-          <StatsSpeedometer stats={SPEEDO_STATS} />
+          <p className="text-gray-500 text-sm mt-3">
+            {COMPANY.legalName} was registered on {COMPANY.registeredDate} — we're early, and honest about it. We'd rather earn your trust city by city than promise a scale we haven't reached yet.
+          </p>
         </ScrollReveal>
       </section>
 
@@ -73,9 +68,31 @@ export default function AboutPage() {
         <div className="max-w-3xl mx-auto px-4">
           <ScrollReveal>
             <h2 className="text-2xl font-extrabold text-gray-900 mb-2 text-center">Our Journey</h2>
-            <p className="text-gray-500 text-sm text-center mb-10">From a two-person idea to a pan-India platform</p>
+            <p className="text-gray-500 text-sm text-center mb-10">Where we've been, and where we're headed</p>
           </ScrollReveal>
           <RoadTimeline items={TIMELINE} />
+        </div>
+      </section>
+
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-4xl mx-auto px-4">
+          <ScrollReveal>
+            <h2 className="text-2xl font-extrabold text-gray-900 mb-2 text-center">Leadership</h2>
+            <p className="text-gray-500 text-sm text-center mb-10">The team behind {COMPANY.brandFull}</p>
+          </ScrollReveal>
+          <StaggerGroup className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+            {COMPANY.team.map((person) => (
+              <StaggerItem key={person.name}>
+                <div className="bg-white rounded-2xl p-5 border border-gray-100 text-center h-full">
+                  <div className="w-14 h-14 rounded-full bg-amber-50 text-amber-600 font-bold text-lg flex items-center justify-center mx-auto mb-3">
+                    {person.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                  </div>
+                  <p className="font-bold text-gray-900 text-sm">{person.name}</p>
+                  <p className="text-xs text-gray-500 mt-1">{person.role}</p>
+                </div>
+              </StaggerItem>
+            ))}
+          </StaggerGroup>
         </div>
       </section>
 
@@ -83,8 +100,7 @@ export default function AboutPage() {
         <ScrollReveal className="max-w-2xl mx-auto px-4">
           <h2 className="text-2xl font-extrabold text-white mb-3">Built by Eightlines</h2>
           <p className="text-amber-100 text-sm mb-6">
-            ZiyamSelfDrive is operated by Eightlines, a small team obsessed with making mobility in India more
-            flexible, affordable, and trustworthy.
+            ZiyamSelfDrive is operated by {COMPANY.legalName}, a small Bengaluru team obsessed with making mobility in India more flexible, affordable, and trustworthy.
           </p>
           <MotionButton href="/careers" className="bg-white text-amber-600 font-bold px-6 py-3 rounded-xl inline-block hover:bg-amber-50 transition-colors">
             View Open Roles

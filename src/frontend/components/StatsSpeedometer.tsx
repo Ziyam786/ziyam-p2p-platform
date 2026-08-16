@@ -49,16 +49,16 @@ export default function StatsSpeedometer({ stats }: { stats: SpeedoStat[] }) {
           <path
             d="M 20 110 A 90 90 0 0 1 200 110"
             fill="none"
-            stroke="#f59e0b"
+            stroke="#3b82f6"
             strokeWidth="10"
             strokeLinecap="round"
             strokeDasharray={`${stat.percent * 283} 283`}
             style={{ transition: 'stroke-dasharray 0.6s ease' }}
           />
           <g style={{ transform: `rotate(${needleDeg}deg)`, transformOrigin: '110px 110px', transition: 'transform 0.6s cubic-bezier(0.4,0,0.2,1)' }}>
-            <line x1="110" y1="110" x2="110" y2="35" stroke="#f59e0b" strokeWidth="3" strokeLinecap="round" />
+            <line x1="110" y1="110" x2="110" y2="35" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" />
           </g>
-          <circle cx="110" cy="110" r="8" fill="#f59e0b" />
+          <circle cx="110" cy="110" r="8" fill="#3b82f6" />
         </svg>
 
         <div className="text-3xl font-extrabold text-amber-400">{stat.value}</div>

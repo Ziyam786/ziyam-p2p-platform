@@ -40,7 +40,7 @@ export default function RoadTimeline({ items }: { items: RoadTimelineItem[] }) {
         <svg width={ROAD_WIDTH} height={totalHeight} className="absolute inset-0">
           <path d={roadPath} stroke="#1e1b1b" strokeWidth="16" fill="none" strokeLinecap="round" />
           <path d={roadPath} stroke="#78350f" strokeWidth="16" fill="none" strokeLinecap="round" opacity="0.35" />
-          <path d={roadPath} stroke="#fbbf24" strokeWidth="2" strokeDasharray="6 10" fill="none" strokeLinecap="round" opacity="0.6" />
+          <path d={roadPath} stroke="#60a5fa" strokeWidth="2" strokeDasharray="6 10" fill="none" strokeLinecap="round" opacity="0.6" />
         </svg>
 
         {points.map((p, i) => (
