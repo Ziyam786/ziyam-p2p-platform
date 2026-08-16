@@ -12,6 +12,7 @@ import RatingsPanel from '../../../../../components/RatingsPanel';
 import IncentivesPanel from '../../../../../components/IncentivesPanel';
 import CarLocationMap, { directionsUrl } from '../../../../../components/CarLocationMap';
 import VehicleServices from '../../../../../components/VehicleServices';
+import FleetOnboardingPanel from '../../../../../components/FleetOnboardingPanel';
 import { useAuth } from '../../../../../lib/auth-context';
 import { useToast } from '../../../../../components/Toast';
 import { carsApi } from '../../../../../lib/api';
@@ -107,6 +108,7 @@ function ManageCarInner() {
           { key: 'incentives', label: 'Incentives' },
           { key: 'services', label: 'Vehicle Services' },
           { key: 'ratings', label: 'Ratings & Reviews' },
+          { key: 'fleet', label: car.fleetManaged ? 'Fleet Program ✓' : 'Fleet Program' },
         ]}
       />
 
@@ -132,6 +134,8 @@ function ManageCarInner() {
         {tab === 'services' && <VehicleServices car={car} />}
 
         {tab === 'ratings' && <RatingsPanel car={car} />}
+
+        {tab === 'fleet' && <FleetOnboardingPanel car={car} />}
       </div>
 
       {showBlackout && <BlackoutManager car={car} onClose={() => setShowBlackout(false)} />}

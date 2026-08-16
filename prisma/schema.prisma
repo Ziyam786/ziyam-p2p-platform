@@ -205,6 +205,15 @@ model Car {
   fleetOperatorId  String?
   fleetOperator    User?     @relation("FleetOperatorCars", fields: [fleetOperatorId], references: [id])
 
+  // 4-step Fleet Partner Onboarding journey (Audit -> Security -> Agreement ->
+  // Go Live). 0 = not started/opted in. 1 = audit submitted, fleet operator
+  // assigned via random "finger-crossed" shuffle. 2 = security/telematics
+  // confirmed (Car.telematicsImei set). 3 = awaiting partnership agreement —
+  // this step has no self-service completion since no real agreement content
+  // exists yet (see leaseAgreementPdf.ts's doc comment); an admin/fleet_admin
+  // manually advances to Go Live (fleetManaged=true) once it's actually signed.
+  fleetOnboardingStep Int @default(0)
+
   // Onboarding / verification (RC, pollution cert, insurance) — see host/onboarding/car wizard
   verificationStatus CarVerificationStatus @default(PENDING)
   rcDocUrl           String?

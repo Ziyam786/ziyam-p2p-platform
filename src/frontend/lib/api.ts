@@ -107,7 +107,20 @@ export const carsApi = {
     get<{ success: true; data: { summary: string | null; positiveTags: string[]; negativeTags: string[] } }>(`/cars/${carId}/review-summary`),
   incentives: (carId: string) => get<{ success: true; data: IncentiveProgress | null }>(`/cars/${carId}/incentives`),
   availability: (carId: string) => get<{ success: true; data: AvailabilityRange[] }>(`/cars/${carId}/availability`),
+
+  fleetOnboardingStatus: (carId: string) => get<{ success: true; data: FleetOnboardingStatus }>(`/cars/${carId}/fleet-onboarding`),
+  submitFleetAudit: (carId: string) =>
+    post<{ success: true; data: Car }>(`/cars/${carId}/fleet-onboarding/audit`, { confirmedEligible: true }),
+  submitFleetSecurity: (carId: string, telematicsImei: string) =>
+    patch<{ success: true; data: Car }>(`/cars/${carId}/fleet-onboarding/security`, { telematicsImei }),
 };
+
+export interface FleetOnboardingStatus {
+  fleetOnboardingStep: number;
+  fleetManaged: boolean;
+  telematicsImei: string | null;
+  fleetOperator: { fullName: string; phoneNumber: string; email: string } | null;
+}
 
 export interface AvailabilityRange {
   startDate: string;

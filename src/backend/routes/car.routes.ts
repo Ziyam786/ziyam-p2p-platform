@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, Prisma } from '@prisma/client';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRole } from '../middleware/auth';
 import { generateChatReply } from '../services/aiService';
 import { FleetService } from '../services/fleetService';
+import { pickFleetOperator } from '../services/fleetOperatorAssignment';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -227,6 +228,86 @@ router.get('/cars/:id/incentives', requireAuth, async (req: Request, res: Respon
 
   const progress = await FleetService.getIncentiveProgress(id);
   res.json({ success: true, data: progress });
+});
+
+/* ── Fleet Partner Onboarding (Audit -> Security -> Agreement -> Go Live) ── */
+
+async function assertOwnsCarForOnboarding(req: Request, carId: string) {
+  const car = await prisma.car.findUnique({ where: { id: carId } });
+  if (!car) return { ok: false as const, status: 404, error: 'Car not found' };
+  if (car.ownerId !== req.user!.userId) return { ok: false as const, status: 403, error: 'Not your listing' };
+  return { ok: true as const, car };
+}
+
+// Host-only status check (unlike the public GET /cars/:id, this is allowed to
+// include the assigned fleet operator's contact details).
+router.get('/cars/:id/fleet-onboarding', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const check = await assertOwnsCarForOnboarding(req, id);
+  if (!check.ok) return res.status(check.status).json({ error: check.error });
+  const car = await prisma.car.findUnique({
+    where: { id },
+    select: {
+      fleetOnboardingStep: true, fleetManaged: true, telematicsImei: true,
+      fleetOperator: { select: { fullName: true, phoneNumber: true, email: true } },
+    },
+  });
+  res.json({ success: true, data: car });
+});
+
+// Step 1 — Audit: host confirms the eligibility checklist and the car is
+// assigned a fleet operator via a random "finger-crossed" shuffle.
+router.post('/cars/:id/fleet-onboarding/audit', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const check = await assertOwnsCarForOnboarding(req, id);
+  if (!check.ok) return res.status(check.status).json({ error: check.error });
+  if (check.car.fleetOnboardingStep > 0) return res.status(409).json({ error: 'Audit already submitted for this car' });
+
+  const { confirmedEligible } = req.body;
+  if (!confirmedEligible) return res.status(400).json({ error: 'You must confirm the eligibility checklist to proceed' });
+
+  const fleetOperatorId = await pickFleetOperator();
+  if (!fleetOperatorId) return res.status(503).json({ error: 'No fleet operators are available to onboard your car right now — please try again shortly.' });
+
+  const car = await prisma.car.update({
+    where: { id },
+    data: { fleetOnboardingStep: 1, fleetOperatorId },
+    include: { fleetOperator: { select: { fullName: true, phoneNumber: true, email: true } } },
+  });
+  res.json({ success: true, data: car });
+});
+
+// Step 2 — Security: GPS/immobilizer install confirmed via the telematics IMEI.
+router.patch('/cars/:id/fleet-onboarding/security', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const check = await assertOwnsCarForOnboarding(req, id);
+  if (!check.ok) return res.status(check.status).json({ error: check.error });
+  if (check.car.fleetOnboardingStep !== 1) return res.status(409).json({ error: 'Complete the audit step first' });
+
+  const { telematicsImei } = req.body;
+  if (!telematicsImei || !String(telematicsImei).trim()) return res.status(400).json({ error: 'telematicsImei is required' });
+
+  const car = await prisma.car.update({
+    where: { id },
+    data: { fleetOnboardingStep: 2, telematicsImei: String(telematicsImei).trim() },
+  });
+  res.json({ success: true, data: car });
+});
+
+// Step 3->4 — Agreement & Go Live: no self-service completion (no real
+// partnership agreement content exists yet) — a fleet admin manually confirms
+// once it's actually been executed with the host.
+router.post('/admin/cars/:id/fleet-onboarding/go-live', requireAuth, requireRole('FLEET_ADMIN', 'ADMIN'), async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const car = await prisma.car.findUnique({ where: { id } });
+  if (!car) return res.status(404).json({ error: 'Car not found' });
+  if (car.fleetOnboardingStep < 2) return res.status(409).json({ error: 'Host has not completed the Audit and Security steps yet' });
+
+  const updated = await prisma.car.update({
+    where: { id },
+    data: { fleetOnboardingStep: 3, fleetManaged: true },
+  });
+  res.json({ success: true, data: updated, message: 'Car is now fleet-managed and live.' });
 });
 
 export default router;

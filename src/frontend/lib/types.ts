@@ -84,6 +84,8 @@ export interface Car {
 
   fleetManaged: boolean;
   fleetOperatorId?: string | null;
+  fleetOperator?: { fullName: string; phoneNumber: string; email: string } | null;
+  fleetOnboardingStep: number;
 
   chassis?: string | null;
 }

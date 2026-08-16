@@ -59,6 +59,8 @@ export interface AdminCar {
   fleetStatus?: string;
   pauseReason?: string | null;
   currentOdo?: number | null;
+  fleetManaged: boolean;
+  fleetOnboardingStep: number;
   createdAt: string;
   _count?: { bookings: number; reviews: number };
 }

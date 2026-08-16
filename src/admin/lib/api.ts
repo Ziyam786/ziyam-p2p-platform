@@ -56,6 +56,7 @@ export const adminApi = {
   cars: () => get<{ success: true; data: AdminCar[] }>('/admin/cars'),
   updateCar: (id: string, data: Partial<Pick<AdminCar, 'isAvailable' | 'featured' | 'dailyRate' | 'city' | 'category'>>) =>
     patch<{ success: true; data: AdminCar }>(`/admin/cars/${id}`, data),
+  approveFleetGoLive: (carId: string) => post<{ success: true; data: AdminCar; message: string }>(`/admin/cars/${carId}/fleet-onboarding/go-live`),
 
   bookings: (status?: string) => get<{ success: true; data: AdminBooking[] }>(`/admin/bookings${status ? `?status=${status}` : ''}`),
   updateBooking: (id: string, status: string) => patch<{ success: true; data: AdminBooking }>(`/admin/bookings/${id}`, { status }),
