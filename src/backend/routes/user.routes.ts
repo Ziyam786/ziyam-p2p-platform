@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth';
 import { sandboxService } from '../services/sandboxService';
 import { esignApi, isSetuConfigured } from '../services/setuService';
 import { renderLeaseAgreementPdf } from '../services/leaseAgreementPdf';
+import { renderHostOnboardingAgreementPdf } from '../services/hostOnboardingAgreementPdf';
 import { config } from '../config';
 
 const router = Router();
@@ -99,12 +100,9 @@ router.post('/users/me/bank/verify', requireAuth, async (req: Request, res: Resp
 
 // Host Onboarding Agreement — the one-time, per-host agreement gating N+1
 // payout eligibility (Aug-2024 policy, see PayoutEngine.assertPayoutEligible).
-// Wet-signature upload works today (the host photographs/scans a physically-
-// signed copy); e-sign is intentionally NOT wired to Setu yet — doing so
-// would mean actually signing a document with no real, finalized legal text,
-// which is worse than no e-sign flow at all. This returns 503 rather than
-// silently succeeding, so the frontend can show an honest "coming soon"
-// state instead of a fake success.
+// Wet-signature upload (the host photographs/scans a physically-signed copy)
+// and Aadhaar e-sign via Setu (same integration used for trip lease
+// agreements) are both real — both are required before payouts unblock.
 router.patch('/users/me/partner-agreement/wet-signature', requireAuth, async (req: Request, res: Response) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'url is required' });
@@ -116,8 +114,62 @@ router.patch('/users/me/partner-agreement/wet-signature', requireAuth, async (re
   res.json({ success: true, data: user });
 });
 
-router.post('/users/me/partner-agreement/esign/start', requireAuth, async (_req: Request, res: Response) => {
-  res.status(503).json({ error: 'E-signing for the Host Onboarding Agreement is not available yet — the official agreement text is still being finalized. Upload a wet-signed copy in the meantime.' });
+router.post('/users/me/partner-agreement/esign/start', requireAuth, async (req: Request, res: Response) => {
+  const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (!isSetuConfigured()) return res.status(503).json({ error: 'eSign is not configured yet' });
+  if (user.partnerAgreementEsignRequestId) return res.status(409).json({ error: 'An eSign request already exists for this agreement' });
+
+  try {
+    const pdf = await renderHostOnboardingAgreementPdf({
+      hostId: user.id,
+      hostName: user.fullName,
+      hostEmail: user.email,
+      hostPhone: user.phoneNumber,
+      createdAt: new Date(),
+    });
+    const { documentId } = await esignApi.uploadDocument(pdf, `host-onboarding-agreement-${user.id.slice(0, 8)}`);
+    const signature = await esignApi.createSignatureRequest(
+      documentId,
+      [{ identifier: user.email, displayName: user.fullName }],
+      `${config.clientUrl}/host/agreement?esigned=1`
+    );
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { partnerAgreementEsignRequestId: signature.id, partnerAgreementEsignStatus: 'sign_initiated' },
+    });
+    res.json({ success: true, data: { esignRequestId: signature.id } });
+  } catch (err: any) {
+    console.error('[ESIGN] host onboarding agreement start failed:', err.response?.data ?? err.message);
+    res.status(502).json({ error: 'Could not start eSign right now. Please try again shortly.' });
+  }
+});
+
+router.get('/users/me/partner-agreement/esign/status', requireAuth, async (req: Request, res: Response) => {
+  const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (!user.partnerAgreementEsignRequestId) return res.json({ success: true, data: { status: null } });
+
+  if (user.partnerAgreementEsignStatus === 'sign_complete' && user.partnerAgreementEsignDownloadUrl) {
+    return res.json({ success: true, data: { status: user.partnerAgreementEsignStatus, downloadUrl: user.partnerAgreementEsignDownloadUrl } });
+  }
+
+  try {
+    const { status } = await esignApi.getStatus(user.partnerAgreementEsignRequestId);
+    let downloadUrl: string | undefined;
+    if (status === 'sign_complete') {
+      const download = await esignApi.getDownloadUrl(user.partnerAgreementEsignRequestId);
+      downloadUrl = download.downloadUrl;
+    }
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { partnerAgreementEsignStatus: status, ...(downloadUrl && { partnerAgreementEsignDownloadUrl: downloadUrl }) },
+    });
+    res.json({ success: true, data: { status, downloadUrl } });
+  } catch (err: any) {
+    console.error('[ESIGN] host onboarding agreement status check failed:', err.response?.data ?? err.message);
+    res.status(502).json({ error: 'Could not check eSign status right now.' });
+  }
 });
 
 // Trip history for the logged-in renter

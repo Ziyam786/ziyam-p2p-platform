@@ -74,7 +74,7 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     legalName: 'Eightlines Fleet Private Limited',
     brand: 'ZIYAM',
     brandFull: 'ZiyamSelfDrive',
-    cin: 'U77100KA2026PTC21777',
+    cin: 'U77100KA2026PTC7772',
     registeredDate: '16 March 2026',
     address: '8-Lines Fleet, 15th Cross Rd, Popular Colony, Mangammanapalya, Bengaluru, Karnataka 560068',
     email: 'eightlinesfleet@gmail.com',
@@ -146,13 +146,13 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     ],
   },
 
-  // GST invoicing — admin-only, deliberately left unset/placeholder rather
-  // than guessing at real values. gstin is empty until the real business
-  // GSTIN is entered from Settings; gst_rate defaults to a clearly-flagged
-  // placeholder (car rental/rent-a-cab services in India have several
-  // possible GST treatments depending on registration — confirm the real
-  // rate with a tax advisor before relying on invoices for filing).
-  company_gstin: '',
+  // GST invoicing. GSTIN is real, confirmed against the actual GST REG-06
+  // registration certificate (Form GST REG-06, effective 27/06/2026,
+  // Bengaluru Urban, Karnataka — Regular registration). gst_rate is still a
+  // placeholder — the certificate confirms registration but not which rate
+  // scheme applies to this specific rent-a-cab structure; confirm with a tax
+  // advisor before relying on invoices for filing.
+  company_gstin: '29AAJCE5740K1Z7',
   company_home_state: 'Karnataka',
   default_gst_rate: 0.05, // PLACEHOLDER — confirm actual applicable rate before relying on this for filing
 

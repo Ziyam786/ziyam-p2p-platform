@@ -42,7 +42,7 @@ function InvoiceInner() {
               <h1 className="text-xl font-extrabold">EIGHTLINESFLEET</h1>
               <p className="text-xs text-gray-500">Eightlines Fleet Private Limited</p>
               <p className="text-xs text-gray-500">8-Lines Fleet, 15th Cross Rd, Popular Colony, Mangammanapalya, Bengaluru, Karnataka 560068</p>
-              <p className="text-xs text-gray-500">CIN: U77100KA2026PTC21777</p>
+              <p className="text-xs text-gray-500">CIN: U77100KA2026PTC7772</p>
             </div>
             <div className="text-right">
               <h2 className="font-bold text-lg">{invoice.type === 'RENTAL' ? 'Vehicle Rental Invoice' : 'Vehicle Service Invoice'}</h2>

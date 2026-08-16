@@ -115,7 +115,10 @@ export const carsApi = {
     patch<{ success: true; data: Car }>(`/cars/${carId}/fleet-onboarding/security`, { telematicsImei }),
   uploadFleetAgreementWetSignature: (carId: string, url: string) =>
     patch<{ success: true; data: Car; message: string }>(`/cars/${carId}/fleet-onboarding/agreement/wet-signature`, { url }),
-  startFleetAgreementEsign: (carId: string) => post<{ success: true }>(`/cars/${carId}/fleet-onboarding/agreement/esign/start`),
+  startFleetAgreementEsign: (carId: string) =>
+    post<{ success: true; data: { esignRequestId: string } }>(`/cars/${carId}/fleet-onboarding/agreement/esign/start`),
+  fleetAgreementEsignStatus: (carId: string) =>
+    get<{ success: true; data: { status: string | null; downloadUrl?: string } }>(`/cars/${carId}/fleet-onboarding/agreement/esign/status`),
 };
 
 export interface FleetOnboardingStatus {
@@ -125,6 +128,7 @@ export interface FleetOnboardingStatus {
   fleetAgreementWetSignedUrl?: string | null;
   fleetAgreementWetSignedAt?: string | null;
   fleetAgreementEsignStatus?: string | null;
+  fleetAgreementEsignDownloadUrl?: string | null;
   fleetOperator: { fullName: string; phoneNumber: string; email: string } | null;
 }
 
@@ -179,7 +183,10 @@ export const usersApi = {
     patch<{ success: true; data: PublicUser }>('/users/me', data),
   uploadPartnerAgreementWetSignature: (url: string) =>
     patch<{ success: true; data: PublicUser }>('/users/me/partner-agreement/wet-signature', { url }),
-  startPartnerAgreementEsign: () => post<{ success: true }>('/users/me/partner-agreement/esign/start'),
+  startPartnerAgreementEsign: () =>
+    post<{ success: true; data: { esignRequestId: string } }>('/users/me/partner-agreement/esign/start'),
+  partnerAgreementEsignStatus: () =>
+    get<{ success: true; data: { status: string | null; downloadUrl?: string } }>('/users/me/partner-agreement/esign/status'),
 };
 
 /* ── KYC ──────────────────────────────────────────────────────────── */

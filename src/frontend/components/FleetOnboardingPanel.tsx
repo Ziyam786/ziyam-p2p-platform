@@ -8,6 +8,13 @@ import type { Car } from '../lib/types';
 
 const STEPS = ['Audit', 'Security', 'Agreement', 'Go Live'];
 
+const ESIGN_LABELS: Record<string, string> = {
+  sign_initiated: 'Waiting for signers to open the signing link',
+  sign_pending: 'Waiting for signature',
+  sign_in_progress: 'Signature in progress',
+  sign_complete: 'Fully signed',
+};
+
 const ELIGIBILITY_CHECKLIST = [
   'Under 6 years old from date of manufacture, with under 50,000 km on the odometer',
   'Roadworthy, mechanically sound, and hygiene-compliant',
@@ -52,6 +59,31 @@ export default function FleetOnboardingPanel({ car }: { car: Car }) {
       load();
     } catch (err) {
       show(err instanceof ApiError ? err.message : 'Failed to confirm security step', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function startEsign() {
+    setSubmitting(true);
+    try {
+      await carsApi.startFleetAgreementEsign(car.id);
+      show('eSign request created — check your email for the signing link', 'success');
+      load();
+    } catch (err) {
+      show(err instanceof ApiError ? err.message : 'Failed to start eSign', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function checkEsignStatus() {
+    setSubmitting(true);
+    try {
+      await carsApi.fleetAgreementEsignStatus(car.id);
+      load();
+    } catch (err) {
+      show(err instanceof ApiError ? err.message : 'Failed to check status', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -157,7 +189,37 @@ export default function FleetOnboardingPanel({ car }: { car: Car }) {
             kind="document"
           />
           {status.fleetAgreementWetSignedUrl && (
-            <p className="text-xs text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2 mt-3">✓ Signed agreement received — awaiting admin confirmation to go live.</p>
+            <p className="text-xs text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2 mt-3 mb-4">✓ Wet-signed copy received.</p>
+          )}
+
+          <div className="border-t border-amber-200 mt-4 pt-4">
+            <p className="text-sm font-bold text-gray-900 mb-1">Aadhaar eSign</p>
+            <p className="text-xs text-gray-500 mb-3">Both you and your fleet operator sign electronically via Setu — a signing link is emailed to each of you.</p>
+            {!status.fleetAgreementEsignStatus ? (
+              <button disabled={submitting} onClick={startEsign} className="btn-gradient disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none text-white font-bold px-5 py-2.5 rounded-xl transition text-sm">
+                {submitting ? 'Starting…' : 'Start eSign'}
+              </button>
+            ) : status.fleetAgreementEsignStatus === 'sign_complete' ? (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-emerald-600 font-semibold">✓ Fully signed</span>
+                {status.fleetAgreementEsignDownloadUrl && (
+                  <a href={status.fleetAgreementEsignDownloadUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold bg-gray-900 hover:bg-black text-white px-4 py-2 rounded-lg transition">
+                    Download Signed PDF
+                  </a>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-amber-600 font-semibold">{ESIGN_LABELS[status.fleetAgreementEsignStatus] ?? 'In progress'}</span>
+                <button disabled={submitting} onClick={checkEsignStatus} className="text-xs font-bold border border-gray-200 hover:border-amber-400 px-4 py-2 rounded-lg transition">
+                  {submitting ? 'Checking…' : 'Refresh Status'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {status.fleetAgreementWetSignedUrl && status.fleetAgreementEsignStatus === 'sign_complete' && (
+            <p className="text-xs text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2 mt-4">✓ Both signatures received — awaiting admin confirmation to go live.</p>
           )}
         </div>
       )}

@@ -4,7 +4,7 @@ export const COMPANY = {
   brand: 'ZIYAM',
   brandFull: 'ZiyamSelfDrive',
   tagline: 'By Eightlines',
-  cin: 'U77100KA2026PTC21777',
+  cin: 'U77100KA2026PTC7772',
   registeredDate: '16 March 2026',
   address: '8-Lines Fleet, 15th Cross Rd, Popular Colony, Mangammanapalya, Bengaluru, Karnataka 560068',
   email: 'eightlinesfleet@gmail.com',
