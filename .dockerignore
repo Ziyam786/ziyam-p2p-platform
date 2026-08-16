@@ -3,6 +3,8 @@ src/frontend/node_modules
 src/frontend/.next
 src/admin/node_modules
 src/admin/.next
+src/agent/node_modules
+src/agent/.next
 .git
 .env
 .env.*
