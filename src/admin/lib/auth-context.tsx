@@ -2,7 +2,9 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { authApi, ApiError } from './api';
-import type { SessionUser } from './types';
+import type { Role, SessionUser } from './types';
+
+const ADMIN_APP_ROLES: Role[] = ['ADMIN', 'AGENT', 'FLEET_ADMIN', 'OPERATIONS_EXECUTIVE', 'MECHANICAL_EXECUTIVE', 'TECHNICIAN'];
 
 interface AuthContextValue {
   user: SessionUser | null;
@@ -21,7 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       const res = await authApi.me();
-      setUser(res.data.role === 'ADMIN' || res.data.role === 'AGENT' ? res.data : null);
+      setUser(ADMIN_APP_ROLES.includes(res.data.role) ? res.data : null);
     } catch (err) {
       if (!(err instanceof ApiError && err.status === 401)) {
         console.error('Failed to load admin session', err);
@@ -38,9 +40,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await authApi.login(email, password);
-    if (res.data.role !== 'ADMIN' && res.data.role !== 'AGENT') {
+    if (!ADMIN_APP_ROLES.includes(res.data.role)) {
       await authApi.logout();
-      throw new ApiError('This account does not have admin or agent access.', 403);
+      throw new ApiError('This account does not have admin access.', 403);
     }
     setUser(res.data);
     return res.data;

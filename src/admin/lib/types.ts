@@ -41,6 +41,9 @@ export interface AdminCar {
   isAvailable: boolean;
   featured: boolean;
   instantBook: boolean;
+  fleetStatus?: string;
+  pauseReason?: string | null;
+  currentOdo?: number | null;
   createdAt: string;
   _count?: { bookings: number; reviews: number };
 }
@@ -207,4 +210,43 @@ export interface FleetSummary {
   bookingCount: number;
   journalEntryCount: number;
   expenseCount: number;
+}
+
+/* ── Fleet Ops trip lifecycle ─────────────────────────────────────────── */
+export type OpsTripStatus = 'SCHEDULED' | 'RUNNING' | 'COMPLETED' | 'CANCELLED';
+
+export interface OpsTripRow {
+  id: string;
+  tripCode?: string | null;
+  carId: string;
+  car?: { make: string; model: string; registrationNo: string; images: string[] };
+  bookingPlatform?: string | null;
+  externalBookingId?: string | null;
+  driverRef?: string | null;
+  customerName: string;
+  customerMobile: string;
+  pickupLocation?: string | null;
+  dropLocation?: string | null;
+  pickupType?: string | null;
+  startTime: string;
+  endTime?: string | null;
+  odometerStart?: number | null;
+  odometerEnd?: number | null;
+  rangeKm?: number | null;
+  fastag?: string | null;
+  checkoutFastag?: string | null;
+  fuelEst?: string | null;
+  carWashed: boolean;
+  washingCharges?: number | null;
+  tyreHealth?: string | null;
+  newDamages?: string | null;
+  baseFare?: number | null;
+  addonTotal?: number | null;
+  amount?: number | null;
+  amountCollected?: number | null;
+  amountPaidGuest?: number | null;
+  status: OpsTripStatus;
+  notes?: string | null;
+  createdBy?: { fullName: string };
+  createdAt: string;
 }

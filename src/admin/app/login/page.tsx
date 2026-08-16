@@ -20,8 +20,10 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const user = await login(email, password);
-      router.push(user.role === 'AGENT' ? '/agent' : '/');
+      // Always push '/' — ProtectedRoute immediately redirects restricted
+      // roles (AGENT, OPERATIONS_EXECUTIVE, etc.) to their actual home.
+      await login(email, password);
+      router.push('/');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Login failed.');
     } finally {

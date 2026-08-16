@@ -1,7 +1,7 @@
 import type {
   AdminBooking, AdminCar, AdminPayout, AdminReview, AdminStats, AdminUser, AuditEntry,
   ChatConversationSummary, ChatMessageRow, FleetExpenseRow, FleetSummary, JournalEntryRow,
-  PlatformBookingEntry, PromoCode, SessionUser, SettingRow,
+  OpsTripRow, PlatformBookingEntry, PromoCode, SessionUser, SettingRow,
 } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api';
@@ -119,4 +119,24 @@ export const agentApi = {
   queue: () => get<{ success: true; count: number; data: AgentServiceRequest[] }>('/agent/service-requests'),
   updateStatus: (id: string, status: 'CONFIRMED' | 'COMPLETED' | 'CANCELLED') =>
     patch<{ success: true; data: AgentServiceRequest }>(`/agent/service-requests/${id}`, { status }),
+};
+
+export interface OpsTripCheckInPayload {
+  carId: string; tripCode?: string; bookingPlatform?: string; externalBookingId?: string; driverRef?: string;
+  customerName: string; customerMobile: string; pickupLocation?: string; dropLocation?: string; pickupType?: string;
+  startTime: string; odometerStart?: number; fastag?: string; baseFare?: number; addonTotal?: number; notes?: string;
+}
+
+export interface OpsTripCheckOutPayload {
+  endTime?: string; odometerEnd?: number; checkoutFastag?: string; fuelEst?: string; carWashed?: boolean;
+  washingCharges?: number; tyreHealth?: string; newDamages?: string; amountCollected?: number; amountPaidGuest?: number;
+}
+
+export const opsTripApi = {
+  list: (params: { status?: string; carId?: string } = {}) =>
+    get<{ success: true; count: number; data: OpsTripRow[] }>(`/ops-trips${toQuery(params)}`),
+  get: (id: string) => get<{ success: true; data: OpsTripRow }>(`/ops-trips/${id}`),
+  checkIn: (data: OpsTripCheckInPayload) => post<{ success: true; data: OpsTripRow }>('/ops-trips', data),
+  checkOut: (id: string, data: OpsTripCheckOutPayload) => patch<{ success: true; data: OpsTripRow }>(`/ops-trips/${id}/checkout`, data),
+  cancel: (id: string) => patch<{ success: true; data: OpsTripRow }>(`/ops-trips/${id}/cancel`),
 };

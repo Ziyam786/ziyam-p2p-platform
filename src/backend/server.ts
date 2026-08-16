@@ -22,6 +22,7 @@ import fleetLedgerRoutes from './routes/fleetLedger.routes';
 import serviceRequestRoutes from './routes/serviceRequest.routes';
 import uploadRoutes from './routes/upload.routes';
 import agentRoutes from './routes/agent.routes';
+import opsTripRoutes from './routes/opsTrip.routes';
 
 const app = express();
 
@@ -103,6 +104,7 @@ app.use('/api', fleetLedgerRoutes);
 app.use('/api', serviceRequestRoutes);
 app.use('/api', uploadRoutes);
 app.use('/api', agentRoutes);
+app.use('/api', opsTripRoutes);
 
 // 404 handler for unmatched API routes
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
