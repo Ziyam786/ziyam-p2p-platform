@@ -113,6 +113,10 @@ export const carsApi = {
     get<{ success: true; data: { summary: string | null; positiveTags: string[]; negativeTags: string[] } }>(`/cars/${carId}/review-summary`),
   incentives: (carId: string) => get<{ success: true; data: IncentiveProgress | null }>(`/cars/${carId}/incentives`),
   availability: (carId: string) => get<{ success: true; data: AvailabilityRange[] }>(`/cars/${carId}/availability`),
+  marketPulse: (city?: string) =>
+    get<{ success: true; data: { city: string | null; availableCount: number; averageDailyRate: number | null; popularCategory: string | null } }>(
+      `/cars/market-pulse${city ? `?city=${encodeURIComponent(city)}` : ''}`
+    ),
 
   fleetOnboardingStatus: (carId: string) => get<{ success: true; data: FleetOnboardingStatus }>(`/cars/${carId}/fleet-onboarding`),
   submitFleetAudit: (carId: string) =>

@@ -55,6 +55,31 @@ router.get('/cars', async (req: Request, res: Response) => {
   res.json({ success: true, count: sorted.length, data: sorted });
 });
 
+// Live market snapshot for a city — average price, most-listed category, and
+// how many cars are bookable right now. Powers the homepage's transparency
+// section and the search bar's live availability count. Real aggregates,
+// not placeholder copy.
+router.get('/cars/market-pulse', async (req: Request, res: Response) => {
+  const { city } = req.query;
+  const where: Prisma.CarWhereInput = city ? { city: String(city) } : {};
+
+  const [availableCount, priceAgg, categoryGroups] = await Promise.all([
+    prisma.car.count({ where: { ...where, isAvailable: true } }),
+    prisma.car.aggregate({ where, _avg: { dailyRate: true } }),
+    prisma.car.groupBy({ by: ['category'], where, _count: { category: true }, orderBy: { _count: { category: 'desc' } }, take: 1 }),
+  ]);
+
+  res.json({
+    success: true,
+    data: {
+      city: city ? String(city) : null,
+      availableCount,
+      averageDailyRate: priceAgg._avg.dailyRate ? Math.round(priceAgg._avg.dailyRate) : null,
+      popularCategory: categoryGroups[0]?.category ?? null,
+    },
+  });
+});
+
 // Legacy alias used by the original booking flow
 router.get('/cars/search', async (req: Request, res: Response) => {
   const { city } = req.query;
