@@ -8,10 +8,10 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Deep Obsidian/Charcoal per the brand spec (#0F172A) — Tailwind's
-        // default "gray" is neutral, not blue-tinted, so dark surfaces
-        // (nav, footer, hero) didn't match. Remapped to the slate scale,
-        // which is anchored on that exact hex at gray-900.
+        // Dark surfaces (nav, footer, hero) anchored on Marc8's "Base" navy
+        // (#000250, 40% brand usage) at gray-900/950 — Tailwind's default
+        // "gray" is neutral, not navy-tinted, so this is remapped rather
+        // than adding a parallel color nothing would actually use.
         gray: {
           50: '#f8fafc',
           100: '#f1f5f9',
@@ -21,27 +21,34 @@ module.exports = {
           500: '#64748b',
           600: '#475569',
           700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
-          950: '#020617',
+          800: '#151541',
+          900: '#000250',
+          950: '#000138',
         },
-        // Brand retheme: matches ziyam.in's live blue/gray identity. Kept the
-        // Tailwind key named "amber" rather than renaming every amber-* class
-        // across the app — this is the one place the whole site's accent
-        // color is defined.
+        // Marc8 brand retheme: Essence Blue (#183eeb, 25% brand usage) is
+        // the site's primary CTA/accent color, anchored at amber-500 (the
+        // shade used most throughout the app). Kept the Tailwind key named
+        // "amber" rather than renaming every amber-* class across the app —
+        // this is the one place the whole site's accent color is defined.
         amber: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
-          950: '#172554',
+          50: '#eef1fd',
+          100: '#dbe2fb',
+          200: '#b8c5f8',
+          300: '#8fa3f2',
+          400: '#5872ea',
+          500: '#183eeb',
+          600: '#1230c4',
+          700: '#0e259d',
+          800: '#0c1e7d',
+          900: '#0a1863',
+          950: '#060f42',
         },
+        // Marc8's sparing (5% usage) accent — for small highlights (promo
+        // badges, urgent states), never as a dominant button/link color.
+        marc8accent: '#ff7200',
+        // Marc8's warm neutral background (20% usage) — an alternative to
+        // plain white for hero/section backgrounds that want some warmth.
+        marc8cream: '#f5f2eb',
         // The logo's own dark-espresso-on-cream palette, for splash/loading
         // treatments and other places that intentionally use the mark's
         // literal brand colors rather than the site accent.

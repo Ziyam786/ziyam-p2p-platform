@@ -227,6 +227,49 @@ router.post('/auth/otp/verify', authRateLimiter, async (req: Request, res: Respo
   res.json({ success: true, data: toPublicUser(user) });
 });
 
+// Verifies a Supabase session (obtained client-side via
+// supabase.auth.signInWithOAuth({ provider: 'google' })) and logs the
+// matching existing account in. Deliberately login-only, not signup: our
+// User model requires a unique phoneNumber, which Google's OAuth profile
+// never provides, so a brand-new account still has to go through the normal
+// signup form once. Existing accounts (whether they originally signed up
+// with a password or via OTP) can use this from then on.
+router.post('/auth/oauth/supabase', authRateLimiter, async (req: Request, res: Response) => {
+  if (!config.supabase.url || !config.supabase.anonKey) {
+    return res.status(503).json({ error: 'Google sign-in is not configured yet' });
+  }
+  const { accessToken } = req.body;
+  if (!accessToken) {
+    return res.status(400).json({ error: 'accessToken is required' });
+  }
+
+  let supabaseEmail: string;
+  try {
+    const verifyRes = await fetch(`${config.supabase.url}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${accessToken}`, apikey: config.supabase.anonKey },
+    });
+    if (!verifyRes.ok) return res.status(401).json({ error: 'Google sign-in session is invalid or expired' });
+    const supabaseUser: any = await verifyRes.json();
+    if (!supabaseUser.email) return res.status(401).json({ error: 'Google sign-in session is invalid or expired' });
+    supabaseEmail = normalizeEmail(supabaseUser.email);
+  } catch (err) {
+    console.error('[AUTH] Supabase token verification failed:', err);
+    return res.status(502).json({ error: 'Could not verify Google sign-in right now. Please try again.' });
+  }
+
+  const user = await prisma.user.findUnique({ where: { email: supabaseEmail } });
+  if (!user) {
+    return res.status(404).json({ error: 'No Ziyam account found for that Google email yet. Please sign up first.', code: 'NO_ACCOUNT' });
+  }
+  if (user.isSuspended) {
+    return res.status(403).json({ error: 'This account has been suspended. Contact support@ziyam.in.' });
+  }
+
+  const token = signAuthToken({ userId: user.id, role: user.role });
+  res.cookie(config.auth.cookieName, token, cookieOptions());
+  res.json({ success: true, data: toPublicUser(user) });
+});
+
 router.post('/auth/logout', (_req: Request, res: Response) => {
   res.clearCookie(config.auth.cookieName, { path: '/' });
   res.json({ success: true });

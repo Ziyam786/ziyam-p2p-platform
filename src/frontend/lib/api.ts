@@ -74,6 +74,8 @@ export const authApi = {
     post<{ success: true; message: string; devCode?: string }>('/auth/otp/request', { phoneNumber }),
   verifyOtp: (phoneNumber: string, code: string) =>
     post<{ success: true; data: PublicUser }>('/auth/otp/verify', { phoneNumber, code }),
+  loginWithSupabase: (accessToken: string) =>
+    post<{ success: true; data: PublicUser }>('/auth/oauth/supabase', { accessToken }),
 };
 
 /* ── Cars ─────────────────────────────────────────────────────────── */
