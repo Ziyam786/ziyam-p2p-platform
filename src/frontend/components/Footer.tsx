@@ -65,18 +65,10 @@ export default function Footer() {
               <p>
                 <a href={`mailto:${info.email}`} className="hover:text-amber-400 transition">{info.email}</a>
                 {' · '}
-                <a href={info.whatsappUrl} target="_blank" rel="noreferrer" className="hover:text-amber-400 transition">{info.phone}</a>
+                <a href={`tel:${info.phone.replace(/\s/g, '')}`} className="hover:text-amber-400 transition">{info.phone}</a>
               </p>
               <p className="text-gray-600">CIN {info.cin}</p>
             </div>
-            <a
-              href={info.whatsappUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-full transition"
-            >
-              💬 WhatsApp Us
-            </a>
           </div>
 
           {Object.entries(links).map(([heading, items]) => (

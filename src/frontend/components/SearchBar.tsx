@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { getStickyDates, setStickyDates } from '../lib/searchDates';
 
 const CITIES = [
   'Bengaluru', 'Mumbai', 'Delhi NCR', 'Hyderabad', 'Chennai',
@@ -17,8 +18,19 @@ export default function SearchBar({ onSearch, compact = false }: SearchBarProps)
   const [pickup, setPickup] = useState('');
   const [dropoff, setDropoff] = useState('');
 
+  // Pre-fill from whatever dates the renter last picked, so the search bar
+  // itself stays "sticky" across pages too.
+  useEffect(() => {
+    const sticky = getStickyDates();
+    if (sticky) {
+      setPickup(sticky.pickup);
+      setDropoff(sticky.dropoff);
+    }
+  }, []);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setStickyDates(pickup, dropoff);
     if (onSearch) {
       onSearch({ city, pickup, dropoff });
     } else {

@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import paymentGateway from '../services/paymentGateway';
 import { PayoutEngine } from '../services/payoutEngine';
 import { TelematicsService } from '../services/telematicsService';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRole } from '../middleware/auth';
 import { notify } from '../services/notificationService';
 
 const router = Router();
@@ -218,11 +218,30 @@ router.post('/booking/:id/complete', requireAuth, async (req: Request, res: Resp
       where: { id },
       data: { status: BookingStatus.COMPLETED },
     });
-    await PayoutEngine.createEscrowLedger(booking.id);
     await creditReferralRewardIfFirstTrip(booking.customerId);
-    res.json({ success: true, message: 'Trip completed. N+1 payout scheduled.' });
+
+    // Fleet-managed cars don't schedule a payout here — that only happens once
+    // the fleet operator confirms receipt (see /booking/:id/fleet-receipt below).
+    if (existing.car.fleetManaged) {
+      res.json({ success: true, message: 'Trip completed. Payout will be scheduled once the fleet operator confirms receipt.' });
+    } else {
+      await PayoutEngine.createEscrowLedger(booking.id);
+      res.json({ success: true, message: 'Trip completed. N+1 payout scheduled.' });
+    }
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Fleet operator confirms they've received a clear payout from the platform
+// for this booking — starts the fleet-managed 1-day host payout window.
+router.post('/booking/:id/fleet-receipt', requireAuth, requireRole('FLEET_OPERATOR', 'ADMIN'), async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const ledger = await PayoutEngine.confirmFleetReceipt(id, req.user!.userId);
+    res.json({ success: true, message: 'Receipt confirmed. Host payout scheduled within 1 day.', data: ledger });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
   }
 });
 

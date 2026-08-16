@@ -119,7 +119,13 @@ model User {
   referredBy    User?   @relation("Referrals", fields: [referredById], references: [id])
   referrals     User[]  @relation("Referrals")
   creditsBalance Float  @default(0)
+
+  // Self-hosted payout cadence preference (fleet-managed cars ignore this —
+  // see Car.fleetManaged / the N+1 policy split in payoutEngine.ts)
+  payoutFrequency String @default("STANDARD") // STANDARD (24-48hr after trip) | WEEKLY
+
   cars            Car[]
+  fleetManagedCars Car[]         @relation("FleetOperatorCars")
   bookings        Booking[]      @relation("CustomerBookings")
   payouts         PayoutLedger[]
   reviewsWritten  Review[]       @relation("ReviewAuthor")
@@ -166,6 +172,13 @@ model Car {
   pickupFee        Float     @default(0)
   telematicsImei   String?
 
+  // Fleet-operator management opt-in — when set, N+1 payouts route through the
+  // fleet operator's receipt-confirmation step instead of the standard
+  // self-hosted 24-48hr/weekly cadence (see payoutEngine.ts)
+  fleetManaged     Boolean   @default(false)
+  fleetOperatorId  String?
+  fleetOperator    User?     @relation("FleetOperatorCars", fields: [fleetOperatorId], references: [id])
+
   // Onboarding / verification (RC, pollution cert, insurance) — see host/onboarding/car wizard
   verificationStatus CarVerificationStatus @default(PENDING)
   rcDocUrl           String?
@@ -190,6 +203,8 @@ model Car {
   fleetExpenses    FleetExpense[]
   serviceRequests  ServiceRequest[]
   createdAt        DateTime  @default(now())
+
+  @@index([fleetOperatorId])
 }
 
 // Date ranges a host manually blocks off (maintenance, personal use, etc.) —
@@ -250,6 +265,11 @@ model Booking {
   // must be supplied by whoever completes the trip — proves the handover
   // actually happened in person rather than either side just tapping "done".
   endOtp           String?
+
+  // Set by the fleet operator once they've confirmed receiving a clear payout
+  // from the platform for this booking — starts the 1-day host payout window
+  // for fleet-managed cars (Car.fleetManaged)
+  fleetReceiptConfirmedAt DateTime?
 
   // Setu Aadhaar eSign — real e-signing of the generated lease agreement PDF
   // (see setuService.ts + fleetLedger-adjacent /bookings/:id/esign routes)

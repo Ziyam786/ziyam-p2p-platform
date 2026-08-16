@@ -39,9 +39,9 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     { name: 'Bengaluru', emoji: '🏙️' },
   ],
   protection_plans: [
-    { value: 'BASIC', label: 'Basic', ratePerDay: 0, desc: 'Standard third-party coverage, included free.' },
-    { value: 'STANDARD', label: 'Standard', ratePerDay: 149, desc: 'Reduced liability + roadside assistance.' },
-    { value: 'PREMIUM', label: 'Premium', ratePerDay: 349, desc: 'Zero liability on damage + 24/7 priority support.' },
+    { value: 'BASIC', label: 'Basic', ratePerDay: 0, desc: 'Standard deposit terms, included free.' },
+    { value: 'STANDARD', label: 'Standard', ratePerDay: 149, desc: 'Reduced deposit hold + priority roadside assistance.' },
+    { value: 'PREMIUM', label: 'Premium', ratePerDay: 349, desc: 'Lowest deposit hold + 24/7 priority support.' },
   ],
   long_rental_discounts: [
     { minDays: 3, percent: 0.05 },
@@ -65,9 +65,9 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     team: [
       { name: 'Syed Fardeen', role: 'Founder & Director' },
       { name: 'Junaid Khan', role: 'Co-founder & Director' },
-      { name: 'Numer Saqlain M', role: 'Co-founder' },
-      { name: 'Mohammed Azam A', role: 'Co-founder' },
-      { name: 'Shaik Afnan Sabil', role: 'Fleet General Managing Director' },
+      { name: 'Numer Saqlain M', role: 'Director' },
+      { name: 'Mohammed Azam A', role: 'Managing Director' },
+      { name: 'Shaik Afnan Sabil', role: 'VP, Operations' },
     ],
   },
   commission_percentage: config.payout.platformCommission,
@@ -75,12 +75,18 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
   settlement_hours: config.payout.settlementHours,
   ai_chat_enabled: true,
   ai_chat_system_prompt:
-    'You are the ZiyamSelfDrive support assistant, a peer-to-peer self-drive car rental platform in India. ' +
-    'Hosts keep 70% of every booking (Ziyam keeps 30%). Payouts settle on an N+1 schedule after trip completion. ' +
-    'Renters must be 21+ with a valid driving licence 1+ year old. KYC is via DigiLocker. Security deposits are ' +
-    'refundable and released after a clean return. Protection plans: Basic (free), Standard (+₹149/day, reduced ' +
-    'liability), Premium (+₹349/day, zero liability). Free cancellation up to 24 hours before pickup. Answer ' +
-    'briefly and helpfully; if you do not know something platform-specific, suggest contacting support@ziyam.in.',
+    'You are the ZiyamSelfDrive support assistant, a peer-to-peer self-drive car rental platform currently operating ' +
+    'in Bengaluru only. Hosts keep 70% of every booking (Ziyam keeps 30%). Self-hosted hosts are paid 24-48 hours ' +
+    'after trip completion (or weekly, if they opt in); hosts managed by a fleet operator are paid within 1 day of ' +
+    'the fleet operator confirming receipt from the platform. Renters must be 21+ with a valid driving licence 1+ ' +
+    'year old. KYC is via DigiLocker and is mandatory for both renters and hosts. Security deposits are refundable ' +
+    'and released after a clean return. Protection plans only affect deposit-hold amount and support priority — ' +
+    'Basic (free), Standard (+₹149/day, reduced deposit hold), Premium (+₹349/day, lowest deposit hold). ZiyamSelfDrive ' +
+    'does not insure vehicles against renter-caused damage: every listed car carries the host\'s own comprehensive ' +
+    'insurance, hosts recover damage costs directly from the renter, and the platform helps by trying to cover up to ' +
+    '₹20,000 of a claim and suggesting garages, with 24/7 roadside assistance for breakdowns or abandoned vehicles. ' +
+    'Free cancellation up to 24 hours before pickup. Answer briefly and helpfully; if you do not know something ' +
+    'platform-specific, suggest contacting support@ziyam.in.',
 };
 
 export async function getSetting<T = unknown>(key: string, fallback?: T): Promise<T> {

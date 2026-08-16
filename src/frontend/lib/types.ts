@@ -28,6 +28,7 @@ export interface PublicUser {
   alternatePhoneNumber?: string | null;
   referralCode?: string | null;
   creditsBalance?: number;
+  payoutFrequency?: 'STANDARD' | 'WEEKLY';
   createdAt: string;
 }
 
@@ -77,6 +78,9 @@ export interface Car {
   minInterBookingHours: number;
   minBookingHours: number;
   maxBookingDays: number;
+
+  fleetManaged: boolean;
+  fleetOperatorId?: string | null;
 }
 
 export interface Booking {

@@ -9,18 +9,22 @@ import CarLocationMap from '../../../components/CarLocationMap';
 import { useAuth } from '../../../lib/auth-context';
 import { useToast } from '../../../components/Toast';
 import { carsApi, bookingsApi, settingsApi, promoApi, ApiError } from '../../../lib/api';
+import { getStickyDates } from '../../../lib/searchDates';
 import type { Car, LongRentalDiscount, Review } from '../../../lib/types';
 
 const INCLUDED_ITEMS = [
   { icon: '⛽', label: 'Fuel not included' },
-  { icon: '🛡️', label: 'Basic insurance' },
-  { icon: '📞', label: '24/7 roadside support' },
+  { icon: '📄', label: 'Host carries comprehensive vehicle insurance' },
+  { icon: '📞', label: '24/7 roadside assistance (breakdowns)' },
 ];
 
+// No plan transfers vehicle-damage liability to the platform — see the
+// Damage & Insurance section below. These only change the deposit handling
+// and support responsiveness.
 const PROTECTION_PLANS = [
-  { value: 'BASIC', label: 'Basic', ratePerDay: 0, desc: 'Standard third-party coverage, included free.' },
-  { value: 'STANDARD', label: 'Standard', ratePerDay: 149, desc: 'Reduced liability + roadside assistance.' },
-  { value: 'PREMIUM', label: 'Premium', ratePerDay: 349, desc: 'Zero liability on damage + 24/7 priority support.' },
+  { value: 'BASIC', label: 'Basic', ratePerDay: 0, desc: 'Standard deposit terms, included free.' },
+  { value: 'STANDARD', label: 'Standard', ratePerDay: 149, desc: 'Reduced deposit hold + priority roadside assistance.' },
+  { value: 'PREMIUM', label: 'Premium', ratePerDay: 349, desc: 'Lowest deposit hold + 24/7 priority support.' },
 ] as const;
 
 const LONG_RENTAL_DISCOUNTS_FALLBACK: LongRentalDiscount[] = [
@@ -49,6 +53,16 @@ export default function CarDetailPage() {
   const [appliedPromo, setAppliedPromo] = useState<{ code: string; discount: number } | null>(null);
   const [promoError, setPromoError] = useState('');
   const [promoChecking, setPromoChecking] = useState(false);
+
+  // Carry over the dates picked on the homepage/search bar so the renter
+  // doesn't have to re-enter them for whichever car they click into.
+  useEffect(() => {
+    const sticky = getStickyDates();
+    if (sticky) {
+      setPickup(sticky.pickup);
+      setDropoff(sticky.dropoff);
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
