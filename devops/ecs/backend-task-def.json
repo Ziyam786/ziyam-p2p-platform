@@ -4,12 +4,12 @@
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "512",
   "memory": "1024",
-  "executionRoleArn": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/ziyam-ecs-execution-role",
-  "taskRoleArn": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/ziyam-ecs-task-role",
+  "executionRoleArn": "arn:aws:iam::042522372467:role/ziyam-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::042522372467:role/ziyam-ecs-task-role",
   "containerDefinitions": [
     {
       "name": "backend",
-      "image": "<AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/ziyam-backend:latest",
+      "image": "042522372467.dkr.ecr.eu-north-1.amazonaws.com/ziyam-backend:latest",
       "portMappings": [{ "containerPort": 5000, "protocol": "tcp" }],
       "essential": true,
       "environment": [
@@ -30,30 +30,27 @@
         { "name": "SETU_MODE", "value": "live" }
       ],
       "secrets": [
-        { "name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/database-url" },
-        { "name": "JWT_SECRET", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/jwt-secret" },
-        { "name": "ANTHROPIC_API_KEY", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/anthropic-api-key" },
-        { "name": "PAYU_KEY", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/payu-key" },
-        { "name": "PAYU_SALT", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/payu-salt" },
-        { "name": "PAYU_CLIENT_ID", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/payu-client-id" },
-        { "name": "PAYU_CLIENT_SECRET", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/payu-client-secret" },
-        { "name": "PAYMENT_WEBHOOK_SECRET", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/payment-webhook-secret" },
-        { "name": "KYC_API_KEY", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/kyc-api-key" },
-        { "name": "SANDBOX_API_KEY", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/sandbox-api-key" },
-        { "name": "SANDBOX_API_SECRET", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/sandbox-api-secret" },
-        { "name": "SETU_CLIENT_ID", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/setu-client-id" },
-        { "name": "SETU_CLIENT_SECRET", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/setu-client-secret" },
-        { "name": "SETU_DIGILOCKER_PRODUCT_INSTANCE_ID", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/setu-digilocker-instance-id" },
-        { "name": "SETU_ESIGN_PRODUCT_INSTANCE_ID", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/setu-esign-instance-id" },
-        { "name": "TELEMATICS_GATEWAY_URL", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/telematics-gateway-url" },
-        { "name": "TELEMATICS_API_KEY", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/telematics-api-key" },
-        { "name": "REDIS_URL", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/redis-url" }
+        { "name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:eu-north-1:042522372467:secret:ziyam/backend-secrets-zKlPhm:ziyam/database-url::" },
+        { "name": "JWT_SECRET", "valueFrom": "arn:aws:secretsmanager:eu-north-1:042522372467:secret:ziyam/backend-secrets-zKlPhm:ziyam/jwt-secret::" },
+        { "name": "ANTHROPIC_API_KEY", "valueFrom": "arn:aws:secretsmanager:eu-north-1:042522372467:secret:ziyam/backend-secrets-zKlPhm:ziyam/anthropic-api-key::" },
+        { "name": "PAYU_KEY", "valueFrom": "arn:aws:secretsmanager:eu-north-1:042522372467:secret:ziyam/backend-secrets-zKlPhm:ziyam/payu-key::" },
+        { "name": "PAYU_SALT", "valueFrom": "arn:aws:secretsmanager:eu-north-1:042522372467:secret:ziyam/backend-secrets-zKlPhm:ziyam/payu-salt::" },
+        { "name": "PAYMENT_WEBHOOK_SECRET", "valueFrom": "arn:aws:secretsmanager:eu-north-1:042522372467:secret:ziyam/backend-secrets-zKlPhm:ziyam/payment-webhook-secret::" },
+        { "name": "KYC_API_KEY", "valueFrom": "arn:aws:secretsmanager:eu-north-1:042522372467:secret:ziyam/backend-secrets-zKlPhm:ziyam/kyc-api-key::" },
+        { "name": "SANDBOX_API_KEY", "valueFrom": "arn:aws:secretsmanager:eu-north-1:042522372467:secret:ziyam/backend-secrets-zKlPhm:ziyam/sandbox-api-key::" },
+        { "name": "SANDBOX_API_SECRET", "valueFrom": "arn:aws:secretsmanager:eu-north-1:042522372467:secret:ziyam/backend-secrets-zKlPhm:ziyam/sandbox-api-secret::" },
+        { "name": "SETU_CLIENT_ID", "valueFrom": "arn:aws:secretsmanager:eu-north-1:042522372467:secret:ziyam/backend-secrets-zKlPhm:ziyam/setu-client-id::" },
+        { "name": "SETU_CLIENT_SECRET", "valueFrom": "arn:aws:secretsmanager:eu-north-1:042522372467:secret:ziyam/backend-secrets-zKlPhm:ziyam/setu-client-secret::" },
+        { "name": "SETU_DIGILOCKER_PRODUCT_INSTANCE_ID", "valueFrom": "arn:aws:secretsmanager:eu-north-1:042522372467:secret:ziyam/backend-secrets-zKlPhm:ziyam/setu-digilocker-instance-id::" },
+        { "name": "SETU_ESIGN_PRODUCT_INSTANCE_ID", "valueFrom": "arn:aws:secretsmanager:eu-north-1:042522372467:secret:ziyam/backend-secrets-zKlPhm:ziyam/setu-esign-instance-id::" },
+        { "name": "TELEMATICS_GATEWAY_URL", "valueFrom": "arn:aws:secretsmanager:eu-north-1:042522372467:secret:ziyam/backend-secrets-zKlPhm:ziyam/telematics-gateway-url::" },
+        { "name": "TELEMATICS_API_KEY", "valueFrom": "arn:aws:secretsmanager:eu-north-1:042522372467:secret:ziyam/backend-secrets-zKlPhm:ziyam/telematics-api-key::" }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "/ecs/ziyam-backend",
-          "awslogs-region": "<AWS_REGION>",
+          "awslogs-region": "eu-north-1",
           "awslogs-stream-prefix": "backend",
           "awslogs-create-group": "true"
         }

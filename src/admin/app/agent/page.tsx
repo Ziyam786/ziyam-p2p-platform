@@ -2,10 +2,19 @@
 
 import React, { useEffect, useState } from 'react';
 import ProtectedRoute from '../../components/ProtectedRoute';
+import Modal from '../../components/Modal';
 import { useToast } from '../../components/Toast';
 import { useAuth } from '../../lib/auth-context';
-import { agentApi } from '../../lib/api';
+import { agentApi, adminApi } from '../../lib/api';
 import type { AgentServiceRequest } from '../../lib/api';
+import type { AdminUser } from '../../lib/types';
+
+const inputCls = 'w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500';
+function toLocalInput(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 const STATUS_STYLES: Record<string, string> = {
   REQUESTED: 'bg-amber-500/10 text-amber-400',
@@ -27,6 +36,12 @@ function AgentPortalInner() {
 
   useEffect(load, []);
 
+  const isAdmin = user?.role === 'ADMIN';
+  const [agents, setAgents] = useState<AdminUser[]>([]);
+  useEffect(() => {
+    if (isAdmin) adminApi.users('AGENT').then((res) => setAgents(res.data)).catch(() => {});
+  }, [isAdmin]);
+
   async function updateStatus(id: string, status: 'CONFIRMED' | 'COMPLETED' | 'CANCELLED') {
     setBusyId(id);
     try {
@@ -37,6 +52,39 @@ function AgentPortalInner() {
       show(err.message ?? 'Failed to update job', 'error');
     } finally {
       setBusyId(null);
+    }
+  }
+
+  const [editing, setEditing] = useState<AgentServiceRequest | null>(null);
+  const [editForm, setEditForm] = useState({ priceEstimate: '', scheduledDate: '', serviceLocation: '', notes: '', assignedAgentId: '' });
+  const [saving, setSaving] = useState(false);
+
+  function openEdit(job: AgentServiceRequest) {
+    setEditing(job);
+    setEditForm({
+      priceEstimate: String(job.priceEstimate), scheduledDate: toLocalInput(job.scheduledDate),
+      serviceLocation: job.serviceLocation, notes: job.notes ?? '', assignedAgentId: job.assignedAgentId ?? '',
+    });
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    setSaving(true);
+    try {
+      await agentApi.update(editing.id, {
+        priceEstimate: Number(editForm.priceEstimate),
+        scheduledDate: new Date(editForm.scheduledDate).toISOString(),
+        serviceLocation: editForm.serviceLocation,
+        notes: editForm.notes || undefined,
+        assignedAgentId: editForm.assignedAgentId || null,
+      });
+      show('Job updated', 'success');
+      setEditing(null);
+      load();
+    } catch (err: any) {
+      show(err.message ?? 'Failed to update job', 'error');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -77,6 +125,15 @@ function AgentPortalInner() {
                       <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0 ${STATUS_STYLES[job.status]}`}>{job.status}</span>
                     </div>
                     <div className="flex gap-2 mt-4">
+                      {isAdmin && (
+                        <button
+                          disabled={busyId === job.id}
+                          onClick={() => openEdit(job)}
+                          className="text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg transition disabled:opacity-50"
+                        >
+                          Edit / Reassign
+                        </button>
+                      )}
                       {job.status === 'REQUESTED' && (
                         <button
                           disabled={busyId === job.id}
@@ -127,6 +184,40 @@ function AgentPortalInner() {
           </>
         )}
       </main>
+
+      <Modal open={Boolean(editing)} onClose={() => setEditing(null)} title={editing ? `Edit — ${editing.serviceType}` : 'Edit job'}>
+        <div className="space-y-3">
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-400 mb-1 block">Price Estimate (₹)</span>
+            <input type="number" min={0} className={inputCls} value={editForm.priceEstimate} onChange={(e) => setEditForm({ ...editForm, priceEstimate: e.target.value })} />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-400 mb-1 block">Scheduled Date & Time</span>
+            <input type="datetime-local" className={inputCls} value={editForm.scheduledDate} onChange={(e) => setEditForm({ ...editForm, scheduledDate: e.target.value })} />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-400 mb-1 block">Service Location</span>
+            <input className={inputCls} value={editForm.serviceLocation} onChange={(e) => setEditForm({ ...editForm, serviceLocation: e.target.value })} />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-400 mb-1 block">Notes</span>
+            <textarea className={`${inputCls} min-h-[70px]`} value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-400 mb-1 block">Assigned Agent</span>
+            <select className={inputCls} value={editForm.assignedAgentId} onChange={(e) => setEditForm({ ...editForm, assignedAgentId: e.target.value })}>
+              <option value="">— Unassigned —</option>
+              {agents.map((a) => <option key={a.id} value={a.id}>{a.fullName} ({a.phoneNumber})</option>)}
+            </select>
+          </label>
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+            <button onClick={() => setEditing(null)} className="text-sm font-semibold px-4 py-2 rounded-lg text-slate-400 hover:text-white transition">Cancel</button>
+            <button disabled={saving} onClick={saveEdit} className="text-sm font-semibold px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white transition">
+              {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import AdminShell from '../../components/AdminShell';
+import Modal from '../../components/Modal';
 import { useToast } from '../../components/Toast';
 import { financeApi } from '../../lib/api';
 import type { BalanceSheetData, CommandCenterData, MonthlyBalanceRow, OutstandingRow, OutstandingType } from '../../lib/types';
@@ -184,6 +185,32 @@ function OutstandingsTab({ show }: { show: (m: string, t: 'success' | 'error') =
     }
   }
 
+  const [editing, setEditing] = useState<OutstandingRow | null>(null);
+  const [editForm, setEditForm] = useState({ expectedDate: '', paymentTo: '', amountOwed: '', outstandingType: 'RECEIVABLE' as OutstandingType });
+
+  function openEdit(r: OutstandingRow) {
+    setEditing(r);
+    setEditForm({ expectedDate: r.expectedDate.slice(0, 10), paymentTo: r.paymentTo, amountOwed: String(r.amountOwed), outstandingType: r.outstandingType });
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    setBusy(true);
+    try {
+      await financeApi.updateOutstanding(editing.id, {
+        expectedDate: editForm.expectedDate, paymentTo: editForm.paymentTo,
+        amountOwed: Number(editForm.amountOwed), outstandingType: editForm.outstandingType,
+      });
+      show('Entry updated', 'success');
+      setEditing(null);
+      load();
+    } catch (err: any) {
+      show(err.message ?? 'Failed to update', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const daysUntil = (d: string) => Math.ceil((new Date(d).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 
   return (
@@ -237,12 +264,31 @@ function OutstandingsTab({ show }: { show: (m: string, t: 'success' | 'error') =
                     Mark {r.outstandingType === 'RECEIVABLE' ? 'Received' : 'Paid'}
                   </button>
                 )}
-                <button disabled={busy} onClick={() => remove(r.id)} className="text-xs font-semibold text-slate-500 hover:text-red-400 px-2 ml-2 shrink-0">✕</button>
+                <button disabled={busy} onClick={() => openEdit(r)} className="text-xs font-semibold text-slate-500 hover:text-slate-200 px-2 ml-2 shrink-0">Edit</button>
+                <button disabled={busy} onClick={() => remove(r.id)} className="text-xs font-semibold text-slate-500 hover:text-red-400 px-2 shrink-0">✕</button>
               </div>
             );
           })}
         </div>
       )}
+
+      <Modal open={Boolean(editing)} onClose={() => setEditing(null)} title="Edit Outstanding Entry">
+        <div className="space-y-3">
+          <Field label="Type">
+            <select value={editForm.outstandingType} onChange={(e) => setEditForm({ ...editForm, outstandingType: e.target.value as OutstandingType })} className={`${rowInput} w-full`}>
+              <option value="RECEIVABLE">Receivable — Owed To Us</option>
+              <option value="PAYABLE">Payable — We Owe</option>
+            </select>
+          </Field>
+          <Field label="Owed To / By"><input value={editForm.paymentTo} onChange={(e) => setEditForm({ ...editForm, paymentTo: e.target.value })} className={`${rowInput} w-full`} /></Field>
+          <Field label="Amount (₹)"><input type="number" min={0} value={editForm.amountOwed} onChange={(e) => setEditForm({ ...editForm, amountOwed: e.target.value })} className={`${rowInput} w-full`} /></Field>
+          <Field label="Expected Date"><input type="date" value={editForm.expectedDate} onChange={(e) => setEditForm({ ...editForm, expectedDate: e.target.value })} className={`${rowInput} w-full`} /></Field>
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+            <button onClick={() => setEditing(null)} className="text-sm font-semibold px-4 py-2 rounded-lg text-slate-400 hover:text-white transition">Cancel</button>
+            <button disabled={busy} onClick={saveEdit} className="text-sm font-semibold px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white transition">{busy ? 'Saving…' : 'Save Changes'}</button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

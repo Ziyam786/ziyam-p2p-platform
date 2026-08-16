@@ -1,8 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, Role, BookingStatus, PayoutStatus } from '@prisma/client';
+import { v4 as uuidv4 } from 'uuid';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { recordAudit } from '../middleware/auditLog';
 import { PayoutEngine } from '../services/payoutEngine';
+import { hashPassword } from '../utils/password';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -47,6 +49,93 @@ router.get('/admin/bookings', async (req: Request, res: Response) => {
   res.json({ success: true, count: bookings.length, data: bookings });
 });
 
+// Admin-created booking — for walk-in or phone bookings where the customer
+// isn't self-serving through the app. Mirrors the real customer-facing
+// POST /booking (booking.routes.ts) for availability/blackout checks and
+// the payout split, with two differences: (1) it accepts either an existing
+// customerId or inline name/phone/email to create one on the spot, since a
+// walk-in customer usually has no account yet, and (2) it skips the
+// self-serve KYC gate — the ops staff creating this booking is verifying
+// the customer's ID in person, which is what the reference app's Handover
+// flow (DL/Aadhaar capture) does explicitly; the new customer record is
+// marked isKycVerified for that reason, not left permanently blocked.
+router.post('/admin/bookings', async (req: Request, res: Response) => {
+  const {
+    customerId, customerName, customerPhone, customerEmail,
+    carId, startTime, endTime, totalAmount, protectionPlan, status,
+  } = req.body;
+
+  if (!carId || !startTime || !endTime || !totalAmount) {
+    return res.status(400).json({ error: 'carId, startTime, endTime, and totalAmount are required' });
+  }
+  if (!customerId && (!customerName || !customerPhone || !customerEmail)) {
+    return res.status(400).json({ error: 'Provide either customerId, or customerName + customerPhone + customerEmail for a new customer' });
+  }
+
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  if (end <= start) return res.status(400).json({ error: 'endTime must be after startTime' });
+
+  const bookingStatus: BookingStatus = status && Object.values(BookingStatus).includes(status) ? status : BookingStatus.CONFIRMED;
+
+  try {
+    const car = await prisma.car.findUnique({ where: { id: carId }, include: { owner: true } });
+    if (!car) return res.status(404).json({ error: 'Car not found' });
+    if (!car.isAvailable) return res.status(409).json({ error: 'Car is not available for booking' });
+    if (!car.owner.payoutAccountId) return res.status(422).json({ error: 'Host payout account not configured' });
+
+    const conflictingBooking = await prisma.booking.findFirst({
+      where: { carId, status: { notIn: [BookingStatus.CANCELLED] }, startTime: { lt: end }, endTime: { gt: start } },
+    });
+    if (conflictingBooking) return res.status(409).json({ error: 'This car is already booked for part of the selected dates' });
+
+    const conflictingBlackout = await prisma.blackout.findFirst({ where: { carId, startDate: { lt: end }, endDate: { gt: start } } });
+    if (conflictingBlackout) return res.status(409).json({ error: 'The host has blocked out part of the selected dates' });
+
+    let finalCustomerId = customerId;
+    if (!finalCustomerId) {
+      const existingByContact = await prisma.user.findFirst({ where: { OR: [{ email: customerEmail }, { phoneNumber: customerPhone }] } });
+      if (existingByContact) {
+        return res.status(409).json({ error: 'A customer with that email or phone already exists — search for them instead of creating a new one.' });
+      }
+      const passwordHash = await hashPassword(uuidv4());
+      const newCustomer = await prisma.user.create({
+        data: {
+          id: uuidv4(), fullName: customerName, email: customerEmail, phoneNumber: customerPhone,
+          passwordHash, role: Role.CUSTOMER, isKycVerified: true,
+        },
+      });
+      finalCustomerId = newCustomer.id;
+    }
+
+    const { platformFee, hostPayout } = await PayoutEngine.splitAmount(Number(totalAmount));
+
+    const booking = await prisma.booking.create({
+      data: {
+        id: uuidv4(),
+        carId,
+        customerId: finalCustomerId,
+        startTime: start,
+        endTime: end,
+        totalAmount: Number(totalAmount),
+        platformFee,
+        hostPayoutAmount: hostPayout,
+        protectionPlan: protectionPlan || 'BASIC',
+        status: bookingStatus,
+      },
+      include: { car: { select: { make: true, model: true, city: true } }, customer: { select: { fullName: true, email: true } } },
+    });
+    await recordAudit(req.user!.userId, 'CREATE_BOOKING', 'Booking', booking.id, { carId, customerId: finalCustomerId, totalAmount, status: bookingStatus });
+    res.status(201).json({ success: true, data: booking });
+  } catch (err: any) {
+    if (err.code === 'P2002') {
+      return res.status(409).json({ error: `That ${err.meta?.target?.[0] ?? 'value'} is already in use by another account.` });
+    }
+    console.error('[ADMIN] Create booking failed:', err);
+    res.status(500).json({ error: 'Could not create the booking. Please try again.' });
+  }
+});
+
 router.patch('/admin/bookings/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
   const { status } = req.body;
@@ -64,8 +153,15 @@ router.get('/admin/users', async (req: Request, res: Response) => {
   const users = await prisma.user.findMany({
     where: role ? { role: role as Role } : undefined,
     select: {
-      id: true, fullName: true, email: true, phoneNumber: true, role: true,
+      id: true, fullName: true, email: true, phoneNumber: true, role: true, bio: true,
       isKycVerified: true, isSuspended: true, createdAt: true,
+      // KYC evidence — which of the three verification paths (see kyc.routes.ts)
+      // a user actually went through, so an admin isn't just flipping a blind
+      // boolean. aadhaarVerifiedName/digilockerStatus set = real Sandbox/DigiLocker
+      // government-backed check already happened; kycDocUrl set with neither of
+      // those = the legacy no-review "instant pass" upload path, worth an actual
+      // look before trusting it.
+      kycDocUrl: true, aadhaarVerifiedName: true, digilockerStatus: true,
       customRoleId: true, customRole: { select: { name: true } },
       _count: { select: { cars: true, bookings: true } },
     },
@@ -77,27 +173,39 @@ router.get('/admin/users', async (req: Request, res: Response) => {
 
 router.patch('/admin/users/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { isSuspended, isKycVerified, role, customRoleId } = req.body;
+  const { isSuspended, isKycVerified, role, customRoleId, fullName, email, phoneNumber, bio } = req.body;
 
   if (role !== undefined && !Object.values(Role).includes(role)) {
     return res.status(400).json({ error: 'Invalid role' });
   }
 
-  const user = await prisma.user.update({
-    where: { id },
-    data: {
-      ...(isSuspended !== undefined && { isSuspended: Boolean(isSuspended) }),
-      ...(isKycVerified !== undefined && { isKycVerified: Boolean(isKycVerified) }),
-      ...(role !== undefined && { role }),
-      ...(customRoleId !== undefined && { customRoleId: customRoleId || null }),
-    },
-    select: {
-      id: true, fullName: true, email: true, role: true, isKycVerified: true, isSuspended: true,
-      customRoleId: true, customRole: { select: { name: true } },
-    },
-  });
-  await recordAudit(req.user!.userId, 'UPDATE_USER', 'User', id, req.body);
-  res.json({ success: true, data: user });
+  try {
+    const user = await prisma.user.update({
+      where: { id },
+      data: {
+        ...(isSuspended !== undefined && { isSuspended: Boolean(isSuspended) }),
+        ...(isKycVerified !== undefined && { isKycVerified: Boolean(isKycVerified) }),
+        ...(role !== undefined && { role }),
+        ...(customRoleId !== undefined && { customRoleId: customRoleId || null }),
+        ...(fullName !== undefined && { fullName }),
+        ...(email !== undefined && { email }),
+        ...(phoneNumber !== undefined && { phoneNumber }),
+        ...(bio !== undefined && { bio }),
+      },
+      select: {
+        id: true, fullName: true, email: true, phoneNumber: true, bio: true, role: true, isKycVerified: true, isSuspended: true,
+        kycDocUrl: true, aadhaarVerifiedName: true, digilockerStatus: true,
+        customRoleId: true, customRole: { select: { name: true } },
+      },
+    });
+    await recordAudit(req.user!.userId, 'UPDATE_USER', 'User', id, req.body);
+    res.json({ success: true, data: user });
+  } catch (err: any) {
+    if (err.code === 'P2002') {
+      return res.status(409).json({ error: `That ${err.meta?.target?.[0] ?? 'value'} is already in use by another account.` });
+    }
+    throw err;
+  }
 });
 
 /* ── Custom Roles ("Who Can Do What" RBAC) ───────────────────────────── */
@@ -165,9 +273,21 @@ router.get('/admin/cars', async (_req: Request, res: Response) => {
   res.json({ success: true, count: cars.length, data: cars });
 });
 
+// Admin-scoped car edit — deliberately mirrors the full field set the owner-scoped
+// PATCH /cars/:id supports (car.routes.ts), since that route 403s anyone whose
+// userId isn't car.ownerId and admins legitimately need to correct any host's
+// listing (typo fixes, mis-set category/pricing, etc). Excludes document URLs,
+// onboarding step, and booking-window policy fields — those belong to the host's
+// own verification/business-rule flows, not general admin correction.
 router.patch('/admin/cars/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { isAvailable, featured, dailyRate, city, category } = req.body;
+  const {
+    isAvailable, featured, dailyRate, city, category,
+    make, model, year, fuelType, transmission, seats,
+    securityDeposit, kmIncludedPerDay, extraKmCharge,
+    description, features, address,
+    instantBook, offersDelivery, deliveryFee, offersPickup, pickupFee,
+  } = req.body;
 
   const car = await prisma.car.update({
     where: { id },
@@ -177,6 +297,23 @@ router.patch('/admin/cars/:id', async (req: Request, res: Response) => {
       ...(dailyRate !== undefined && { dailyRate: Number(dailyRate) }),
       ...(city !== undefined && { city }),
       ...(category !== undefined && { category }),
+      ...(make !== undefined && { make }),
+      ...(model !== undefined && { model }),
+      ...(year !== undefined && { year: Number(year) }),
+      ...(fuelType !== undefined && { fuelType }),
+      ...(transmission !== undefined && { transmission }),
+      ...(seats !== undefined && { seats: Number(seats) }),
+      ...(securityDeposit !== undefined && { securityDeposit: Number(securityDeposit) }),
+      ...(kmIncludedPerDay !== undefined && { kmIncludedPerDay: Number(kmIncludedPerDay) }),
+      ...(extraKmCharge !== undefined && { extraKmCharge: Number(extraKmCharge) }),
+      ...(description !== undefined && { description }),
+      ...(features !== undefined && { features }),
+      ...(address !== undefined && { address }),
+      ...(instantBook !== undefined && { instantBook: Boolean(instantBook) }),
+      ...(offersDelivery !== undefined && { offersDelivery: Boolean(offersDelivery) }),
+      ...(deliveryFee !== undefined && { deliveryFee: Number(deliveryFee) }),
+      ...(offersPickup !== undefined && { offersPickup: Boolean(offersPickup) }),
+      ...(pickupFee !== undefined && { pickupFee: Number(pickupFee) }),
     },
   });
   await recordAudit(req.user!.userId, 'UPDATE_CAR', 'Car', id, req.body);
@@ -196,11 +333,54 @@ router.get('/admin/reviews', async (_req: Request, res: Response) => {
   res.json({ success: true, count: reviews.length, data: reviews });
 });
 
+// Soft-moderation: hides the review from all public listings (car detail,
+// search rating aggregation, host profile, AI review-summary) without
+// destroying it — preferred over delete for a disputed/reported review so
+// there's still a record if it's contested later. Delete remains for
+// genuinely bogus/spam reviews that don't need to be kept around.
+router.patch('/admin/reviews/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { hidden } = req.body;
+  if (typeof hidden !== 'boolean') return res.status(400).json({ error: 'hidden must be a boolean' });
+  const review = await prisma.review.update({ where: { id }, data: { hidden } });
+  await recordAudit(req.user!.userId, hidden ? 'HIDE_REVIEW' : 'UNHIDE_REVIEW', 'Review', id);
+  res.json({ success: true, data: review });
+});
+
 router.delete('/admin/reviews/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
   await prisma.review.delete({ where: { id } });
   await recordAudit(req.user!.userId, 'DELETE_REVIEW', 'Review', id);
   res.json({ success: true });
+});
+
+/* ── Service Requests (Agent jobs) ────────────────────────────────── */
+// Edit + reassignment, separate from the agent's own PATCH
+// /agent/service-requests/:id (agent.routes.ts) which only ever touches
+// status. Correcting a job's price/date/location/notes or moving it to a
+// different agent is a dispatcher decision, not something an agent does to
+// their own assignment.
+router.patch('/admin/service-requests/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { priceEstimate, scheduledDate, serviceLocation, notes, assignedAgentId } = req.body;
+
+  if (assignedAgentId) {
+    const agent = await prisma.user.findUnique({ where: { id: assignedAgentId } });
+    if (!agent || agent.role !== 'AGENT') return res.status(400).json({ error: 'assignedAgentId must be an existing user with the AGENT role' });
+  }
+
+  const updated = await prisma.serviceRequest.update({
+    where: { id },
+    data: {
+      ...(priceEstimate !== undefined && { priceEstimate: Number(priceEstimate) }),
+      ...(scheduledDate !== undefined && { scheduledDate: new Date(scheduledDate) }),
+      ...(serviceLocation !== undefined && { serviceLocation }),
+      ...(notes !== undefined && { notes }),
+      ...(assignedAgentId !== undefined && { assignedAgentId: assignedAgentId || null }),
+    },
+  });
+  await recordAudit(req.user!.userId, 'UPDATE_SERVICE_REQUEST', 'ServiceRequest', id, req.body);
+  res.json({ success: true, data: updated });
 });
 
 /* ── Payouts ──────────────────────────────────────────────────────── */

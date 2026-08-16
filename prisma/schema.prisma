@@ -402,6 +402,11 @@ model Review {
   rating       Int
   comment      String?
   createdAt    DateTime @default(now())
+
+  // Admin soft-moderation — hides a review from all public listings without
+  // destroying it, unlike delete. Preferred for disputed/reported reviews so
+  // there's still a record if the host/renter contests the moderation later.
+  hidden       Boolean  @default(false)
 }
 
 // Admin-managed discount codes, applied by renters at checkout.

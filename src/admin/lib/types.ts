@@ -15,6 +15,9 @@ export interface AdminUser {
   isSuspended: boolean;
   avatarUrl?: string | null;
   bio?: string | null;
+  kycDocUrl?: string | null;
+  aadhaarVerifiedName?: string | null;
+  digilockerStatus?: string | null;
   customRoleId?: string | null;
   customRole?: { name: string } | null;
   createdAt: string;
@@ -51,11 +54,24 @@ export interface AdminCar {
   registrationNo: string;
   year: number;
   category: string;
+  fuelType: string;
+  transmission: string;
+  seats: number;
   city: string;
+  address?: string | null;
   dailyRate: number;
+  securityDeposit: number;
+  kmIncludedPerDay: number;
+  extraKmCharge: number;
+  description?: string | null;
+  features: string[];
   isAvailable: boolean;
   featured: boolean;
   instantBook: boolean;
+  offersDelivery: boolean;
+  deliveryFee: number;
+  offersPickup: boolean;
+  pickupFee: number;
   fleetStatus?: string;
   pauseReason?: string | null;
   currentOdo?: number | null;
@@ -90,6 +106,7 @@ export interface AdminReview {
   author?: { fullName: string };
   rating: number;
   comment?: string | null;
+  hidden: boolean;
   createdAt: string;
 }
 

@@ -16,7 +16,7 @@ function withRatingSummary<T extends { reviews: { rating: number }[] }>(car: T) 
 router.get('/users/me/wishlist', requireAuth, async (req: Request, res: Response) => {
   const entries = await prisma.wishlist.findMany({
     where: { userId: req.user!.userId },
-    include: { car: { include: { reviews: { select: { rating: true } } } } },
+    include: { car: { include: { reviews: { where: { hidden: false }, select: { rating: true } } } } },
     orderBy: { createdAt: 'desc' },
   });
   const data = entries.map((e) => withRatingSummary(e.car));

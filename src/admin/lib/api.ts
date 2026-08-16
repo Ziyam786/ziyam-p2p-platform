@@ -1,7 +1,7 @@
 import type {
   AdminBooking, AdminCar, AdminPayout, AdminReview, AdminStats, AdminUser, AuditEntry,
-  BalanceSheetData, ChatConversationSummary, ChatMessageRow, CommandCenterData, CustomRoleRow, FleetExpenseRow,
-  FleetSummary, JournalEntryRow, MonthlyBalanceRow, OpsInvoiceRow, OpsTripRow, OutstandingFrequency, OutstandingRow,
+  BalanceSheetData, BookingStatus, ChatConversationSummary, ChatMessageRow, CommandCenterData, CustomRoleRow, FleetExpenseRow,
+  FleetSummary, JournalEntryRow, MonthlyBalanceRow, OpsInvoiceRow, OpsInvoiceStatus, OpsTripRow, OutstandingFrequency, OutstandingRow,
   OutstandingType, PlatformBookingEntry, PromoCode, SessionUser, SettingRow,
 } from './types';
 
@@ -43,7 +43,7 @@ export const adminApi = {
   stats: () => get<{ success: true; data: AdminStats }>('/admin/stats'),
 
   users: (role?: string) => get<{ success: true; data: AdminUser[] }>(`/admin/users${role ? `?role=${role}` : ''}`),
-  updateUser: (id: string, data: Partial<Pick<AdminUser, 'isSuspended' | 'isKycVerified' | 'role'>> & { customRoleId?: string | null }) =>
+  updateUser: (id: string, data: Partial<Pick<AdminUser, 'isSuspended' | 'isKycVerified' | 'role' | 'fullName' | 'email' | 'phoneNumber' | 'bio'>> & { customRoleId?: string | null }) =>
     patch<{ success: true; data: AdminUser }>(`/admin/users/${id}`, data),
 
   customRoles: () => get<{ success: true; count: number; data: CustomRoleRow[] }>('/admin/custom-roles'),
@@ -54,14 +54,23 @@ export const adminApi = {
   deleteCustomRole: (id: string) => del<{ success: true }>(`/admin/custom-roles/${id}`),
 
   cars: () => get<{ success: true; data: AdminCar[] }>('/admin/cars'),
-  updateCar: (id: string, data: Partial<Pick<AdminCar, 'isAvailable' | 'featured' | 'dailyRate' | 'city' | 'category'>>) =>
-    patch<{ success: true; data: AdminCar }>(`/admin/cars/${id}`, data),
+  updateCar: (id: string, data: Partial<Pick<AdminCar,
+    'isAvailable' | 'featured' | 'dailyRate' | 'city' | 'category' | 'make' | 'model' | 'year' |
+    'fuelType' | 'transmission' | 'seats' | 'securityDeposit' | 'kmIncludedPerDay' | 'extraKmCharge' |
+    'description' | 'features' | 'address' | 'instantBook' | 'offersDelivery' | 'deliveryFee' |
+    'offersPickup' | 'pickupFee'
+  >>) => patch<{ success: true; data: AdminCar }>(`/admin/cars/${id}`, data),
   approveFleetGoLive: (carId: string) => post<{ success: true; data: AdminCar; message: string }>(`/admin/cars/${carId}/fleet-onboarding/go-live`),
 
   bookings: (status?: string) => get<{ success: true; data: AdminBooking[] }>(`/admin/bookings${status ? `?status=${status}` : ''}`),
   updateBooking: (id: string, status: string) => patch<{ success: true; data: AdminBooking }>(`/admin/bookings/${id}`, { status }),
+  createBooking: (data: {
+    customerId?: string; customerName?: string; customerPhone?: string; customerEmail?: string;
+    carId: string; startTime: string; endTime: string; totalAmount: number; protectionPlan?: string; status?: BookingStatus;
+  }) => post<{ success: true; data: AdminBooking }>('/admin/bookings', data),
 
   reviews: () => get<{ success: true; data: AdminReview[] }>('/admin/reviews'),
+  setReviewHidden: (id: string, hidden: boolean) => patch<{ success: true; data: AdminReview }>(`/admin/reviews/${id}`, { hidden }),
   deleteReview: (id: string) => del<{ success: true }>(`/admin/reviews/${id}`),
 
   payouts: (status?: string) => get<{ success: true; data: AdminPayout[] }>(`/admin/payouts${status ? `?status=${status}` : ''}`),
@@ -79,6 +88,8 @@ export const adminApi = {
   createPromoCode: (data: { code: string; discountPercent?: number; discountFlat?: number; maxUses?: number; expiresAt?: string }) =>
     post<{ success: true; data: PromoCode }>('/admin/promo-codes', data),
   togglePromoCode: (code: string, active: boolean) => patch<{ success: true; data: PromoCode }>(`/admin/promo-codes/${code}`, { active }),
+  updatePromoCode: (code: string, data: Partial<Pick<PromoCode, 'discountPercent' | 'discountFlat' | 'maxUses' | 'expiresAt'>>) =>
+    patch<{ success: true; data: PromoCode }>(`/admin/promo-codes/${code}`, data),
   deletePromoCode: (code: string) => del<{ success: true }>(`/admin/promo-codes/${code}`),
 };
 
@@ -97,17 +108,23 @@ export const fleetApi = {
   bookings: (f: FleetFilters = {}) => get<{ success: true; count: number; data: PlatformBookingEntry[] }>(`/fleet/bookings${toQuery(f)}`),
   addBooking: (data: { carId: string; platform: string; externalBookingId: string; bookedAt: string; totalFare: number; doorstepCharges?: number; platformCommission?: number; expectedCreditDate?: string }) =>
     post<{ success: true; data: PlatformBookingEntry }>('/fleet/bookings', data),
+  updateBooking: (id: string, data: Partial<{ platform: string; externalBookingId: string; bookedAt: string; totalFare: number; doorstepCharges: number; platformCommission: number | null; expectedCreditDate: string | null }>) =>
+    patch<{ success: true; data: PlatformBookingEntry }>(`/fleet/bookings/${id}`, data),
   markBookingReceived: (id: string) => patch<{ success: true; data: PlatformBookingEntry }>(`/fleet/bookings/${id}/received`),
   deleteBooking: (id: string) => del<{ success: true }>(`/fleet/bookings/${id}`),
 
   journalEntries: (f: FleetFilters = {}) => get<{ success: true; count: number; data: JournalEntryRow[] }>(`/fleet/journal-entries${toQuery(f)}`),
   addJournalEntry: (data: { carId: string; collectionDate: string; amountCollected: number; totalAmount: number; category: string; remarks?: string }) =>
     post<{ success: true; data: JournalEntryRow }>('/fleet/journal-entries', data),
+  updateJournalEntry: (id: string, data: Partial<{ collectionDate: string; amountCollected: number; totalAmount: number; category: string; remarks: string }>) =>
+    patch<{ success: true; data: JournalEntryRow }>(`/fleet/journal-entries/${id}`, data),
   deleteJournalEntry: (id: string) => del<{ success: true }>(`/fleet/journal-entries/${id}`),
 
   expenses: (f: FleetFilters = {}) => get<{ success: true; count: number; data: FleetExpenseRow[] }>(`/fleet/expenses${toQuery(f)}`),
   addExpense: (data: { expenseType: string; carId?: string; paymentMode: string; paidTo?: string; amount: number; date: string; description?: string }) =>
     post<{ success: true; data: FleetExpenseRow }>('/fleet/expenses', data),
+  updateExpense: (id: string, data: Partial<{ expenseType: string; carId: string | null; paymentMode: string; paidTo: string; amount: number; date: string; description: string }>) =>
+    patch<{ success: true; data: FleetExpenseRow }>(`/fleet/expenses/${id}`, data),
   deleteExpense: (id: string) => del<{ success: true }>(`/fleet/expenses/${id}`),
 };
 
@@ -119,6 +136,7 @@ export interface AgentServiceRequest {
   serviceLocation: string;
   status: 'REQUESTED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
   notes?: string | null;
+  assignedAgentId?: string | null;
   car: { make: string; model: string; registrationNo: string; city: string; images: string[] };
   requestedBy: { fullName: string; phoneNumber: string };
   booking?: { id: string; startTime: string; endTime: string } | null;
@@ -128,6 +146,8 @@ export const agentApi = {
   queue: () => get<{ success: true; count: number; data: AgentServiceRequest[] }>('/agent/service-requests'),
   updateStatus: (id: string, status: 'CONFIRMED' | 'COMPLETED' | 'CANCELLED') =>
     patch<{ success: true; data: AgentServiceRequest }>(`/agent/service-requests/${id}`, { status }),
+  update: (id: string, data: Partial<{ priceEstimate: number; scheduledDate: string; serviceLocation: string; notes: string; assignedAgentId: string | null }>) =>
+    patch<{ success: true; data: AgentServiceRequest }>(`/admin/service-requests/${id}`, data),
 };
 
 export interface OpsTripCheckInPayload {
@@ -146,6 +166,7 @@ export const opsTripApi = {
     get<{ success: true; count: number; data: OpsTripRow[] }>(`/ops-trips${toQuery(params)}`),
   get: (id: string) => get<{ success: true; data: OpsTripRow }>(`/ops-trips/${id}`),
   checkIn: (data: OpsTripCheckInPayload) => post<{ success: true; data: OpsTripRow }>('/ops-trips', data),
+  update: (id: string, data: Partial<OpsTripCheckInPayload>) => patch<{ success: true; data: OpsTripRow }>(`/ops-trips/${id}`, data),
   checkOut: (id: string, data: OpsTripCheckOutPayload) => patch<{ success: true; data: OpsTripRow }>(`/ops-trips/${id}/checkout`, data),
   cancel: (id: string) => patch<{ success: true; data: OpsTripRow }>(`/ops-trips/${id}/cancel`),
   generateInvoice: (tripId: string) => post<{ success: true; data: OpsInvoiceRow }>(`/ops-trips/${tripId}/invoice`),
@@ -155,6 +176,8 @@ export const opsInvoiceApi = {
   list: (params: { type?: string; status?: string } = {}) =>
     get<{ success: true; count: number; data: OpsInvoiceRow[] }>(`/ops-invoices${toQuery(params)}`),
   get: (id: string) => get<{ success: true; data: OpsInvoiceRow }>(`/ops-invoices/${id}`),
+  updateStatus: (id: string, status: OpsInvoiceStatus) =>
+    patch<{ success: true; data: OpsInvoiceRow }>(`/ops-invoices/${id}/status`, { status }),
 };
 
 export const financeApi = {
@@ -167,6 +190,8 @@ export const financeApi = {
     get<{ success: true; count: number; data: OutstandingRow[] }>(`/finance/outstandings${toQuery(params)}`),
   addOutstanding: (data: { expectedDate: string; paymentTo: string; amountOwed: number; outstandingType: OutstandingType; sourceType?: string; frequency?: OutstandingFrequency; recurringGroup?: string }) =>
     post<{ success: true; data: OutstandingRow }>('/finance/outstandings', data),
+  updateOutstanding: (id: string, data: Partial<{ expectedDate: string; paymentTo: string; amountOwed: number; outstandingType: OutstandingType; frequency: OutstandingFrequency }>) =>
+    patch<{ success: true; data: OutstandingRow }>(`/finance/outstandings/${id}`, data),
   settleOutstanding: (id: string) => patch<{ success: true; data: OutstandingRow }>(`/finance/outstandings/${id}/settle`),
   deleteOutstanding: (id: string) => del<{ success: true }>(`/finance/outstandings/${id}`),
 

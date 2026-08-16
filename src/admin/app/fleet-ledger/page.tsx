@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import AdminShell from '../../components/AdminShell';
+import Modal from '../../components/Modal';
 import { useToast } from '../../components/Toast';
 import { adminApi, fleetApi, type FleetFilters } from '../../lib/api';
 import type { AdminCar, FleetExpenseRow, FleetSummary, JournalEntryRow, PlatformBookingEntry } from '../../lib/types';
@@ -20,6 +21,14 @@ function inr(n: number) {
 }
 function label(s: string) {
   return s.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+function toLocalInput(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function toDateInput(iso: string) {
+  return new Date(iso).toISOString().slice(0, 10);
 }
 
 export default function FleetLedgerPage() {
@@ -220,6 +229,40 @@ function BookingsTab({ cars, rows, busy, setBusy, onChange, show, platforms }: {
     }
   }
 
+  const [editing, setEditing] = useState<PlatformBookingEntry | null>(null);
+  const [editForm, setEditForm] = useState({ platform: '', externalBookingId: '', bookedAt: '', totalFare: '', doorstepCharges: '', platformCommission: '', expectedCreditDate: '' });
+
+  function openEdit(r: PlatformBookingEntry) {
+    setEditing(r);
+    setEditForm({
+      platform: r.platform, externalBookingId: r.externalBookingId, bookedAt: toLocalInput(r.bookedAt),
+      totalFare: String(r.totalFare), doorstepCharges: String(r.doorstepCharges),
+      platformCommission: r.platformCommission ? String(r.platformCommission) : '',
+      expectedCreditDate: r.expectedCreditDate ? toDateInput(r.expectedCreditDate) : '',
+    });
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    setBusy(true);
+    try {
+      await fleetApi.updateBooking(editing.id, {
+        platform: editForm.platform, externalBookingId: editForm.externalBookingId,
+        bookedAt: new Date(editForm.bookedAt).toISOString(), totalFare: Number(editForm.totalFare),
+        doorstepCharges: Number(editForm.doorstepCharges),
+        platformCommission: editForm.platformCommission ? Number(editForm.platformCommission) : null,
+        expectedCreditDate: editForm.expectedCreditDate || null,
+      });
+      show('Booking updated', 'success');
+      setEditing(null);
+      onChange();
+    } catch (err: any) {
+      show(err.message ?? 'Failed to update', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div>
       <form onSubmit={handleAdd} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-6 grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
@@ -249,10 +292,29 @@ function BookingsTab({ cars, rows, busy, setBusy, onChange, show, platforms }: {
           ) : (
             <button key="rcv" disabled={busy} onClick={() => markReceived(r.id)} className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700 hover:border-emerald-500 text-slate-300 hover:text-emerald-400 transition">Mark Received</button>
           ),
-          <button key="del" disabled={busy} onClick={() => remove(r.id)} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white transition">Delete</button>,
+          <div key="actions" className="flex gap-2">
+            <button disabled={busy} onClick={() => openEdit(r)} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition">Edit</button>
+            <button disabled={busy} onClick={() => remove(r.id)} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white transition">Delete</button>
+          </div>,
         ])}
         empty="No platform bookings logged yet."
       />
+
+      <Modal open={Boolean(editing)} onClose={() => setEditing(null)} title="Edit Platform Booking">
+        <div className="space-y-3">
+          <Field label="Platform"><select value={editForm.platform} onChange={(e) => setEditForm({ ...editForm, platform: e.target.value })} className={`${rowInput} w-full`}>{platforms.map((p) => <option key={p} value={p}>{label(p)}</option>)}</select></Field>
+          <Field label="Booking ID"><input value={editForm.externalBookingId} onChange={(e) => setEditForm({ ...editForm, externalBookingId: e.target.value })} className={`${rowInput} w-full`} /></Field>
+          <Field label="Date & Time"><input type="datetime-local" value={editForm.bookedAt} onChange={(e) => setEditForm({ ...editForm, bookedAt: e.target.value })} className={`${rowInput} w-full`} /></Field>
+          <Field label="Total Fare (₹)"><input type="number" min={0} value={editForm.totalFare} onChange={(e) => setEditForm({ ...editForm, totalFare: e.target.value })} className={`${rowInput} w-full`} /></Field>
+          <Field label="Doorstep Charges (₹)"><input type="number" min={0} value={editForm.doorstepCharges} onChange={(e) => setEditForm({ ...editForm, doorstepCharges: e.target.value })} className={`${rowInput} w-full`} /></Field>
+          <Field label="Platform Commission (₹)"><input type="number" min={0} value={editForm.platformCommission} onChange={(e) => setEditForm({ ...editForm, platformCommission: e.target.value })} placeholder="optional" className={`${rowInput} w-full`} /></Field>
+          <Field label="Expected Credit Date"><input type="date" value={editForm.expectedCreditDate} onChange={(e) => setEditForm({ ...editForm, expectedCreditDate: e.target.value })} className={`${rowInput} w-full`} /></Field>
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+            <button onClick={() => setEditing(null)} className="text-sm font-semibold px-4 py-2 rounded-lg text-slate-400 hover:text-white transition">Cancel</button>
+            <button disabled={busy} onClick={saveEdit} className="text-sm font-semibold px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white transition">{busy ? 'Saving…' : 'Save Changes'}</button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -297,6 +359,35 @@ function JournalTab({ cars, rows, busy, setBusy, onChange, show, categories }: {
     }
   }
 
+  const [editing, setEditing] = useState<JournalEntryRow | null>(null);
+  const [editForm, setEditForm] = useState({ collectionDate: '', amountCollected: '', totalAmount: '', category: '', remarks: '' });
+
+  function openEdit(r: JournalEntryRow) {
+    setEditing(r);
+    setEditForm({
+      collectionDate: toDateInput(r.collectionDate), amountCollected: String(r.amountCollected),
+      totalAmount: String(r.totalAmount), category: r.category, remarks: r.remarks ?? '',
+    });
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    setBusy(true);
+    try {
+      await fleetApi.updateJournalEntry(editing.id, {
+        collectionDate: editForm.collectionDate, amountCollected: Number(editForm.amountCollected),
+        totalAmount: Number(editForm.totalAmount), category: editForm.category, remarks: editForm.remarks || undefined,
+      });
+      show('Journal entry updated', 'success');
+      setEditing(null);
+      onChange();
+    } catch (err: any) {
+      show(err.message ?? 'Failed to update', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div>
       <form onSubmit={handleAdd} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-6 grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
@@ -318,10 +409,27 @@ function JournalTab({ cars, rows, busy, setBusy, onChange, show, categories }: {
           inr(r.amountCollected),
           inr(r.totalAmount),
           r.remarks ?? '—',
-          <button key="del" disabled={busy} onClick={() => remove(r.id)} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white transition">Delete</button>,
+          <div key="actions" className="flex gap-2">
+            <button disabled={busy} onClick={() => openEdit(r)} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition">Edit</button>
+            <button disabled={busy} onClick={() => remove(r.id)} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white transition">Delete</button>
+          </div>,
         ])}
         empty="No journal entries logged yet."
       />
+
+      <Modal open={Boolean(editing)} onClose={() => setEditing(null)} title="Edit Journal Entry">
+        <div className="space-y-3">
+          <Field label="Collection Date"><input type="date" value={editForm.collectionDate} onChange={(e) => setEditForm({ ...editForm, collectionDate: e.target.value })} className={`${rowInput} w-full`} /></Field>
+          <Field label="Category"><select value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} className={`${rowInput} w-full`}>{categories.map((c) => <option key={c} value={c}>{label(c)}</option>)}</select></Field>
+          <Field label="Amount Collected (₹)"><input type="number" min={0} value={editForm.amountCollected} onChange={(e) => setEditForm({ ...editForm, amountCollected: e.target.value })} className={`${rowInput} w-full`} /></Field>
+          <Field label="Total Amount (₹)"><input type="number" min={0} value={editForm.totalAmount} onChange={(e) => setEditForm({ ...editForm, totalAmount: e.target.value })} className={`${rowInput} w-full`} /></Field>
+          <Field label="Remarks"><input value={editForm.remarks} onChange={(e) => setEditForm({ ...editForm, remarks: e.target.value })} className={`${rowInput} w-full`} /></Field>
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+            <button onClick={() => setEditing(null)} className="text-sm font-semibold px-4 py-2 rounded-lg text-slate-400 hover:text-white transition">Cancel</button>
+            <button disabled={busy} onClick={saveEdit} className="text-sm font-semibold px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white transition">{busy ? 'Saving…' : 'Save Changes'}</button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -367,6 +475,35 @@ function ExpensesTab({ cars, rows, busy, setBusy, onChange, show, expenseTypes, 
     }
   }
 
+  const [editing, setEditing] = useState<FleetExpenseRow | null>(null);
+  const [editForm, setEditForm] = useState({ expenseType: '', carId: '', paymentMode: '', paidTo: '', amount: '', date: '', description: '' });
+
+  function openEdit(r: FleetExpenseRow) {
+    setEditing(r);
+    setEditForm({
+      expenseType: r.expenseType, carId: r.carId ?? '', paymentMode: r.paymentMode,
+      paidTo: r.paidTo ?? '', amount: String(r.amount), date: toDateInput(r.date), description: r.description ?? '',
+    });
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    setBusy(true);
+    try {
+      await fleetApi.updateExpense(editing.id, {
+        expenseType: editForm.expenseType, carId: editForm.carId || null, paymentMode: editForm.paymentMode,
+        paidTo: editForm.paidTo || undefined, amount: Number(editForm.amount), date: editForm.date, description: editForm.description || undefined,
+      });
+      show('Expense updated', 'success');
+      setEditing(null);
+      onChange();
+    } catch (err: any) {
+      show(err.message ?? 'Failed to update', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div>
       <form onSubmit={handleAdd} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-6 grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
@@ -389,10 +526,29 @@ function ExpensesTab({ cars, rows, busy, setBusy, onChange, show, expenseTypes, 
           inr(r.amount),
           new Date(r.date).toLocaleDateString(),
           r.description ?? '—',
-          <button key="del" disabled={busy} onClick={() => remove(r.id)} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white transition">Delete</button>,
+          <div key="actions" className="flex gap-2">
+            <button disabled={busy} onClick={() => openEdit(r)} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition">Edit</button>
+            <button disabled={busy} onClick={() => remove(r.id)} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white transition">Delete</button>
+          </div>,
         ])}
         empty="No expenses logged yet."
       />
+
+      <Modal open={Boolean(editing)} onClose={() => setEditing(null)} title="Edit Expense">
+        <div className="space-y-3">
+          <Field label="Expense Type"><select value={editForm.expenseType} onChange={(e) => setEditForm({ ...editForm, expenseType: e.target.value })} className={`${rowInput} w-full`}>{expenseTypes.map((t) => <option key={t} value={t}>{label(t)}</option>)}</select></Field>
+          <Field label="Associated Vehicle"><select value={editForm.carId} onChange={(e) => setEditForm({ ...editForm, carId: e.target.value })} className={`${rowInput} w-full`}><option value="">Fleet-Wide</option>{cars.map((c) => <option key={c.id} value={c.id}>{c.make} {c.model} · {c.registrationNo}</option>)}</select></Field>
+          <Field label="Payment Mode"><select value={editForm.paymentMode} onChange={(e) => setEditForm({ ...editForm, paymentMode: e.target.value })} className={`${rowInput} w-full`}>{paymentModes.map((m) => <option key={m} value={m}>{label(m)}</option>)}</select></Field>
+          <Field label="Paid To"><input value={editForm.paidTo} onChange={(e) => setEditForm({ ...editForm, paidTo: e.target.value })} className={`${rowInput} w-full`} /></Field>
+          <Field label="Amount (₹)"><input type="number" min={0} value={editForm.amount} onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })} className={`${rowInput} w-full`} /></Field>
+          <Field label="Date"><input type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} className={`${rowInput} w-full`} /></Field>
+          <Field label="Description"><input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} className={`${rowInput} w-full`} /></Field>
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+            <button onClick={() => setEditing(null)} className="text-sm font-semibold px-4 py-2 rounded-lg text-slate-400 hover:text-white transition">Cancel</button>
+            <button disabled={busy} onClick={saveEdit} className="text-sm font-semibold px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white transition">{busy ? 'Saving…' : 'Save Changes'}</button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

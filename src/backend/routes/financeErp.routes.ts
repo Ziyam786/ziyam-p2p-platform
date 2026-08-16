@@ -146,6 +146,23 @@ router.post('/finance/outstandings', async (req: Request, res: Response) => {
   res.status(201).json({ success: true, data: entry });
 });
 
+router.patch('/finance/outstandings/:id', async (req: Request, res: Response) => {
+  const existing = await prisma.outstanding.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+  const { expectedDate, paymentTo, amountOwed, outstandingType, frequency } = req.body;
+  const updated = await prisma.outstanding.update({
+    where: { id: req.params.id },
+    data: {
+      ...(expectedDate !== undefined && { expectedDate: new Date(expectedDate) }),
+      ...(paymentTo !== undefined && { paymentTo }),
+      ...(amountOwed !== undefined && { amountOwed: Number(amountOwed) }),
+      ...(outstandingType !== undefined && { outstandingType }),
+      ...(frequency !== undefined && { frequency }),
+    },
+  });
+  res.json({ success: true, data: updated });
+});
+
 router.patch('/finance/outstandings/:id/settle', async (req: Request, res: Response) => {
   const entry = await prisma.outstanding.findUnique({ where: { id: req.params.id } });
   if (!entry) return res.status(404).json({ error: 'Not found' });
