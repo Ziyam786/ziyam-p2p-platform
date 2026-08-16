@@ -159,6 +159,12 @@ export interface ProtectionPlanDef { value: ProtectionPlan; label: string; rateP
 export interface LongRentalDiscount { minDays: number; percent: number; }
 export interface Testimonial { name: string; quote: string; rating: number; }
 
+export interface CompanyInfo {
+  legalName: string; brand: string; brandFull: string; cin: string; registeredDate: string;
+  address: string; email: string; phone: string; whatsappUrl: string; operatingCity: string;
+  scopeNote: string; jurisdiction: string; team: { name: string; role: string }[];
+}
+
 export interface PublicSettings {
   hero_title: string;
   hero_subtitle: string;
@@ -169,6 +175,7 @@ export interface PublicSettings {
   commission_percentage: number;
   long_rental_discounts: LongRentalDiscount[];
   testimonials: Testimonial[];
+  company_info: CompanyInfo;
 }
 
 export interface PromoCode {

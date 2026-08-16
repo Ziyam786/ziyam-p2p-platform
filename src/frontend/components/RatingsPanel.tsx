@@ -6,7 +6,7 @@ import type { Car } from '../lib/types';
 
 function gaugeColor(rating: number) {
   if (rating >= 4.5) return '#10b981';
-  if (rating >= 3.5) return '#f59e0b';
+  if (rating >= 3.5) return '#3b82f6';
   return '#ef4444';
 }
 

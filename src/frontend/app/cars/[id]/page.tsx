@@ -8,7 +8,7 @@ import Rating from '../../../components/Rating';
 import CarLocationMap from '../../../components/CarLocationMap';
 import { useAuth } from '../../../lib/auth-context';
 import { useToast } from '../../../components/Toast';
-import { carsApi, bookingsApi, settingsApi, promoApi } from '../../../lib/api';
+import { carsApi, bookingsApi, settingsApi, promoApi, ApiError } from '../../../lib/api';
 import type { Car, LongRentalDiscount, Review } from '../../../lib/types';
 
 const INCLUDED_ITEMS = [
@@ -131,6 +131,11 @@ export default function CarDetailPage() {
       });
       router.push(`/checkout/${res.bookingId}`);
     } catch (err: any) {
+      if (err instanceof ApiError && err.code === 'KYC_REQUIRED') {
+        show('Complete KYC verification to book a car — taking you there now.', 'error');
+        router.push('/account/kyc');
+        return;
+      }
       show(err.message ?? 'Could not start booking', 'error');
     } finally {
       setSubmitting(false);
@@ -523,6 +528,12 @@ export default function CarDetailPage() {
                     <span className="text-amber-600">₹{total.toLocaleString()}</span>
                   </div>
                 </div>
+              )}
+
+              {user && !user.isKycVerified && (
+                <a href="/account/kyc" className="block text-center text-xs font-semibold bg-amber-50 text-amber-700 rounded-xl px-3 py-2.5 hover:bg-amber-100 transition">
+                  🪪 KYC verification is required to book — complete it here first
+                </a>
               )}
 
               <button

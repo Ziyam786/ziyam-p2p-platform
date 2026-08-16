@@ -14,6 +14,7 @@ const PUBLIC_KEYS = [
   'commission_percentage',
   'long_rental_discounts',
   'testimonials',
+  'company_info',
 ] as const;
 
 export const DEFAULT_SETTINGS: Record<string, unknown> = {
@@ -57,6 +58,27 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     { name: 'Vikram S.', quote: "I've listed my Swift on Ziyam for 8 months now. The N+1 payouts land like clockwork and support actually picks up the phone.", rating: 5 },
     { name: 'Fatima K.', quote: 'KYC took two minutes, car was delivered to my apartment. Didn\'t expect that level of convenience from a P2P platform.', rating: 4 },
   ],
+  company_info: {
+    legalName: 'Eightlines Fleet Private Limited',
+    brand: 'ZIYAM',
+    brandFull: 'ZiyamSelfDrive',
+    cin: 'U77100KA2026PTC21777',
+    registeredDate: '16 March 2026',
+    address: '8-Lines Fleet, 15th Cross Rd, Popular Colony, Mangammanapalya, Bengaluru, Karnataka 560068',
+    email: 'eightlinesfleet@gmail.com',
+    phone: '+91 63636 17864',
+    whatsappUrl: 'https://wa.me/916363617864',
+    operatingCity: 'Bengaluru',
+    scopeNote: 'Currently operating in Bengaluru only — expanding pan-India as the fleet grows.',
+    jurisdiction: 'Courts at Bengaluru, Karnataka',
+    team: [
+      { name: 'Syed Fardeen', role: 'Founder & Director' },
+      { name: 'Junaid Khan', role: 'Co-founder & Director' },
+      { name: 'Numer Saqlain M', role: 'Co-founder' },
+      { name: 'Mohammed Azam A', role: 'Co-founder' },
+      { name: 'Shaik Afnan Sabil', role: 'Fleet General Managing Director' },
+    ],
+  },
   commission_percentage: config.payout.platformCommission,
   host_share_percentage: config.payout.hostShare,
   settlement_hours: config.payout.settlementHours,

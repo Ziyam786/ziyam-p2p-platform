@@ -54,6 +54,13 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
   }
 
   try {
+    // KYC is mandatory for both sides of a trip — hosts are already gated at
+    // listing time (see host.routes.ts), this closes the matching gap for guests.
+    const customer = await prisma.user.findUnique({ where: { id: customerId }, select: { isKycVerified: true } });
+    if (!customer?.isKycVerified) {
+      return res.status(403).json({ error: 'Please complete KYC verification before booking a car.', code: 'KYC_REQUIRED' });
+    }
+
     const car = await prisma.car.findUnique({ where: { id: carId }, include: { owner: true } });
     if (!car) return res.status(404).json({ error: 'Car not found' });
     if (!car.isAvailable) return res.status(409).json({ error: 'Car is no longer available' });

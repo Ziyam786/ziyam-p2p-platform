@@ -6,6 +6,12 @@ import { useToast } from '../../components/Toast';
 import { adminApi } from '../../lib/api';
 import type { LongRentalDiscount, ProtectionPlanDef } from '../../lib/types';
 
+interface CompanyInfo {
+  legalName: string; brand: string; brandFull: string; cin: string; registeredDate: string;
+  address: string; email: string; phone: string; whatsappUrl: string; operatingCity: string;
+  scopeNote: string; jurisdiction: string; team: { name: string; role: string }[];
+}
+
 const rowInput = 'bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500';
 
 export default function SettingsPage() {
@@ -20,6 +26,8 @@ export default function SettingsPage() {
   const [aiEnabled, setAiEnabled] = useState(true);
   const [aiPrompt, setAiPrompt] = useState('');
   const [savingAi, setSavingAi] = useState(false);
+  const [company, setCompany] = useState<CompanyInfo | null>(null);
+  const [savingCompany, setSavingCompany] = useState(false);
 
   useEffect(() => {
     adminApi
@@ -33,9 +41,23 @@ export default function SettingsPage() {
         setDiscounts((byKey.get('long_rental_discounts') as LongRentalDiscount[]) ?? []);
         setAiEnabled((byKey.get('ai_chat_enabled') as boolean) ?? true);
         setAiPrompt((byKey.get('ai_chat_system_prompt') as string) ?? '');
+        setCompany((byKey.get('company_info') as CompanyInfo) ?? null);
       })
       .finally(() => setLoading(false));
   }, []);
+
+  async function saveCompanySettings() {
+    if (!company) return;
+    setSavingCompany(true);
+    try {
+      await adminApi.updateSetting('company_info', company);
+      show('Business info updated — reflected across the site footer & About page', 'success');
+    } catch (err: any) {
+      show(err.message ?? 'Failed to save', 'error');
+    } finally {
+      setSavingCompany(false);
+    }
+  }
 
   async function savePayoutSettings() {
     setSaving(true);
@@ -84,6 +106,66 @@ export default function SettingsPage() {
   return (
     <AdminShell title="Platform Settings" subtitle="Business config that's usually hardcoded — now live-editable">
       <div className="space-y-6">
+        {company && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <h2 className="font-bold text-slate-100 mb-1">Business Info</h2>
+            <p className="text-xs text-slate-500 mb-5">Powers the site footer, About page, and legal page contact details</p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Legal Entity Name</label>
+                <input value={company.legalName} onChange={(e) => setCompany({ ...company, legalName: e.target.value })} className={`${rowInput} w-full`} />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">CIN</label>
+                <input value={company.cin} onChange={(e) => setCompany({ ...company, cin: e.target.value })} className={`${rowInput} w-full`} />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Email</label>
+                <input value={company.email} onChange={(e) => setCompany({ ...company, email: e.target.value })} className={`${rowInput} w-full`} />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Phone / WhatsApp Number</label>
+                <input value={company.phone} onChange={(e) => setCompany({ ...company, phone: e.target.value })} className={`${rowInput} w-full`} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs text-slate-500 mb-1">Registered Address</label>
+                <input value={company.address} onChange={(e) => setCompany({ ...company, address: e.target.value })} className={`${rowInput} w-full`} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs text-slate-500 mb-1">Operating Scope Note</label>
+                <input value={company.scopeNote} onChange={(e) => setCompany({ ...company, scopeNote: e.target.value })} className={`${rowInput} w-full`} />
+              </div>
+            </div>
+
+            <h3 className="text-sm font-semibold text-slate-300 mb-2">Leadership Team</h3>
+            <div className="space-y-2 mb-5">
+              {company.team.map((person, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <input
+                    value={person.name}
+                    onChange={(e) => setCompany({ ...company, team: company.team.map((p, j) => j === i ? { ...p, name: e.target.value } : p) })}
+                    placeholder="Name" className={`${rowInput} flex-1`}
+                  />
+                  <input
+                    value={person.role}
+                    onChange={(e) => setCompany({ ...company, team: company.team.map((p, j) => j === i ? { ...p, role: e.target.value } : p) })}
+                    placeholder="Role" className={`${rowInput} flex-1`}
+                  />
+                  <button onClick={() => setCompany({ ...company, team: company.team.filter((_, j) => j !== i) })} className="text-red-400 hover:text-red-300 px-2 text-sm">✕</button>
+                </div>
+              ))}
+              <button onClick={() => setCompany({ ...company, team: [...company.team, { name: '', role: '' }] })} className="text-xs text-brand-400 hover:text-brand-300 font-semibold">
+                + Add team member
+              </button>
+            </div>
+
+            <button onClick={saveCompanySettings} disabled={savingCompany} className="bg-brand-600 hover:bg-brand-700 disabled:bg-slate-700 text-white text-sm font-bold px-5 py-2.5 rounded-lg transition">
+              {savingCompany ? 'Saving…' : 'Save Business Info'}
+            </button>
+          </div>
+        )}
+
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
           <h2 className="font-bold text-slate-100 mb-1">Revenue Split & Settlement</h2>
           <p className="text-xs text-slate-500 mb-5">Applies to every new booking created after saving</p>

@@ -100,7 +100,7 @@ export default function CarOnboardingWizard({
             <svg viewBox="0 0 36 36" className="w-12 h-12 -rotate-90">
               <circle cx="18" cy="18" r="16" fill="none" stroke="#e5e7eb" strokeWidth="4" />
               <circle
-                cx="18" cy="18" r="16" fill="none" stroke="#f59e0b" strokeWidth="4" strokeLinecap="round"
+                cx="18" cy="18" r="16" fill="none" stroke="#3b82f6" strokeWidth="4" strokeLinecap="round"
                 strokeDasharray={`${(stepsCompleted / 4) * 100.5} 100.5`}
               />
             </svg>
