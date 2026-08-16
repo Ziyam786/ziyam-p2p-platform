@@ -354,6 +354,35 @@ router.delete('/admin/reviews/:id', async (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
+/* ── Service Requests (Agent jobs) ────────────────────────────────── */
+// Edit + reassignment, separate from the agent's own PATCH
+// /agent/service-requests/:id (agent.routes.ts) which only ever touches
+// status. Correcting a job's price/date/location/notes or moving it to a
+// different agent is a dispatcher decision, not something an agent does to
+// their own assignment.
+router.patch('/admin/service-requests/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { priceEstimate, scheduledDate, serviceLocation, notes, assignedAgentId } = req.body;
+
+  if (assignedAgentId) {
+    const agent = await prisma.user.findUnique({ where: { id: assignedAgentId } });
+    if (!agent || agent.role !== 'AGENT') return res.status(400).json({ error: 'assignedAgentId must be an existing user with the AGENT role' });
+  }
+
+  const updated = await prisma.serviceRequest.update({
+    where: { id },
+    data: {
+      ...(priceEstimate !== undefined && { priceEstimate: Number(priceEstimate) }),
+      ...(scheduledDate !== undefined && { scheduledDate: new Date(scheduledDate) }),
+      ...(serviceLocation !== undefined && { serviceLocation }),
+      ...(notes !== undefined && { notes }),
+      ...(assignedAgentId !== undefined && { assignedAgentId: assignedAgentId || null }),
+    },
+  });
+  await recordAudit(req.user!.userId, 'UPDATE_SERVICE_REQUEST', 'ServiceRequest', id, req.body);
+  res.json({ success: true, data: updated });
+});
+
 /* ── Payouts ──────────────────────────────────────────────────────── */
 router.get('/admin/payouts', async (req: Request, res: Response) => {
   const { status } = req.query;

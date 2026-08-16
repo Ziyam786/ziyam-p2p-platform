@@ -39,6 +39,7 @@ export default function OpsTripsPage() {
   const [busy, setBusy] = useState(false);
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [checkoutTrip, setCheckoutTrip] = useState<OpsTripRow | null>(null);
+  const [editingTrip, setEditingTrip] = useState<OpsTripRow | null>(null);
 
   function load() {
     setLoading(true);
@@ -92,6 +93,11 @@ export default function OpsTripsPage() {
               </div>
               <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0 ${STATUS_STYLES[t.status]}`}>{t.status}</span>
               <div className="flex gap-2 shrink-0">
+                {(t.status === 'RUNNING' || t.status === 'SCHEDULED') && (
+                  <button onClick={() => setEditingTrip(t)} className="text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg transition">
+                    Edit
+                  </button>
+                )}
                 {t.status === 'RUNNING' && (
                   <button onClick={() => setCheckoutTrip(t)} className="text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg transition">
                     Check Out
@@ -137,6 +143,7 @@ export default function OpsTripsPage() {
 
       {showCheckIn && <CheckInModal cars={cars} onClose={() => setShowCheckIn(false)} onDone={() => { setShowCheckIn(false); load(); }} show={show} />}
       {checkoutTrip && <CheckOutModal trip={checkoutTrip} onClose={() => setCheckoutTrip(null)} onDone={() => { setCheckoutTrip(null); load(); }} show={show} />}
+      {editingTrip && <EditTripModal trip={editingTrip} onClose={() => setEditingTrip(null)} onDone={() => { setEditingTrip(null); load(); }} show={show} />}
     </AdminShell>
   );
 }
@@ -230,6 +237,87 @@ function CheckInModal({ cars, onClose, onDone, show }: {
         </div>
         <button type="submit" disabled={submitting || carPaused} className="w-full bg-brand-600 hover:bg-brand-700 disabled:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-lg transition">
           {submitting ? 'Checking in…' : 'Check In & Start Trip'}
+        </button>
+      </form>
+    </Modal>
+  );
+}
+
+function EditTripModal({ trip, onClose, onDone, show }: {
+  trip: OpsTripRow; onClose: () => void; onDone: () => void; show: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [customerName, setCustomerName] = useState(trip.customerName);
+  const [customerMobile, setCustomerMobile] = useState(trip.customerMobile);
+  const [pickupLocation, setPickupLocation] = useState(trip.pickupLocation ?? '');
+  const [dropLocation, setDropLocation] = useState(trip.dropLocation ?? '');
+  const [pickupType, setPickupType] = useState(trip.pickupType ?? 'Self Pickup');
+  const [bookingPlatform, setBookingPlatform] = useState(trip.bookingPlatform ?? '');
+  const [externalBookingId, setExternalBookingId] = useState(trip.externalBookingId ?? '');
+  const [startTime, setStartTime] = useState(trip.startTime.slice(0, 16));
+  const [odometerStart, setOdometerStart] = useState(trip.odometerStart != null ? String(trip.odometerStart) : '');
+  const [fastag, setFastag] = useState(trip.fastag ?? '');
+  const [baseFare, setBaseFare] = useState(trip.baseFare != null ? String(trip.baseFare) : '');
+  const [addonTotal, setAddonTotal] = useState(trip.addonTotal != null ? String(trip.addonTotal) : '');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!customerName || !customerMobile) return show('Customer Name and Mobile are required', 'error');
+    setSubmitting(true);
+    try {
+      await opsTripApi.update(trip.id, {
+        customerName, customerMobile,
+        pickupLocation: pickupLocation || undefined, dropLocation: dropLocation || undefined, pickupType,
+        bookingPlatform: bookingPlatform || undefined, externalBookingId: externalBookingId || undefined,
+        startTime: new Date(startTime).toISOString(),
+        odometerStart: odometerStart ? Number(odometerStart) : undefined,
+        fastag: fastag || undefined,
+        baseFare: baseFare ? Number(baseFare) : undefined,
+        addonTotal: addonTotal ? Number(addonTotal) : undefined,
+      });
+      show('Trip details updated', 'success');
+      onDone();
+    } catch (err: any) {
+      show(err.message ?? 'Failed to update trip', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title={`Edit Trip — ${trip.car?.make} ${trip.car?.model}`}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <p className="text-xs text-slate-500">Corrects the check-in details for this {trip.status.toLowerCase()} trip. Return-side details are set separately at check-out.</p>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Customer Name"><input value={customerName} onChange={(e) => setCustomerName(e.target.value)} className={rowInput} required /></Field>
+          <Field label="Customer Mobile"><input value={customerMobile} onChange={(e) => setCustomerMobile(e.target.value)} className={rowInput} required /></Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Pickup Location"><input value={pickupLocation} onChange={(e) => setPickupLocation(e.target.value)} className={rowInput} /></Field>
+          <Field label="Drop Location"><input value={dropLocation} onChange={(e) => setDropLocation(e.target.value)} className={rowInput} /></Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Pickup Type">
+            <select value={pickupType} onChange={(e) => setPickupType(e.target.value)} className={rowInput}>
+              {['Self Pickup', 'Doorstep', 'Airport Pickup', 'Airport Drop'].map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </Field>
+          <Field label="Start Date & Time"><input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={rowInput} required /></Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Booking Platform (optional)"><input value={bookingPlatform} onChange={(e) => setBookingPlatform(e.target.value)} placeholder="Zoomcar, Revv, Bharat, Direct…" className={rowInput} /></Field>
+          <Field label="External Booking ID"><input value={externalBookingId} onChange={(e) => setExternalBookingId(e.target.value)} className={rowInput} /></Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Odometer Start (km)"><input type="number" min={0} value={odometerStart} onChange={(e) => setOdometerStart(e.target.value)} className={rowInput} /></Field>
+          <Field label="FASTag Balance"><input value={fastag} onChange={(e) => setFastag(e.target.value)} className={rowInput} /></Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Base Fare (₹)"><input type="number" min={0} value={baseFare} onChange={(e) => setBaseFare(e.target.value)} className={rowInput} /></Field>
+          <Field label="Addon Total (₹)"><input type="number" min={0} value={addonTotal} onChange={(e) => setAddonTotal(e.target.value)} className={rowInput} /></Field>
+        </div>
+        <button type="submit" disabled={submitting} className="w-full bg-brand-600 hover:bg-brand-700 disabled:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-lg transition">
+          {submitting ? 'Saving…' : 'Save Changes'}
         </button>
       </form>
     </Modal>

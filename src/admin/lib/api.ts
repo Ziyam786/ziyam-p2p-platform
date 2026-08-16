@@ -136,6 +136,7 @@ export interface AgentServiceRequest {
   serviceLocation: string;
   status: 'REQUESTED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
   notes?: string | null;
+  assignedAgentId?: string | null;
   car: { make: string; model: string; registrationNo: string; city: string; images: string[] };
   requestedBy: { fullName: string; phoneNumber: string };
   booking?: { id: string; startTime: string; endTime: string } | null;
@@ -145,6 +146,8 @@ export const agentApi = {
   queue: () => get<{ success: true; count: number; data: AgentServiceRequest[] }>('/agent/service-requests'),
   updateStatus: (id: string, status: 'CONFIRMED' | 'COMPLETED' | 'CANCELLED') =>
     patch<{ success: true; data: AgentServiceRequest }>(`/agent/service-requests/${id}`, { status }),
+  update: (id: string, data: Partial<{ priceEstimate: number; scheduledDate: string; serviceLocation: string; notes: string; assignedAgentId: string | null }>) =>
+    patch<{ success: true; data: AgentServiceRequest }>(`/admin/service-requests/${id}`, data),
 };
 
 export interface OpsTripCheckInPayload {
@@ -163,6 +166,7 @@ export const opsTripApi = {
     get<{ success: true; count: number; data: OpsTripRow[] }>(`/ops-trips${toQuery(params)}`),
   get: (id: string) => get<{ success: true; data: OpsTripRow }>(`/ops-trips/${id}`),
   checkIn: (data: OpsTripCheckInPayload) => post<{ success: true; data: OpsTripRow }>('/ops-trips', data),
+  update: (id: string, data: Partial<OpsTripCheckInPayload>) => patch<{ success: true; data: OpsTripRow }>(`/ops-trips/${id}`, data),
   checkOut: (id: string, data: OpsTripCheckOutPayload) => patch<{ success: true; data: OpsTripRow }>(`/ops-trips/${id}/checkout`, data),
   cancel: (id: string) => patch<{ success: true; data: OpsTripRow }>(`/ops-trips/${id}/cancel`),
   generateInvoice: (tripId: string) => post<{ success: true; data: OpsInvoiceRow }>(`/ops-trips/${tripId}/invoice`),
@@ -186,6 +190,8 @@ export const financeApi = {
     get<{ success: true; count: number; data: OutstandingRow[] }>(`/finance/outstandings${toQuery(params)}`),
   addOutstanding: (data: { expectedDate: string; paymentTo: string; amountOwed: number; outstandingType: OutstandingType; sourceType?: string; frequency?: OutstandingFrequency; recurringGroup?: string }) =>
     post<{ success: true; data: OutstandingRow }>('/finance/outstandings', data),
+  updateOutstanding: (id: string, data: Partial<{ expectedDate: string; paymentTo: string; amountOwed: number; outstandingType: OutstandingType; frequency: OutstandingFrequency }>) =>
+    patch<{ success: true; data: OutstandingRow }>(`/finance/outstandings/${id}`, data),
   settleOutstanding: (id: string) => patch<{ success: true; data: OutstandingRow }>(`/finance/outstandings/${id}/settle`),
   deleteOutstanding: (id: string) => del<{ success: true }>(`/finance/outstandings/${id}`),
 

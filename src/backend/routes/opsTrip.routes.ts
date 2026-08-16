@@ -86,6 +86,50 @@ router.post('/ops-trips', async (req: Request, res: Response) => {
   res.status(201).json({ success: true, data: trip });
 });
 
+// Corrects a trip's check-in details (customer/pickup/fare, typically a
+// typo) before checkout closes it out — checkout has its own separate
+// return-side fields (checkOut below) and isn't affected by this route.
+router.patch('/ops-trips/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const existing = await prisma.opsTrip.findUnique({ where: { id } });
+  if (!existing) return res.status(404).json({ error: 'Trip not found' });
+  if (existing.status !== 'RUNNING' && existing.status !== 'SCHEDULED') {
+    return res.status(409).json({ error: 'Only running or scheduled trips can be edited — this one is already closed out' });
+  }
+
+  const {
+    tripCode, bookingPlatform, externalBookingId, driverRef,
+    customerName, customerMobile, pickupLocation, dropLocation, pickupType,
+    startTime, odometerStart, fastag, baseFare, addonTotal, notes,
+  } = req.body;
+
+  const nextBaseFare = baseFare !== undefined ? Number(baseFare) : existing.baseFare;
+  const nextAddonTotal = addonTotal !== undefined ? Number(addonTotal) : existing.addonTotal;
+
+  const trip = await prisma.opsTrip.update({
+    where: { id },
+    data: {
+      ...(tripCode !== undefined && { tripCode }),
+      ...(bookingPlatform !== undefined && { bookingPlatform }),
+      ...(externalBookingId !== undefined && { externalBookingId }),
+      ...(driverRef !== undefined && { driverRef }),
+      ...(customerName !== undefined && { customerName }),
+      ...(customerMobile !== undefined && { customerMobile }),
+      ...(pickupLocation !== undefined && { pickupLocation }),
+      ...(dropLocation !== undefined && { dropLocation }),
+      ...(pickupType !== undefined && { pickupType }),
+      ...(startTime !== undefined && { startTime: new Date(startTime) }),
+      ...(odometerStart !== undefined && { odometerStart: Number(odometerStart) }),
+      ...(fastag !== undefined && { fastag }),
+      ...(baseFare !== undefined && { baseFare: nextBaseFare }),
+      ...(addonTotal !== undefined && { addonTotal: nextAddonTotal }),
+      ...(notes !== undefined && { notes }),
+      ...((baseFare !== undefined || addonTotal !== undefined) && { amount: (nextBaseFare || 0) + (nextAddonTotal || 0) }),
+    },
+  });
+  res.json({ success: true, data: trip });
+});
+
 // Check-out: closes the trip with return-side details.
 router.patch('/ops-trips/:id/checkout', async (req: Request, res: Response) => {
   const { id } = req.params;
