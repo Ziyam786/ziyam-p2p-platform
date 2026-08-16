@@ -14,6 +14,7 @@ const NAV = [
   { href: '/reviews', label: 'Reviews', icon: '⭐' },
   { href: '/payouts', label: 'Payouts', icon: '💸' },
   { href: '/fleet-ledger', label: 'Fleet Ledger', icon: '📒' },
+  { href: '/finance', label: 'Financial ERP', icon: '🏦' },
   { href: '/promo-codes', label: 'Promo Codes', icon: '🎟️' },
   { href: '/content', label: 'Site Content', icon: '📝' },
   { href: '/settings', label: 'Platform Settings', icon: '⚙️' },

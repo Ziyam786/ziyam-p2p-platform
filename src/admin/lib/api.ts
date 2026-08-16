@@ -1,7 +1,8 @@
 import type {
   AdminBooking, AdminCar, AdminPayout, AdminReview, AdminStats, AdminUser, AuditEntry,
-  ChatConversationSummary, ChatMessageRow, FleetExpenseRow, FleetSummary, JournalEntryRow,
-  OpsTripRow, PlatformBookingEntry, PromoCode, SessionUser, SettingRow,
+  BalanceSheetData, ChatConversationSummary, ChatMessageRow, CommandCenterData, FleetExpenseRow,
+  FleetSummary, JournalEntryRow, MonthlyBalanceRow, OpsTripRow, OutstandingFrequency, OutstandingRow,
+  OutstandingType, PlatformBookingEntry, PromoCode, SessionUser, SettingRow,
 } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api';
@@ -139,4 +140,22 @@ export const opsTripApi = {
   checkIn: (data: OpsTripCheckInPayload) => post<{ success: true; data: OpsTripRow }>('/ops-trips', data),
   checkOut: (id: string, data: OpsTripCheckOutPayload) => patch<{ success: true; data: OpsTripRow }>(`/ops-trips/${id}/checkout`, data),
   cancel: (id: string) => patch<{ success: true; data: OpsTripRow }>(`/ops-trips/${id}/cancel`),
+};
+
+export const financeApi = {
+  commandCenter: (params: { from?: string; to?: string } = {}) =>
+    get<{ success: true; data: CommandCenterData }>(`/finance/command-center${toQuery(params)}`),
+  balanceSheet: (params: { asOf?: string } = {}) =>
+    get<{ success: true; data: BalanceSheetData }>(`/finance/balance-sheet${toQuery(params)}`),
+
+  outstandings: (params: { type?: string; status?: string } = {}) =>
+    get<{ success: true; count: number; data: OutstandingRow[] }>(`/finance/outstandings${toQuery(params)}`),
+  addOutstanding: (data: { expectedDate: string; paymentTo: string; amountOwed: number; outstandingType: OutstandingType; sourceType?: string; frequency?: OutstandingFrequency; recurringGroup?: string }) =>
+    post<{ success: true; data: OutstandingRow }>('/finance/outstandings', data),
+  settleOutstanding: (id: string) => patch<{ success: true; data: OutstandingRow }>(`/finance/outstandings/${id}/settle`),
+  deleteOutstanding: (id: string) => del<{ success: true }>(`/finance/outstandings/${id}`),
+
+  monthlyBalances: () => get<{ success: true; count: number; data: MonthlyBalanceRow[] }>('/finance/monthly-balances'),
+  setMonthlyBalance: (month: string, data: { openingBalance: number; closingBalance?: number }) =>
+    put<{ success: true; data: MonthlyBalanceRow }>(`/finance/monthly-balances/${month}`, data),
 };

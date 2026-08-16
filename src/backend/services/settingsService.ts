@@ -123,6 +123,11 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
   fleet_ledger_categories: ['FASTAG', 'FUEL', 'INSTANCES', 'WASHING', 'DAMAGE'],
   fleet_expense_types: ['ROUTINE_MAINTENANCE', 'INSURANCE_PREMIUMS', 'STATE_PERMITS', 'ROAD_TAX', 'DRIVER_SALARIES', 'GENERAL_ADMIN'],
   fleet_payment_modes: ['CASH', 'UPI', 'CORPORATE_CARD', 'FLEET_FUEL_CARD'],
+
+  // Financial ERP Command Center — admin-only. Starting cash injection the
+  // cumulative cash-position/balance-sheet math builds on top of (see
+  // financeErp.routes.ts, ground-truthed formulas from the real ERP).
+  finance_opening_capital: 0,
 };
 
 export async function getSetting<T = unknown>(key: string, fallback?: T): Promise<T> {

@@ -250,3 +250,51 @@ export interface OpsTripRow {
   createdBy?: { fullName: string };
   createdAt: string;
 }
+
+/* ── Financial ERP ────────────────────────────────────────────────────── */
+export interface CommandCenterData {
+  cashPosition: number;
+  moneyIn: number;
+  moneyOut: number;
+  bottomLine: number;
+  retainedEarnings: number;
+  openingCapital: number;
+  tripCount: number;
+  collectionCount: number;
+}
+
+export interface BalanceSheetData {
+  openingCapital: number;
+  retainedEarnings: number;
+  cash: number;
+  receivables: number;
+  payables: number;
+  assets: number;
+  liabilities: number;
+  equity: number;
+}
+
+export type OutstandingType = 'RECEIVABLE' | 'PAYABLE';
+export type OutstandingStatus = 'PENDING' | 'PAID';
+export type OutstandingFrequency = 'ONCE' | 'EVERY_TRIP' | 'EVERY_MONTH' | 'EVERY_DUE' | 'EVERY_PAYMENT' | 'EVERY_COLLECTION';
+
+export interface OutstandingRow {
+  id: string;
+  expectedDate: string;
+  paymentTo: string;
+  amountOwed: number;
+  outstandingType: OutstandingType;
+  sourceType?: string | null;
+  frequency: OutstandingFrequency;
+  recurringGroup?: string | null;
+  status: OutstandingStatus;
+  paidDate?: string | null;
+  createdAt: string;
+}
+
+export interface MonthlyBalanceRow {
+  month: string;
+  openingBalance: number;
+  closingBalance?: number | null;
+  createdAt: string;
+}
