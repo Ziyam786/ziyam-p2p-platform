@@ -157,6 +157,14 @@ export default function HomePage() {
           <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.42 }}>
             <SearchBar />
           </motion.div>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.55 }}
+            className="text-center text-gray-300 text-xs mt-4"
+          >
+            New here? <a href="/get-started" className="text-amber-400 font-semibold hover:underline">Answer 2 quick questions</a> and we'll show you what's available — no account needed.
+          </motion.p>
         </motion.div>
 
         {/* Trust badges */}
