@@ -8,20 +8,22 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Matches the renter/host app's brand blue (tailwind.config.js in
-        // src/frontend) so both apps read as the same product family.
+        // Marc8's Essence Blue (#183eeb, 25% brand usage) — matches the exact
+        // ramp used by src/frontend's "amber" key and src/agent's "brand" key
+        // so all three apps read as the same product family. This replaces a
+        // stale generic Tailwind blue left over from before the Marc8 rebrand.
         brand: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
-          950: '#172554',
+          50: '#eef1fd',
+          100: '#dbe2fb',
+          200: '#b8c5f8',
+          300: '#8fa3f2',
+          400: '#5872ea',
+          500: '#183eeb',
+          600: '#1230c4',
+          700: '#0e259d',
+          800: '#0c1e7d',
+          900: '#0a1863',
+          950: '#060f42',
         },
       },
     },

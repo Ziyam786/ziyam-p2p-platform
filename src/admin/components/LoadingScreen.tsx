@@ -14,7 +14,7 @@ export default function LoadingScreen({ label }: { label?: string }) {
             pathLength={100} strokeDasharray={100} className="animate-[ziyam-ring_1.6s_ease-in-out_infinite]"
           />
           <path
-            d="M 30 32 L 70 32 L 30 68 L 70 68" stroke="#F3E9D8" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round"
+            d="M 30 32 L 80 22 L 20 78 L 70 68" stroke="#F3E9D8" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round"
             pathLength={100} strokeDasharray={100} className="animate-[ziyam-z_1.6s_ease-in-out_infinite]"
           />
         </svg>
