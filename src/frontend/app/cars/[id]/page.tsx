@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
@@ -225,8 +226,10 @@ export default function CarDetailPage() {
           {/* ── LEFT: Images + Details ─────────────────────────── */}
           <div className="lg:col-span-2 space-y-6">
             {/* Hero image */}
-            <div className="rounded-2xl overflow-hidden h-72 md:h-96 bg-gray-200">
-              {activeImg && <img src={activeImg} alt={`${car.make} ${car.model}`} className="w-full h-full object-cover" />}
+            <div className="relative rounded-2xl overflow-hidden h-72 md:h-96 bg-gray-200">
+              {activeImg && (
+                <Image src={activeImg} alt={`${car.make} ${car.model}`} fill priority sizes="(max-width: 1024px) 100vw, 66vw" className="object-cover" />
+              )}
             </div>
 
             {/* Thumbnails */}
@@ -236,11 +239,11 @@ export default function CarDetailPage() {
                   <button
                     key={i}
                     onClick={() => setActiveImg(img)}
-                    className={`w-20 h-14 rounded-xl overflow-hidden border-2 transition ${
+                    className={`relative w-20 h-14 rounded-xl overflow-hidden border-2 transition ${
                       activeImg === img ? 'border-amber-500' : 'border-transparent'
                     }`}
                   >
-                    <img src={img} alt="" className="w-full h-full object-cover" />
+                    <Image src={img} alt="" fill sizes="80px" className="object-cover" />
                   </button>
                 ))}
               </div>
@@ -355,9 +358,9 @@ export default function CarDetailPage() {
                 href={`/hosts/${car.ownerId}`}
                 className="bg-white rounded-2xl p-5 border border-gray-100 flex items-center gap-5 hover:border-amber-300 transition"
               >
-                <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center text-2xl overflow-hidden">
+                <div className="relative w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center text-2xl overflow-hidden">
                   {car.owner.avatarUrl ? (
-                    <img src={car.owner.avatarUrl} alt="" className="w-full h-full object-cover" />
+                    <Image src={car.owner.avatarUrl} alt="" fill sizes="56px" className="object-cover" />
                   ) : (
                     '👤'
                   )}
