@@ -15,6 +15,9 @@ export interface AdminUser {
   isSuspended: boolean;
   avatarUrl?: string | null;
   bio?: string | null;
+  kycDocUrl?: string | null;
+  aadhaarVerifiedName?: string | null;
+  digilockerStatus?: string | null;
   customRoleId?: string | null;
   customRole?: { name: string } | null;
   createdAt: string;

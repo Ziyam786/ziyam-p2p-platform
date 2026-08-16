@@ -64,8 +64,15 @@ router.get('/admin/users', async (req: Request, res: Response) => {
   const users = await prisma.user.findMany({
     where: role ? { role: role as Role } : undefined,
     select: {
-      id: true, fullName: true, email: true, phoneNumber: true, role: true,
+      id: true, fullName: true, email: true, phoneNumber: true, role: true, bio: true,
       isKycVerified: true, isSuspended: true, createdAt: true,
+      // KYC evidence — which of the three verification paths (see kyc.routes.ts)
+      // a user actually went through, so an admin isn't just flipping a blind
+      // boolean. aadhaarVerifiedName/digilockerStatus set = real Sandbox/DigiLocker
+      // government-backed check already happened; kycDocUrl set with neither of
+      // those = the legacy no-review "instant pass" upload path, worth an actual
+      // look before trusting it.
+      kycDocUrl: true, aadhaarVerifiedName: true, digilockerStatus: true,
       customRoleId: true, customRole: { select: { name: true } },
       _count: { select: { cars: true, bookings: true } },
     },
@@ -77,27 +84,39 @@ router.get('/admin/users', async (req: Request, res: Response) => {
 
 router.patch('/admin/users/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { isSuspended, isKycVerified, role, customRoleId } = req.body;
+  const { isSuspended, isKycVerified, role, customRoleId, fullName, email, phoneNumber, bio } = req.body;
 
   if (role !== undefined && !Object.values(Role).includes(role)) {
     return res.status(400).json({ error: 'Invalid role' });
   }
 
-  const user = await prisma.user.update({
-    where: { id },
-    data: {
-      ...(isSuspended !== undefined && { isSuspended: Boolean(isSuspended) }),
-      ...(isKycVerified !== undefined && { isKycVerified: Boolean(isKycVerified) }),
-      ...(role !== undefined && { role }),
-      ...(customRoleId !== undefined && { customRoleId: customRoleId || null }),
-    },
-    select: {
-      id: true, fullName: true, email: true, role: true, isKycVerified: true, isSuspended: true,
-      customRoleId: true, customRole: { select: { name: true } },
-    },
-  });
-  await recordAudit(req.user!.userId, 'UPDATE_USER', 'User', id, req.body);
-  res.json({ success: true, data: user });
+  try {
+    const user = await prisma.user.update({
+      where: { id },
+      data: {
+        ...(isSuspended !== undefined && { isSuspended: Boolean(isSuspended) }),
+        ...(isKycVerified !== undefined && { isKycVerified: Boolean(isKycVerified) }),
+        ...(role !== undefined && { role }),
+        ...(customRoleId !== undefined && { customRoleId: customRoleId || null }),
+        ...(fullName !== undefined && { fullName }),
+        ...(email !== undefined && { email }),
+        ...(phoneNumber !== undefined && { phoneNumber }),
+        ...(bio !== undefined && { bio }),
+      },
+      select: {
+        id: true, fullName: true, email: true, phoneNumber: true, bio: true, role: true, isKycVerified: true, isSuspended: true,
+        kycDocUrl: true, aadhaarVerifiedName: true, digilockerStatus: true,
+        customRoleId: true, customRole: { select: { name: true } },
+      },
+    });
+    await recordAudit(req.user!.userId, 'UPDATE_USER', 'User', id, req.body);
+    res.json({ success: true, data: user });
+  } catch (err: any) {
+    if (err.code === 'P2002') {
+      return res.status(409).json({ error: `That ${err.meta?.target?.[0] ?? 'value'} is already in use by another account.` });
+    }
+    throw err;
+  }
 });
 
 /* ── Custom Roles ("Who Can Do What" RBAC) ───────────────────────────── */

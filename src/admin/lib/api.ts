@@ -43,7 +43,7 @@ export const adminApi = {
   stats: () => get<{ success: true; data: AdminStats }>('/admin/stats'),
 
   users: (role?: string) => get<{ success: true; data: AdminUser[] }>(`/admin/users${role ? `?role=${role}` : ''}`),
-  updateUser: (id: string, data: Partial<Pick<AdminUser, 'isSuspended' | 'isKycVerified' | 'role'>> & { customRoleId?: string | null }) =>
+  updateUser: (id: string, data: Partial<Pick<AdminUser, 'isSuspended' | 'isKycVerified' | 'role' | 'fullName' | 'email' | 'phoneNumber' | 'bio'>> & { customRoleId?: string | null }) =>
     patch<{ success: true; data: AdminUser }>(`/admin/users/${id}`, data),
 
   customRoles: () => get<{ success: true; count: number; data: CustomRoleRow[] }>('/admin/custom-roles'),
