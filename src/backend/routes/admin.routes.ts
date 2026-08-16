@@ -165,9 +165,21 @@ router.get('/admin/cars', async (_req: Request, res: Response) => {
   res.json({ success: true, count: cars.length, data: cars });
 });
 
+// Admin-scoped car edit — deliberately mirrors the full field set the owner-scoped
+// PATCH /cars/:id supports (car.routes.ts), since that route 403s anyone whose
+// userId isn't car.ownerId and admins legitimately need to correct any host's
+// listing (typo fixes, mis-set category/pricing, etc). Excludes document URLs,
+// onboarding step, and booking-window policy fields — those belong to the host's
+// own verification/business-rule flows, not general admin correction.
 router.patch('/admin/cars/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { isAvailable, featured, dailyRate, city, category } = req.body;
+  const {
+    isAvailable, featured, dailyRate, city, category,
+    make, model, year, fuelType, transmission, seats,
+    securityDeposit, kmIncludedPerDay, extraKmCharge,
+    description, features, address,
+    instantBook, offersDelivery, deliveryFee, offersPickup, pickupFee,
+  } = req.body;
 
   const car = await prisma.car.update({
     where: { id },
@@ -177,6 +189,23 @@ router.patch('/admin/cars/:id', async (req: Request, res: Response) => {
       ...(dailyRate !== undefined && { dailyRate: Number(dailyRate) }),
       ...(city !== undefined && { city }),
       ...(category !== undefined && { category }),
+      ...(make !== undefined && { make }),
+      ...(model !== undefined && { model }),
+      ...(year !== undefined && { year: Number(year) }),
+      ...(fuelType !== undefined && { fuelType }),
+      ...(transmission !== undefined && { transmission }),
+      ...(seats !== undefined && { seats: Number(seats) }),
+      ...(securityDeposit !== undefined && { securityDeposit: Number(securityDeposit) }),
+      ...(kmIncludedPerDay !== undefined && { kmIncludedPerDay: Number(kmIncludedPerDay) }),
+      ...(extraKmCharge !== undefined && { extraKmCharge: Number(extraKmCharge) }),
+      ...(description !== undefined && { description }),
+      ...(features !== undefined && { features }),
+      ...(address !== undefined && { address }),
+      ...(instantBook !== undefined && { instantBook: Boolean(instantBook) }),
+      ...(offersDelivery !== undefined && { offersDelivery: Boolean(offersDelivery) }),
+      ...(deliveryFee !== undefined && { deliveryFee: Number(deliveryFee) }),
+      ...(offersPickup !== undefined && { offersPickup: Boolean(offersPickup) }),
+      ...(pickupFee !== undefined && { pickupFee: Number(pickupFee) }),
     },
   });
   await recordAudit(req.user!.userId, 'UPDATE_CAR', 'Car', id, req.body);

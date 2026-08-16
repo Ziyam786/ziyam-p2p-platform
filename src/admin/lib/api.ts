@@ -54,8 +54,12 @@ export const adminApi = {
   deleteCustomRole: (id: string) => del<{ success: true }>(`/admin/custom-roles/${id}`),
 
   cars: () => get<{ success: true; data: AdminCar[] }>('/admin/cars'),
-  updateCar: (id: string, data: Partial<Pick<AdminCar, 'isAvailable' | 'featured' | 'dailyRate' | 'city' | 'category'>>) =>
-    patch<{ success: true; data: AdminCar }>(`/admin/cars/${id}`, data),
+  updateCar: (id: string, data: Partial<Pick<AdminCar,
+    'isAvailable' | 'featured' | 'dailyRate' | 'city' | 'category' | 'make' | 'model' | 'year' |
+    'fuelType' | 'transmission' | 'seats' | 'securityDeposit' | 'kmIncludedPerDay' | 'extraKmCharge' |
+    'description' | 'features' | 'address' | 'instantBook' | 'offersDelivery' | 'deliveryFee' |
+    'offersPickup' | 'pickupFee'
+  >>) => patch<{ success: true; data: AdminCar }>(`/admin/cars/${id}`, data),
   approveFleetGoLive: (carId: string) => post<{ success: true; data: AdminCar; message: string }>(`/admin/cars/${carId}/fleet-onboarding/go-live`),
 
   bookings: (status?: string) => get<{ success: true; data: AdminBooking[] }>(`/admin/bookings${status ? `?status=${status}` : ''}`),
