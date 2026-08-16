@@ -287,6 +287,59 @@ router.post('/booking/:id/wash-service', requireAuth, async (req: Request, res: 
   }
 });
 
+// Guest<->host messaging, scoped to this booking. Either party can read/send;
+// no general DM system, just pickup coordination and pre-trip questions.
+router.get('/bookings/:id/messages', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  const isCustomer = booking.customerId === req.user!.userId;
+  const isHost = booking.car.ownerId === req.user!.userId;
+  if (!isCustomer && !isHost) return res.status(403).json({ error: 'Not part of this booking' });
+
+  const messages = await prisma.message.findMany({
+    where: { bookingId: id },
+    include: { sender: { select: { id: true, fullName: true, avatarUrl: true } } },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  // Mark the other party's messages read now that this party has fetched the thread.
+  await prisma.message.updateMany({
+    where: { bookingId: id, senderId: { not: req.user!.userId }, read: false },
+    data: { read: true },
+  });
+
+  res.json({ success: true, count: messages.length, data: messages });
+});
+
+router.post('/bookings/:id/messages', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { body } = req.body;
+  if (!body || !String(body).trim()) return res.status(400).json({ error: 'Message body is required' });
+
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true, customer: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  const isCustomer = booking.customerId === req.user!.userId;
+  const isHost = booking.car.ownerId === req.user!.userId;
+  if (!isCustomer && !isHost) return res.status(403).json({ error: 'Not part of this booking' });
+
+  const message = await prisma.message.create({
+    data: { bookingId: id, senderId: req.user!.userId, body: String(body).trim() },
+    include: { sender: { select: { id: true, fullName: true, avatarUrl: true } } },
+  });
+
+  const recipientId = isCustomer ? booking.car.ownerId : booking.customerId;
+  await notify(
+    recipientId,
+    'GENERIC',
+    'New message',
+    `${message.sender.fullName}: ${message.body.slice(0, 80)}`,
+    `/account/trips/${id}`
+  );
+
+  res.status(201).json({ success: true, data: message });
+});
+
 // Remote keyless unlock for an active booking
 router.post('/booking/:id/unlock', requireAuth, async (req: Request, res: Response) => {
   const { id } = req.params;

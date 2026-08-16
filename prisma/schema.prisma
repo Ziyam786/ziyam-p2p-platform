@@ -161,6 +161,7 @@ model User {
   loggedOpsInvoices      OpsInvoice[]
   loggedOpsPayments      OpsPayment[]
   loggedOutstandings     Outstanding[]
+  messagesSent           Message[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -334,7 +335,25 @@ model Booking {
   payoutLedger     PayoutLedger?
   review           Review?
   serviceRequests  ServiceRequest[]
+  messages         Message[]
   createdAt        DateTime       @default(now())
+}
+
+// Guest<->host messaging, scoped to a specific booking (not a general DM
+// system) — pickup coordination, pre-trip questions, etc. senderId is
+// whichever of the booking's two parties sent it; the other party is always
+// the recipient, so no separate recipientId column is needed.
+model Message {
+  id        String   @id @default(uuid())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id])
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([bookingId])
 }
 
 model PayoutLedger {

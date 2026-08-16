@@ -8,6 +8,7 @@ import ProtectedRoute from '../../../../components/ProtectedRoute';
 import Rating from '../../../../components/Rating';
 import { useToast } from '../../../../components/Toast';
 import { useAuth } from '../../../../lib/auth-context';
+import TripChat from '../../../../components/TripChat';
 import { bookingsApi, reviewsApi } from '../../../../lib/api';
 import type { Booking } from '../../../../lib/types';
 
@@ -225,6 +226,12 @@ function TripDetailInner() {
             )}
           </div>
         </div>
+
+        {['CONFIRMED', 'ACTIVE', 'COMPLETED'].includes(trip.status) && (
+          <div className="mb-6">
+            <TripChat bookingId={trip.id} otherPartyName={isHost ? trip.customer?.fullName : trip.car?.owner?.fullName} />
+          </div>
+        )}
 
         {trip.status === 'COMPLETED' && (
           <div className="bg-white rounded-2xl border border-gray-100 p-6">

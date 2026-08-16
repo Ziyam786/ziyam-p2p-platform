@@ -139,7 +139,19 @@ export const bookingsApi = {
   myTrips: () => get<{ success: true; count: number; data: Booking[] }>('/users/me/bookings'),
   requestWash: (id: string, data?: { serviceLocation?: string; notes?: string }) =>
     post<{ success: true; message: string }>(`/booking/${id}/wash-service`, data),
+  messages: (id: string) => get<{ success: true; count: number; data: TripMessage[] }>(`/bookings/${id}/messages`),
+  sendMessage: (id: string, body: string) => post<{ success: true; data: TripMessage }>(`/bookings/${id}/messages`, { body }),
 };
+
+export interface TripMessage {
+  id: string;
+  bookingId: string;
+  senderId: string;
+  sender: { id: string; fullName: string; avatarUrl?: string | null };
+  body: string;
+  read: boolean;
+  createdAt: string;
+}
 
 /* ── Users ────────────────────────────────────────────────────────── */
 export const usersApi = {
