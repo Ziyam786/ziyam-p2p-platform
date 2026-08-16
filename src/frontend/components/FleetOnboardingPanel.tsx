@@ -15,10 +15,18 @@ const ESIGN_LABELS: Record<string, string> = {
   sign_complete: 'Fully signed',
 };
 
+// Mirrors Annexure II of the Fleet Partner Agreement (fleetPartnerAgreementPdf.ts)
+// so the audit a host self-certifies here is the same standard the signed
+// agreement actually holds them to — not a separate, looser checklist.
 const ELIGIBILITY_CHECKLIST = [
   'Under 6 years old from date of manufacture, with under 50,000 km on the odometer',
-  'Roadworthy, mechanically sound, and hygiene-compliant',
   'Valid RC, active comprehensive insurance, and valid PUC certificate on file',
+  'Parking and service brakes in good working order (≥25% brake life remaining)',
+  'Engine, cooling, and electrical systems fault-free — no active warning lights or open recalls',
+  'Windshield, windows, wipers, headlights, tail lights, and mirrors intact and functional',
+  'Tyres have ≥50% tread depth, are under 4 years old, and free of cuts or bulges',
+  'Seatbelts and airbags functional, with no structural damage to the body or floor pan',
+  'Vehicle is clean, hygienic, and odour-free',
 ];
 
 export default function FleetOnboardingPanel({ car }: { car: Car }) {

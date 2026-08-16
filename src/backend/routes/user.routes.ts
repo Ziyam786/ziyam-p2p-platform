@@ -3,8 +3,8 @@ import { PrismaClient, BookingStatus } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
 import { sandboxService } from '../services/sandboxService';
 import { esignApi, isSetuConfigured } from '../services/setuService';
-import { renderLeaseAgreementPdf } from '../services/leaseAgreementPdf';
 import { renderHostOnboardingAgreementPdf } from '../services/hostOnboardingAgreementPdf';
+import { startLeaseAgreementEsign } from '../services/leaseAgreementEsign';
 import { config } from '../config';
 
 const router = Router();
@@ -203,51 +203,24 @@ router.get('/bookings/:id', requireAuth, async (req: Request, res: Response) => 
 
 // Real Aadhaar e-signing of the generated lease agreement, via Setu eSign —
 // renders the same content as /bookings/:id/agreement into a PDF, uploads it,
-// and creates a two-signer (host + guest) signature request.
+// and creates a two-signer (host + guest) signature request. This is also
+// triggered automatically right after payment confirms (see
+// payuCallback.routes.ts) — this manual route is the fallback for when that
+// best-effort auto-trigger didn't run (e.g. Setu was briefly unreachable).
 router.post('/bookings/:id/esign/start', requireAuth, async (req: Request, res: Response) => {
   const { id } = req.params;
-  const booking = await prisma.booking.findUnique({
-    where: { id },
-    include: { car: { include: { owner: true } }, customer: true },
-  });
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
   if (!booking) return res.status(404).json({ error: 'Booking not found' });
   const isCustomer = booking.customerId === req.user!.userId;
   const isHost = booking.car.ownerId === req.user!.userId;
   if (!isCustomer && !isHost) return res.status(403).json({ error: 'Not part of this booking' });
 
-  if (!isSetuConfigured()) return res.status(503).json({ error: 'eSign is not configured yet' });
-  if (booking.esignRequestId) return res.status(409).json({ error: 'An eSign request already exists for this booking' });
-
   try {
-    const pdf = await renderLeaseAgreementPdf({
-      bookingId: booking.id,
-      createdAt: booking.createdAt,
-      hostName: booking.car.owner.fullName,
-      guestName: booking.customer.fullName,
-      guestPhone: booking.customer.phoneNumber,
-      registrationNo: booking.car.registrationNo,
-      chassisNo: booking.car.chassis,
-      make: booking.car.make,
-      model: booking.car.model,
-      year: booking.car.year,
-      startTime: booking.startTime,
-      endTime: booking.endTime,
-      protectionPlan: booking.protectionPlan,
-      totalAmount: booking.totalAmount,
-      securityDeposit: booking.car.securityDeposit,
-    });
-    const { documentId } = await esignApi.uploadDocument(pdf, `lease-agreement-${booking.id.slice(0, 8)}`);
-    const signature = await esignApi.createSignatureRequest(
-      documentId,
-      [
-        { identifier: booking.car.owner.email, displayName: booking.car.owner.fullName },
-        { identifier: booking.customer.email, displayName: booking.customer.fullName },
-      ],
-      `${config.clientUrl}/bookings/${booking.id}/agreement?esigned=1`
-    );
-    await prisma.booking.update({ where: { id }, data: { esignRequestId: signature.id, esignStatus: 'sign_initiated' } });
-    res.json({ success: true, data: { esignRequestId: signature.id } });
+    const result = await startLeaseAgreementEsign(id);
+    res.json({ success: true, data: result });
   } catch (err: any) {
+    if (err.message === 'eSign is not configured yet') return res.status(503).json({ error: err.message });
+    if (err.message === 'An eSign request already exists for this booking') return res.status(409).json({ error: err.message });
     console.error('[ESIGN] start failed:', err.response?.data ?? err.message);
     res.status(502).json({ error: 'Could not start eSign right now. Please try again shortly.' });
   }
