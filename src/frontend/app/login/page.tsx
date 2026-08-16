@@ -6,7 +6,7 @@ import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import { useAuth } from '../../lib/auth-context';
 import { ApiError } from '../../lib/api';
-import { supabase } from '../../lib/supabase';
+import { isSupabaseConfigured, getSupabaseClient } from '../../lib/supabase';
 
 function LoginInner() {
   const router = useRouter();
@@ -78,6 +78,7 @@ function LoginInner() {
   }
 
   async function handleGoogleLogin() {
+    const supabase = await getSupabaseClient();
     if (!supabase) return;
     setError('');
     const callbackUrl = new URL('/login/callback', window.location.origin);
@@ -198,7 +199,7 @@ function LoginInner() {
             </form>
           )}
 
-          {supabase && (
+          {isSupabaseConfigured() && (
             <>
               <div className="flex items-center gap-3 my-6">
                 <div className="flex-1 h-px bg-gray-200" />

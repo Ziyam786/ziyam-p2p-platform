@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
 import { useAuth } from '../../../lib/auth-context';
-import { supabase } from '../../../lib/supabase';
+import { getSupabaseClient } from '../../../lib/supabase';
 import { ApiError } from '../../../lib/api';
 
 function CallbackInner() {
@@ -18,6 +18,7 @@ function CallbackInner() {
     let active = true;
 
     async function finish() {
+      const supabase = await getSupabaseClient();
       if (!supabase) {
         setError('Google sign-in is not set up on this deployment yet.');
         return;
