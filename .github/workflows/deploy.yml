@@ -22,7 +22,6 @@ jobs:
         run: npm run build
 
       - name: Deploy over SSH
-        if: ${{ secrets.SERVER_HOST != '' }}
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
