@@ -11,6 +11,13 @@ import { kycApi, hostApi } from '../../../lib/api';
 
 const STEPS = ['Create account', 'Verify KYC', 'List your first car', 'Done'];
 
+const HOST_BENEFITS = [
+  { icon: '💰', title: 'Highest payout in the market', desc: 'Keep 70% of every booking — no hidden platform cuts.' },
+  { icon: '🔒', title: 'Payout guaranteed', desc: 'Fleet-managed cars follow our N+1 policy — your payout is never left waiting on a stalled booking.' },
+  { icon: '🪪', title: 'Every guest is verified', desc: 'DigiLocker or Aadhaar KYC is mandatory before anyone can book — no exceptions.' },
+  { icon: '🎛️', title: 'You stay in control', desc: 'Set your own price, availability, and delivery terms. Pause anytime.' },
+];
+
 export default function HostOnboardingPage() {
   const { user, loading, refresh } = useAuth();
   const router = useRouter();
@@ -89,14 +96,37 @@ export default function HostOnboardingPage() {
         {loading || checkingCars ? (
           <p className="text-gray-400 text-sm text-center">Loading…</p>
         ) : currentStep === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
-            <span className="text-4xl block mb-3">🔑</span>
-            <p className="font-bold text-gray-900 mb-2">Create a host account to get started</p>
-            <p className="text-gray-500 text-sm mb-6">Choose "List my car" or "Fleet operator" when signing up.</p>
-            <a href="/signup" className="btn-gradient text-white font-bold px-6 py-3 rounded-xl transition text-sm">
-              Create Host Account
+          <>
+            <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center mb-8">
+              <span className="text-4xl block mb-3">🔑</span>
+              <p className="font-bold text-gray-900 mb-2">Create a host account to get started</p>
+              <p className="text-gray-500 text-sm mb-6">Choose "List my car" or "Fleet operator" when signing up.</p>
+              <a href="/signup" className="btn-gradient text-white font-bold px-6 py-3 rounded-xl transition text-sm">
+                Create Host Account
+              </a>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+              {HOST_BENEFITS.map((b) => (
+                <div key={b.title} className="bg-white rounded-2xl border border-gray-100 p-5">
+                  <span className="text-2xl block mb-2">{b.icon}</span>
+                  <p className="font-bold text-gray-900 text-sm mb-1">{b.title}</p>
+                  <p className="text-gray-500 text-xs leading-relaxed">{b.desc}</p>
+                </div>
+              ))}
+            </div>
+
+            <a
+              href="/host/earnings-calculator"
+              className="flex items-center justify-between bg-marc8cream border border-amber-200 rounded-2xl p-5 hover:border-amber-400 transition"
+            >
+              <div>
+                <p className="font-bold text-gray-900 text-sm mb-1">Not sure what you'd earn?</p>
+                <p className="text-gray-500 text-xs">Try the earnings calculator — see a real estimate for your car before you list it.</p>
+              </div>
+              <span className="text-amber-500 font-semibold text-sm whitespace-nowrap ml-4">Calculate →</span>
             </a>
-          </div>
+          </>
         ) : currentStep === 1 ? (
           <div className="bg-white rounded-2xl border border-gray-100 p-8">
             <p className="font-bold text-gray-900 mb-2">Verify your identity</p>
