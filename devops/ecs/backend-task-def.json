@@ -35,8 +35,6 @@
         { "name": "ANTHROPIC_API_KEY", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/anthropic-api-key" },
         { "name": "PAYU_KEY", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/payu-key" },
         { "name": "PAYU_SALT", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/payu-salt" },
-        { "name": "PAYU_CLIENT_ID", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/payu-client-id" },
-        { "name": "PAYU_CLIENT_SECRET", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/payu-client-secret" },
         { "name": "PAYMENT_WEBHOOK_SECRET", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/payment-webhook-secret" },
         { "name": "KYC_API_KEY", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/kyc-api-key" },
         { "name": "SANDBOX_API_KEY", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/sandbox-api-key" },
@@ -46,8 +44,7 @@
         { "name": "SETU_DIGILOCKER_PRODUCT_INSTANCE_ID", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/setu-digilocker-instance-id" },
         { "name": "SETU_ESIGN_PRODUCT_INSTANCE_ID", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/setu-esign-instance-id" },
         { "name": "TELEMATICS_GATEWAY_URL", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/telematics-gateway-url" },
-        { "name": "TELEMATICS_API_KEY", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/telematics-api-key" },
-        { "name": "REDIS_URL", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/redis-url" }
+        { "name": "TELEMATICS_API_KEY", "valueFrom": "arn:aws:secretsmanager:<AWS_REGION>:<AWS_ACCOUNT_ID>:secret:ziyam/telematics-api-key" }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
