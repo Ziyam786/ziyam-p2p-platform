@@ -94,7 +94,7 @@ export default function CarCard({ car }: CarCardProps) {
 
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           {car.securityDeposit === 0 && (
-            <span className="bg-blue-50 text-blue-600 text-[10px] font-bold px-2 py-0.5 rounded-full">💰 Zero Deposit</span>
+            <span className="bg-orange-50 text-marc8accent text-[10px] font-bold px-2 py-0.5 rounded-full">💰 Zero Deposit</span>
           )}
           {car.offersDelivery && (
             <span className="bg-purple-50 text-purple-600 text-[10px] font-bold px-2 py-0.5 rounded-full">🚚 Delivery Available</span>

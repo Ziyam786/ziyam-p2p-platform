@@ -206,7 +206,7 @@ export default function HomePage() {
       </section>
 
       {/* ── TOP CITIES ───────────────────────────────────────────── */}
-      <section className="py-16 bg-gray-50">
+      <section className="py-16 bg-marc8cream">
         <div className="max-w-6xl mx-auto px-4">
           <ScrollReveal>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Where We Operate</h2>
