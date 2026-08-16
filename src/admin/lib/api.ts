@@ -100,3 +100,22 @@ export const fleetApi = {
     post<{ success: true; data: FleetExpenseRow }>('/fleet/expenses', data),
   deleteExpense: (id: string) => del<{ success: true }>(`/fleet/expenses/${id}`),
 };
+
+export interface AgentServiceRequest {
+  id: string;
+  serviceType: string;
+  priceEstimate: number;
+  scheduledDate: string;
+  serviceLocation: string;
+  status: 'REQUESTED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
+  notes?: string | null;
+  car: { make: string; model: string; registrationNo: string; city: string; images: string[] };
+  requestedBy: { fullName: string; phoneNumber: string };
+  booking?: { id: string; startTime: string; endTime: string } | null;
+}
+
+export const agentApi = {
+  queue: () => get<{ success: true; count: number; data: AgentServiceRequest[] }>('/agent/service-requests'),
+  updateStatus: (id: string, status: 'CONFIRMED' | 'COMPLETED' | 'CANCELLED') =>
+    patch<{ success: true; data: AgentServiceRequest }>(`/agent/service-requests/${id}`, { status }),
+};

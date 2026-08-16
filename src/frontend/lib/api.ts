@@ -137,6 +137,8 @@ export const bookingsApi = {
   cancel: (id: string) => post<{ success: true; data: Booking }>(`/bookings/${id}/cancel`),
   get: (id: string) => get<{ success: true; data: Booking }>(`/bookings/${id}`),
   myTrips: () => get<{ success: true; count: number; data: Booking[] }>('/users/me/bookings'),
+  requestWash: (id: string, data?: { serviceLocation?: string; notes?: string }) =>
+    post<{ success: true; message: string }>(`/booking/${id}/wash-service`, data),
 };
 
 /* ── Users ────────────────────────────────────────────────────────── */

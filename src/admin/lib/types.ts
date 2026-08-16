@@ -1,4 +1,4 @@
-export type Role = 'CUSTOMER' | 'SELF_HOST' | 'FLEET_OPERATOR' | 'ADMIN';
+export type Role = 'CUSTOMER' | 'SELF_HOST' | 'FLEET_OPERATOR' | 'AGENT' | 'ADMIN';
 export type BookingStatus = 'PENDING' | 'PENDING_PAYMENT' | 'CONFIRMED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 export type PayoutStatus = 'HELD_IN_ESCROW' | 'QUEUED_FOR_N1' | 'SETTLED' | 'FAILED';
 

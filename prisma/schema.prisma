@@ -17,6 +17,7 @@ enum Role {
   CUSTOMER
   SELF_HOST
   FLEET_OPERATOR
+  AGENT
   ADMIN
 }
 
@@ -136,6 +137,7 @@ model User {
   loggedJournalEntries   JournalEntry[]
   loggedFleetExpenses    FleetExpense[]
   requestedServices      ServiceRequest[]
+  assignedServiceRequests ServiceRequest[] @relation("AgentServiceRequests")
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -279,6 +281,7 @@ model Booking {
   paymentIntentId  String?
   payoutLedger     PayoutLedger?
   review           Review?
+  serviceRequests  ServiceRequest[]
   createdAt        DateTime       @default(now())
 }
 
@@ -413,7 +416,7 @@ model ServiceRequest {
   car             Car                 @relation(fields: [carId], references: [id])
   requestedById   String
   requestedBy     User                @relation(fields: [requestedById], references: [id])
-  serviceType     String              // "Basic Service" | "Standard Services" | custom
+  serviceType     String              // "Basic Service" | "Standard Services" | "Washing" | custom
   priceEstimate   Float
   scheduledDate   DateTime
   serviceLocation String
@@ -421,10 +424,20 @@ model ServiceRequest {
   notes           String?
   fleetExpenseId  String?             @unique
   fleetExpense    FleetExpense?       @relation(fields: [fleetExpenseId], references: [id])
+
+  // Guest-initiated add-ons (e.g. washing) tied to a specific trip rather
+  // than a host's own maintenance request — auto-assigned to an agent below.
+  bookingId       String?
+  booking         Booking?            @relation(fields: [bookingId], references: [id])
+  assignedAgentId String?
+  agent           User?               @relation("AgentServiceRequests", fields: [assignedAgentId], references: [id])
+
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
   @@index([carId])
+  @@index([bookingId])
+  @@index([assignedAgentId])
 }
 
 // Traceability for admin mutations (suspend, feature, refund, etc).

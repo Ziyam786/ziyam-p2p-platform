@@ -24,6 +24,7 @@ function TripDetailInner() {
   const [comment, setComment] = useState('');
   const [endOtp, setEndOtp] = useState<string | null>(null);
   const [otpInput, setOtpInput] = useState('');
+  const [washRequested, setWashRequested] = useState(false);
 
   const isHost = Boolean(user && trip?.car && trip.car.ownerId === user.id);
 
@@ -69,6 +70,20 @@ function TripDetailInner() {
       load();
     } catch (err: any) {
       show(err.message ?? 'Failed to complete trip', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function requestWash() {
+    if (!trip) return;
+    setBusy(true);
+    try {
+      const res = await bookingsApi.requestWash(trip.id);
+      show(res.message, 'success');
+      setWashRequested(true);
+    } catch (err: any) {
+      show(err.message ?? 'Failed to request wash service', 'error');
     } finally {
       setBusy(false);
     }
@@ -159,6 +174,15 @@ function TripDetailInner() {
                 <a href={`/bookings/${trip.id}/agreement`} className="border border-gray-200 text-gray-700 hover:border-amber-400 text-sm font-bold px-5 py-2.5 rounded-xl transition">
                   📄 View Lease Agreement
                 </a>
+              )}
+              {['ACTIVE', 'COMPLETED'].includes(trip.status) && !isHost && (
+                <button
+                  disabled={busy || washRequested}
+                  onClick={requestWash}
+                  className="border border-gray-200 text-gray-700 hover:border-amber-400 text-sm font-bold px-5 py-2.5 rounded-xl transition disabled:opacity-50"
+                >
+                  🧼 {washRequested ? 'Wash Requested' : `Request Wash (₹349)`}
+                </button>
               )}
             </div>
 

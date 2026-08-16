@@ -21,7 +21,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       const res = await authApi.me();
-      setUser(res.data.role === 'ADMIN' ? res.data : null);
+      setUser(res.data.role === 'ADMIN' || res.data.role === 'AGENT' ? res.data : null);
     } catch (err) {
       if (!(err instanceof ApiError && err.status === 401)) {
         console.error('Failed to load admin session', err);
@@ -38,9 +38,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await authApi.login(email, password);
-    if (res.data.role !== 'ADMIN') {
+    if (res.data.role !== 'ADMIN' && res.data.role !== 'AGENT') {
       await authApi.logout();
-      throw new ApiError('This account does not have admin access.', 403);
+      throw new ApiError('This account does not have admin or agent access.', 403);
     }
     setUser(res.data);
     return res.data;

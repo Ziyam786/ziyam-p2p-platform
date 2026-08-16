@@ -20,8 +20,8 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
-      router.push('/');
+      const user = await login(email, password);
+      router.push(user.role === 'AGENT' ? '/agent' : '/');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Login failed.');
     } finally {
