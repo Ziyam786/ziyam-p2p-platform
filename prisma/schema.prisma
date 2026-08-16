@@ -181,6 +181,9 @@ model User {
   loggedFleetExpenses    FleetExpense[]
   requestedServices      ServiceRequest[]
   assignedServiceRequests ServiceRequest[] @relation("AgentServiceRequests")
+  loggedOpsTrips         OpsTrip[]
+  loggedOpsInvoices      OpsInvoice[]
+  loggedOpsPayments      OpsPayment[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -275,6 +278,7 @@ model Car {
   journalEntries   JournalEntry[]
   fleetExpenses    FleetExpense[]
   serviceRequests  ServiceRequest[]
+  opsTrips         OpsTrip[]
   createdAt        DateTime  @default(now())
 
   @@index([fleetOperatorId])
@@ -503,12 +507,198 @@ model ServiceRequest {
   assignedAgentId String?
   agent           User?               @relation("AgentServiceRequests", fields: [assignedAgentId], references: [id])
 
+  // Fleet Ops Maintenance Hub fields (merged in from the standalone dashboard) —
+  // cost breakdown, technician assignment, and per-job invoice details. The real
+  // production app writes status='completed' on every insert (no scheduling/
+  // in-progress states are actually wired up), so ServiceRequestStatus's
+  // existing REQUESTED/CONFIRMED/COMPLETED/CANCELLED set is left as-is rather
+  // than widened for workflow states nothing currently uses.
+  serviceCategory String?
+  labourCost      Float?
+  partsCost       Float?
+  totalCost       Float?
+  technician      String?
+  mechanicNotes   String?
+  odometer        Float?
+  serviceCode     String?
+  invoiceBillTo   String?
+  invoiceMobile   String?
+  invoiceDate     DateTime?
+  items           ServiceRequestItem[]
+  opsInvoices     OpsInvoice[]
+
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
   @@index([carId])
   @@index([bookingId])
   @@index([assignedAgentId])
+}
+
+model ServiceRequestItem {
+  id        String         @id @default(uuid())
+  serviceId String
+  service   ServiceRequest @relation(fields: [serviceId], references: [id])
+  itemName  String
+  price     Float?
+  note      String?
+  createdAt DateTime       @default(now())
+
+  @@index([serviceId])
+}
+
+enum OpsTripStatus {
+  SCHEDULED
+  RUNNING
+  COMPLETED
+  CANCELLED
+}
+
+// Fleet Ops trip check-in/check-out lifecycle, merged in from the standalone
+// Fleet Ops Admin Dashboard — trips sourced from external platforms (Zoomcar,
+// Revv, Bharat) or manually logged by ops staff for a walk-in/direct customer.
+// Deliberately kept separate from Booking: Booking is a renter's own PayU/KYC
+// self-checkout through this platform's own N+1 PayoutLedger engine; OpsTrip is
+// front-desk-staff-logged with no renter account at all (customerName/Mobile
+// are plain strings, no User FK — that's a real data-model incompatibility
+// with Booking.customerId, not just a workflow-preference one). addons /
+// checkoutAddons are stored as JSON to match the real production system
+// exactly (denormalized on the row, not a relational child table) — real addon
+// type literals in use: Toll packages, Co-Driver, Driver, Night Driver, Driver
+// food and accommodation, Unlimited kms, Fuel Package, Airport Pickup, Airport
+// Drop, Waiting Charges, Car doorstep, Full Car Washing, Interior/Exterior
+// Cleaning only, DAMAGES, other.
+model OpsTrip {
+  id              String        @id @default(uuid())
+  tripCode        String?
+  carId           String
+  car             Car           @relation(fields: [carId], references: [id])
+  bookingPlatform String?       // Zoomcar | Revv | Bharat | Ziyam Direct | etc — see fleet_platforms Setting
+  externalBookingId String?     // the source platform's own booking reference, if any
+  driverRef       String?
+
+  customerName    String
+  customerMobile  String
+  pickupLocation  String?
+  dropLocation    String?
+  pickupType      String?       // e.g. Airport Pickup/Drop, Doorstep, Self
+
+  startTime       DateTime
+  endTime         DateTime?
+
+  odometerStart   Float?
+  odometerEnd     Float?
+  rangeKm         Float?
+  fastag          String?
+  checkoutFastag  String?
+  fuelEst         String?
+  carWashed       Boolean       @default(false)
+  washingCharges  Float?
+  tyreHealth      String?
+  newDamages      String?
+
+  baseFare        Float?
+  addonTotal      Float?
+  amount          Float?        // grand total = baseFare + addonTotal, frozen at check-in/out
+  amountCollected Float?
+  amountPaidGuest Float?
+  addons          Json?
+  checkoutAddons  Json?
+
+  status          OpsTripStatus @default(SCHEDULED)
+  notes           String?
+
+  createdById     String
+  createdBy       User          @relation(fields: [createdById], references: [id])
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  images          OpsTripImage[]
+  invoices        OpsInvoice[]
+
+  @@index([carId])
+  @@index([status])
+}
+
+model OpsTripImage {
+  id        String   @id @default(uuid())
+  tripId    String
+  trip      OpsTrip  @relation(fields: [tripId], references: [id])
+  url       String
+  createdAt DateTime @default(now())
+
+  @@index([tripId])
+}
+
+enum OpsInvoiceType {
+  RENTAL
+  SERVICE
+}
+
+enum OpsInvoiceStatus {
+  DRAFT
+  PENDING
+  SENT
+  PAID
+}
+
+// Two invoice types sharing one model (RENTAL ties to an OpsTrip, SERVICE ties
+// to a ServiceRequest) — matches the real system's "same branding/format, two
+// document types" behavior. serviceChargePct/serviceCharge/netToOwner are
+// frozen onto the row at creation from the admin-editable Setting
+// fleet_facilitation_fee_pct — later config changes don't retroactively alter
+// already-issued invoices, matching real production behavior.
+model OpsInvoice {
+  id                String           @id @default(uuid())
+  invoiceNumber     String           @unique
+  type              OpsInvoiceType
+  tripId            String?
+  trip              OpsTrip?         @relation(fields: [tripId], references: [id])
+  serviceId         String?
+  service           ServiceRequest?  @relation(fields: [serviceId], references: [id])
+
+  amount            Float
+  serviceChargePct  Float
+  serviceCharge     Float
+  netToOwner        Float
+  status            OpsInvoiceStatus @default(SENT)
+  issuedAt          DateTime         @default(now())
+
+  customerName      String?
+  customerMobile    String?
+
+  createdById       String
+  createdBy         User             @relation(fields: [createdById], references: [id])
+  createdAt         DateTime         @default(now())
+
+  payments          OpsPayment[]
+
+  @@index([tripId])
+  @@index([serviceId])
+}
+
+enum OpsPaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model OpsPayment {
+  id           String           @id @default(uuid())
+  invoiceId    String
+  invoice      OpsInvoice       @relation(fields: [invoiceId], references: [id])
+  method       String?          // Cash | UPI | Card | Bank Transfer — see fleet_payment_modes Setting
+  transferDate DateTime?
+  reference    String?
+  notes        String?
+  amount       Float
+  status       OpsPaymentStatus @default(PENDING)
+
+  createdById  String
+  createdBy    User             @relation(fields: [createdById], references: [id])
+  createdAt    DateTime         @default(now())
+
+  @@index([invoiceId])
 }
 
 // Traceability for admin mutations (suspend, feature, refund, etc).

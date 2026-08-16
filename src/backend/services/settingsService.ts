@@ -107,6 +107,13 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     '₹20,000 of a claim and suggesting garages, with 24/7 roadside assistance for breakdowns or abandoned vehicles. ' +
     'Free cancellation up to 24 hours before pickup. Answer briefly and helpfully; if you do not know something ' +
     'platform-specific, suggest contacting support@ziyam.in.',
+
+  // Fleet Ops facilitation fee — admin-only (not in PUBLIC_KEYS). Ground-truthed
+  // from the real production system: one configurable percentage (not the
+  // marketing doc's "18-28% dynamic" range), frozen onto each OpsInvoice at
+  // creation time so later config changes don't retroactively alter
+  // already-issued invoices. Default matches the real system's default.
+  fleet_facilitation_fee_pct: 20,
 };
 
 export async function getSetting<T = unknown>(key: string, fallback?: T): Promise<T> {
