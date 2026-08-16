@@ -1,16 +1,23 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, Prisma } from '@prisma/client';
-import { requireAuth, requireRole } from '../middleware/auth';
+import { requireAuth, requireRole, requirePermission } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
 
-// Fleet-financial data is internal ops tooling: fleet operators see only their
-// own cars' entries, admins see everything.
-router.use('/fleet', requireAuth, requireRole('FLEET_OPERATOR', 'ADMIN'));
+// Fleet-financial data is internal ops tooling: fleet operators see only
+// their own cars' entries (row-level scoping via ownedCarIds below); internal
+// FLEET_ADMIN staff see everything but are further gated per-screen by
+// requirePermission below (earnings/collections/expenses are 3 of the real
+// ERP's 9 "Who Can Do What" permission keys — a FLEET_ADMIN might be granted
+// only some of them); admins see and can do everything.
+router.use('/fleet', requireAuth, requireRole('FLEET_OPERATOR', 'FLEET_ADMIN', 'ADMIN'));
+router.use('/fleet/bookings', requirePermission('earnings'));
+router.use('/fleet/journal-entries', requirePermission('collections'));
+router.use('/fleet/expenses', requirePermission('expenses'));
 
 async function ownedCarIds(req: Request): Promise<string[] | undefined> {
-  if (req.user!.role === 'ADMIN') return undefined; // no restriction
+  if (req.user!.role === 'ADMIN' || req.user!.role === 'FLEET_ADMIN') return undefined; // no restriction — internal staff, not a car owner
   const cars = await prisma.car.findMany({ where: { ownerId: req.user!.userId }, select: { id: true } });
   return cars.map((c) => c.id);
 }

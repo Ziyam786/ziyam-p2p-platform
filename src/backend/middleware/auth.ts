@@ -54,3 +54,36 @@ export function requireRole(...roles: Role[]) {
     next();
   };
 }
+
+// Roles this fine-grained layer actually governs. Everyone else (CUSTOMER,
+// SELF_HOST, FLEET_OPERATOR) has their own row-level access model on these
+// same routes (e.g. "only your own cars' ledger entries") that predates and
+// is unrelated to CustomRole — requirePermission() is a no-op for them so it
+// layers cleanly on top of an existing requireRole() gate without breaking it.
+const CUSTOM_ROLE_GOVERNED: Role[] = ['FLEET_ADMIN', 'OPERATIONS_EXECUTIVE', 'MECHANICAL_EXECUTIVE', 'TECHNICIAN', 'AGENT'];
+
+/**
+ * Granular per-screen check for the "Who Can Do What" RBAC layer
+ * (CustomRole.permissions), orthogonal to the coarse Role enum above. Loaded
+ * fresh per-request — never assumed from the JWT, since permissions can be
+ * edited live from the Team & Access screen and the token only carries
+ * {userId, role}. ADMIN always passes. Internal-staff roles with no
+ * CustomRole assigned are denied (fails closed).
+ */
+export function requirePermission(screen: string) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+    if (req.user.role === 'ADMIN') return next();
+    if (!CUSTOM_ROLE_GOVERNED.includes(req.user.role)) return next();
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { customRole: { select: { permissions: true } } },
+    });
+    const permissions = (user?.customRole?.permissions as Record<string, boolean> | undefined) ?? {};
+    if (permissions[screen] !== true) {
+      return res.status(403).json({ error: `You don't have access to ${screen}. Ask an admin to grant it from Team & Access.` });
+    }
+    next();
+  };
+}

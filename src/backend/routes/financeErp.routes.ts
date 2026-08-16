@@ -1,13 +1,19 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { requireAuth, requireRole } from '../middleware/auth';
+import { requireAuth, requireRole, requirePermission } from '../middleware/auth';
 import { getSetting } from '../services/settingsService';
 
 const router = Router();
 const prisma = new PrismaClient();
 
-// Financial ERP — internal finance/admin tooling only.
+// Financial ERP — internal finance/admin tooling only. Sub-resources are
+// further gated per-screen via requirePermission, matching 5 of the real
+// ERP's 9 "Who Can Do What" keys (monthly-balances has no dedicated key in
+// the source app, so it stays behind the base finance-access gate only).
 router.use('/finance', requireAuth, requireRole('FLEET_ADMIN', 'ADMIN'));
+router.use('/finance/command-center', requirePermission('dashboard'));
+router.use('/finance/balance-sheet', requirePermission('balanceSheet'));
+router.use('/finance/outstandings', requirePermission('outstandings'));
 
 /**
  * Ground-truthed from the real production Financial ERP's tripCredited()

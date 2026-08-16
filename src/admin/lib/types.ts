@@ -15,7 +15,22 @@ export interface AdminUser {
   isSuspended: boolean;
   avatarUrl?: string | null;
   bio?: string | null;
+  customRoleId?: string | null;
+  customRole?: { name: string } | null;
   createdAt: string;
+}
+
+export const PERMISSION_KEYS = ['dashboard', 'earnings', 'collections', 'expenses', 'outstandings', 'balanceSheet', 'plStatement', 'config', 'roles'] as const;
+export type PermissionKey = typeof PERMISSION_KEYS[number];
+
+export interface CustomRoleRow {
+  id: string;
+  name: string;
+  description?: string | null;
+  permissions: Record<PermissionKey, boolean>;
+  _count?: { users: number };
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SessionUser {

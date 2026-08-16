@@ -1,6 +1,6 @@
 import type {
   AdminBooking, AdminCar, AdminPayout, AdminReview, AdminStats, AdminUser, AuditEntry,
-  BalanceSheetData, ChatConversationSummary, ChatMessageRow, CommandCenterData, FleetExpenseRow,
+  BalanceSheetData, ChatConversationSummary, ChatMessageRow, CommandCenterData, CustomRoleRow, FleetExpenseRow,
   FleetSummary, JournalEntryRow, MonthlyBalanceRow, OpsTripRow, OutstandingFrequency, OutstandingRow,
   OutstandingType, PlatformBookingEntry, PromoCode, SessionUser, SettingRow,
 } from './types';
@@ -43,8 +43,15 @@ export const adminApi = {
   stats: () => get<{ success: true; data: AdminStats }>('/admin/stats'),
 
   users: (role?: string) => get<{ success: true; data: AdminUser[] }>(`/admin/users${role ? `?role=${role}` : ''}`),
-  updateUser: (id: string, data: Partial<Pick<AdminUser, 'isSuspended' | 'isKycVerified' | 'role'>>) =>
+  updateUser: (id: string, data: Partial<Pick<AdminUser, 'isSuspended' | 'isKycVerified' | 'role'>> & { customRoleId?: string | null }) =>
     patch<{ success: true; data: AdminUser }>(`/admin/users/${id}`, data),
+
+  customRoles: () => get<{ success: true; count: number; data: CustomRoleRow[] }>('/admin/custom-roles'),
+  createCustomRole: (data: { name: string; description?: string; permissions: Record<string, boolean> }) =>
+    post<{ success: true; data: CustomRoleRow }>('/admin/custom-roles', data),
+  updateCustomRole: (id: string, data: { name?: string; description?: string; permissions?: Record<string, boolean> }) =>
+    patch<{ success: true; data: CustomRoleRow }>(`/admin/custom-roles/${id}`, data),
+  deleteCustomRole: (id: string) => del<{ success: true }>(`/admin/custom-roles/${id}`),
 
   cars: () => get<{ success: true; data: AdminCar[] }>('/admin/cars'),
   updateCar: (id: string, data: Partial<Pick<AdminCar, 'isAvailable' | 'featured' | 'dailyRate' | 'city' | 'category'>>) =>
