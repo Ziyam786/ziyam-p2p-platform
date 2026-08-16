@@ -11,6 +11,11 @@ const nextConfig = {
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**' },
+      // The live deployment currently runs on a plain IP with no domain/SSL
+      // yet, so uploaded image URLs (baked in as absolute URLs at upload
+      // time — see lib/api.ts's API_ORIGIN) are http://, not https://.
+      // Safe to drop once a real domain + HTTPS is set up.
+      { protocol: 'http', hostname: '**' },
     ],
   },
 };

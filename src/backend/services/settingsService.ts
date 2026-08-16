@@ -189,9 +189,11 @@ export async function getAllSettings() {
 }
 
 export async function getPublicSettings() {
+  const rows = await prisma.setting.findMany({ where: { key: { in: PUBLIC_KEYS as unknown as string[] } } });
+  const map = new Map(rows.map((r) => [r.key, r.value]));
   const result: Record<string, unknown> = {};
   for (const key of PUBLIC_KEYS) {
-    result[key] = await getSetting(key);
+    result[key] = map.has(key) ? map.get(key) : DEFAULT_SETTINGS[key];
   }
   return result;
 }

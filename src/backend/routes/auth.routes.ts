@@ -72,11 +72,18 @@ async function generateUniqueReferralCode(fullName: string): Promise<string> {
 }
 
 function cookieOptions() {
-  const isProd = config.nodeEnv === 'production';
+  // Deliberately keyed off whether the server is actually reachable over
+  // HTTPS (via SERVER_URL), not NODE_ENV. A `Secure` cookie is silently
+  // dropped by the browser on a plain-HTTP connection — tying this to
+  // NODE_ENV=production would mean nobody could ever actually stay logged
+  // in on a production deploy that hasn't gotten HTTPS yet (the current
+  // state of the live deployment). This also self-corrects once a real
+  // domain + TLS is in place, with no code change needed then.
+  const isHttps = config.serverUrl.startsWith('https://');
   return {
     httpOnly: true,
-    secure: isProd,
-    sameSite: (isProd ? 'none' : 'lax') as 'none' | 'lax',
+    secure: isHttps,
+    sameSite: (isHttps ? 'none' : 'lax') as 'none' | 'lax',
     maxAge: 30 * 24 * 60 * 60 * 1000,
     path: '/',
   };
