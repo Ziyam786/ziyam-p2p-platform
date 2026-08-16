@@ -10,6 +10,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<PublicUser>;
   requestLoginOtp: (phoneNumber: string) => Promise<{ devCode?: string }>;
   loginWithOtp: (phoneNumber: string, code: string) => Promise<PublicUser>;
+  loginWithSupabase: (accessToken: string) => Promise<PublicUser>;
   signup: (data: { fullName: string; email: string; phoneNumber: string; password: string; role?: string; referralCode?: string }) => Promise<PublicUser>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -56,6 +57,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return res.data;
   }, []);
 
+  const loginWithSupabase = useCallback(async (accessToken: string) => {
+    const res = await authApi.loginWithSupabase(accessToken);
+    setUser(res.data);
+    return res.data;
+  }, []);
+
   const signup = useCallback(async (data: { fullName: string; email: string; phoneNumber: string; password: string; role?: string; referralCode?: string }) => {
     const res = await authApi.signup(data);
     setUser(res.data);
@@ -68,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, requestLoginOtp, loginWithOtp, signup, logout, refresh }}>
+    <AuthContext.Provider value={{ user, loading, login, requestLoginOtp, loginWithOtp, loginWithSupabase, signup, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );

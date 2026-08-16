@@ -89,6 +89,16 @@ export const config = {
     anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? '',
     model: process.env.AI_MODEL ?? 'claude-haiku-4-5-20251001',
   },
+
+  // Supabase is used only for "Continue with Google" — the OAuth dance
+  // happens entirely client-side via @supabase/supabase-js, and this backend
+  // just verifies the resulting access token against Supabase's own /auth/v1/user
+  // endpoint. Everything else (sessions, all other routes) still runs on the
+  // existing JWT-cookie system untouched.
+  supabase: {
+    url: process.env.SUPABASE_URL ?? '',
+    anonKey: process.env.SUPABASE_ANON_KEY ?? '',
+  },
 };
 
 export { requireEnv };

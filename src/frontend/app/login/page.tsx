@@ -6,6 +6,7 @@ import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import { useAuth } from '../../lib/auth-context';
 import { ApiError } from '../../lib/api';
+import { supabase } from '../../lib/supabase';
 
 function LoginInner() {
   const router = useRouter();
@@ -74,6 +75,19 @@ function LoginInner() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleGoogleLogin() {
+    if (!supabase) return;
+    setError('');
+    const callbackUrl = new URL('/login/callback', window.location.origin);
+    const redirect = searchParams.get('redirect');
+    if (redirect) callbackUrl.searchParams.set('redirect', redirect);
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: callbackUrl.toString() },
+    });
+    if (oauthError) setError(oauthError.message);
   }
 
   return (
@@ -182,6 +196,29 @@ function LoginInner() {
                 </button>
               )}
             </form>
+          )}
+
+          {supabase && (
+            <>
+              <div className="flex items-center gap-3 my-6">
+                <div className="flex-1 h-px bg-gray-200" />
+                <span className="text-xs text-gray-400 font-medium">OR</span>
+                <div className="flex-1 h-px bg-gray-200" />
+              </div>
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                className="w-full flex items-center justify-center gap-2.5 border border-gray-200 rounded-xl py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47a5.54 5.54 0 0 1-2.4 3.63v3.02h3.88c2.27-2.09 3.57-5.17 3.57-8.84Z" />
+                  <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.88-3.02c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.26v3.11A12 12 0 0 0 12 24Z" />
+                  <path fill="#FBBC05" d="M5.27 14.27a7.2 7.2 0 0 1 0-4.54V6.62H1.26a12 12 0 0 0 0 10.76l4.01-3.11Z" />
+                  <path fill="#EA4335" d="M12 4.77c1.76 0 3.34.6 4.59 1.79l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 0 0 1.26 6.62l4.01 3.11C6.22 6.88 8.87 4.77 12 4.77Z" />
+                </svg>
+                Continue with Google
+              </button>
+            </>
           )}
 
           <p className="text-center text-sm text-gray-500 mt-6">
