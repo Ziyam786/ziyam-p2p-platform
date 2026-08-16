@@ -431,7 +431,7 @@ router.post('/ops-trips/:id/images', async (req: Request, res: Response) => {
 /* ── Invoices — "Vehicle Rental Invoice" (trip) / "Vehicle Service Invoice"
    (maintenance job), same model+format, matching the real production system. */
 
-router.get('/ops-invoices', requireRole('OPERATIONS_EXECUTIVE', 'FLEET_ADMIN', 'ADMIN'), async (req: Request, res: Response) => {
+router.get('/ops-invoices', requireAuth, requireRole('OPERATIONS_EXECUTIVE', 'FLEET_ADMIN', 'ADMIN'), async (req: Request, res: Response) => {
   const { type, status } = req.query;
   const data = await prisma.opsInvoice.findMany({
     where: {
@@ -449,7 +449,7 @@ router.get('/ops-invoices', requireRole('OPERATIONS_EXECUTIVE', 'FLEET_ADMIN', '
   res.json({ success: true, count: data.length, data });
 });
 
-router.get('/ops-invoices/:id', requireRole('OPERATIONS_EXECUTIVE', 'FLEET_ADMIN', 'ADMIN'), async (req: Request, res: Response) => {
+router.get('/ops-invoices/:id', requireAuth, requireRole('OPERATIONS_EXECUTIVE', 'FLEET_ADMIN', 'ADMIN'), async (req: Request, res: Response) => {
   const invoice = await prisma.opsInvoice.findUnique({
     where: { id: req.params.id },
     include: { trip: { include: { car: true } }, service: { include: { car: true } }, payments: true },
