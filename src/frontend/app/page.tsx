@@ -74,6 +74,7 @@ export default function HomePage() {
   const [categories, setCategories] = useState<CategoryDef[]>(CATEGORIES_FALLBACK);
   const [cities, setCities] = useState<CityDef[]>(CITIES_FALLBACK);
   const [testimonials, setTestimonials] = useState<Testimonial[]>(TESTIMONIALS_FALLBACK);
+  const [pulse, setPulse] = useState<{ availableCount: number; averageDailyRate: number | null; popularCategory: string | null } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -98,6 +99,11 @@ export default function HomePage() {
         if (s.testimonials?.length) setTestimonials(s.testimonials);
       })
       .catch((err) => console.error('Failed to load site settings, using defaults', err));
+
+    carsApi
+      .marketPulse()
+      .then((res) => active && setPulse(res.data))
+      .catch(() => {});
 
     return () => {
       active = false;
@@ -185,6 +191,34 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ── MARKET PULSE ─────────────────────────────────────────── */}
+      {/* Real live aggregates, not placeholder copy — only renders once
+          there's actually something meaningful to show. */}
+      {pulse && pulse.availableCount > 0 && (
+        <section className="py-10 bg-marc8cream border-y border-amber-100">
+          <div className="max-w-5xl mx-auto px-4">
+            <StaggerGroup className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
+              <StaggerItem>
+                <div className="text-3xl font-extrabold text-gray-900">{pulse.availableCount}</div>
+                <div className="text-xs text-gray-500 mt-1 uppercase tracking-wider">Cars bookable right now</div>
+              </StaggerItem>
+              {pulse.averageDailyRate && (
+                <StaggerItem>
+                  <div className="text-3xl font-extrabold text-gray-900">₹{pulse.averageDailyRate.toLocaleString()}</div>
+                  <div className="text-xs text-gray-500 mt-1 uppercase tracking-wider">Average price per day</div>
+                </StaggerItem>
+              )}
+              {pulse.popularCategory && (
+                <StaggerItem>
+                  <div className="text-3xl font-extrabold text-marc8accent">{pulse.popularCategory}</div>
+                  <div className="text-xs text-gray-500 mt-1 uppercase tracking-wider">Most listed category</div>
+                </StaggerItem>
+              )}
+            </StaggerGroup>
+          </div>
+        </section>
+      )}
 
       {/* ── BROWSE BY CATEGORY ───────────────────────────────────── */}
       <section className="py-16 bg-white">
