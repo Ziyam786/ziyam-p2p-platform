@@ -4,19 +4,19 @@
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "256",
   "memory": "512",
-  "executionRoleArn": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/ziyam-ecs-execution-role",
-  "taskRoleArn": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/ziyam-ecs-task-role",
+  "executionRoleArn": "arn:aws:iam::042522372467:role/ziyam-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::042522372467:role/ziyam-ecs-task-role",
   "containerDefinitions": [
     {
       "name": "admin",
-      "image": "<AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/ziyam-admin:latest",
+      "image": "042522372467.dkr.ecr.eu-north-1.amazonaws.com/ziyam-admin:latest",
       "portMappings": [{ "containerPort": 3000, "protocol": "tcp" }],
       "essential": true,
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "/ecs/ziyam-admin",
-          "awslogs-region": "<AWS_REGION>",
+          "awslogs-region": "eu-north-1",
           "awslogs-stream-prefix": "admin",
           "awslogs-create-group": "true"
         }
