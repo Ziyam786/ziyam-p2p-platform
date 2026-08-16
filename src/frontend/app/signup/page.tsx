@@ -114,11 +114,11 @@ function SignupInner() {
               <input
                 type="password"
                 required
-                minLength={6}
+                minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-                placeholder="At least 6 characters"
+                placeholder="At least 8 characters"
               />
             </div>
             <button

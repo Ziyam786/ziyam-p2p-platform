@@ -89,6 +89,11 @@ model User {
   email           String         @unique
   phoneNumber     String         @unique
   passwordHash    String
+  // Account lockout after repeated failed logins — reset to 0/null on any
+  // successful login. See MAX_FAILED_ATTEMPTS / LOCKOUT_DURATION_MS in
+  // auth.routes.ts.
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
   avatarUrl       String?
   bio             String?
   role            Role           @default(CUSTOMER)
@@ -164,6 +169,22 @@ model User {
   messagesSent           Message[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+}
+
+// One-time passcodes for phone-based login (guest + host — same login is
+// role-agnostic). Not tied to a User by foreign key on purpose: a request
+// must succeed even before we've decided whether to reveal that the phone
+// number has an account (see /auth/otp/request).
+model OtpCode {
+  id          String    @id @default(uuid())
+  phoneNumber String
+  code        String
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  attempts    Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@index([phoneNumber])
 }
 
 model Car {
@@ -276,6 +297,12 @@ model Car {
   opsTrips         OpsTrip[]
   createdAt        DateTime  @default(now())
 
+  // city+isAvailable covers the public car search (the highest-traffic read
+  // path in the app — nearly every listing query filters on both); ownerId
+  // covers the host dashboard's "my cars" — Postgres doesn't auto-index FK
+  // columns the way some other databases do.
+  @@index([city, isAvailable])
+  @@index([ownerId])
   @@index([fleetOperatorId])
 }
 
@@ -331,6 +358,13 @@ model Booking {
   hostPayoutAmount Float
   protectionPlan   String         @default("BASIC") // BASIC, STANDARD, PREMIUM
   deliveryRequested Boolean       @default(false)
+  // Flat ₹500 add-on — a second named driver covered on the trip. Name +
+  // license are required together whenever this is set, since an unnamed
+  // co-driver isn't actually covered by the host's insurance or the lease
+  // agreement.
+  coDriverRequested     Boolean   @default(false)
+  coDriverName          String?
+  coDriverLicenseNumber String?
   promoCode        String?
   status           BookingStatus  @default(PENDING)
   // 4-digit code generated when the trip starts; shown only to the host and
@@ -354,6 +388,12 @@ model Booking {
   serviceRequests  ServiceRequest[]
   messages         Message[]
   createdAt        DateTime       @default(now())
+
+  // carId+status covers the overlap check every new booking runs; customerId
+  // covers "my trips" — both previously unindexed despite being the most
+  // heavily filtered fields in the app.
+  @@index([carId, status])
+  @@index([customerId])
 }
 
 // Guest<->host messaging, scoped to a specific booking (not a general DM
@@ -407,6 +447,11 @@ model Review {
   // destroying it, unlike delete. Preferred for disputed/reported reviews so
   // there's still a record if the host/renter contests the moderation later.
   hidden       Boolean  @default(false)
+
+  // Both filtered on constantly for rating aggregation — every car listing
+  // and every host profile queries one of these on nearly every page load.
+  @@index([carId, hidden])
+  @@index([targetHostId, hidden])
 }
 
 // Admin-managed discount codes, applied by renters at checkout.

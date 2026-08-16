@@ -8,6 +8,8 @@ interface AuthContextValue {
   user: PublicUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<PublicUser>;
+  requestLoginOtp: (phoneNumber: string) => Promise<{ devCode?: string }>;
+  loginWithOtp: (phoneNumber: string, code: string) => Promise<PublicUser>;
   signup: (data: { fullName: string; email: string; phoneNumber: string; password: string; role?: string; referralCode?: string }) => Promise<PublicUser>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -43,6 +45,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return res.data;
   }, []);
 
+  const requestLoginOtp = useCallback(async (phoneNumber: string) => {
+    const res = await authApi.requestOtp(phoneNumber);
+    return { devCode: res.devCode };
+  }, []);
+
+  const loginWithOtp = useCallback(async (phoneNumber: string, code: string) => {
+    const res = await authApi.verifyOtp(phoneNumber, code);
+    setUser(res.data);
+    return res.data;
+  }, []);
+
   const signup = useCallback(async (data: { fullName: string; email: string; phoneNumber: string; password: string; role?: string; referralCode?: string }) => {
     const res = await authApi.signup(data);
     setUser(res.data);
@@ -55,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, refresh }}>
+    <AuthContext.Provider value={{ user, loading, login, requestLoginOtp, loginWithOtp, signup, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );

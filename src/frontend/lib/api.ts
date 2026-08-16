@@ -70,6 +70,10 @@ export const authApi = {
     post<{ success: true; data: PublicUser }>('/auth/login', data),
   logout: () => post<{ success: true }>('/auth/logout'),
   me: () => get<{ success: true; data: PublicUser }>('/auth/me'),
+  requestOtp: (phoneNumber: string) =>
+    post<{ success: true; message: string; devCode?: string }>('/auth/otp/request', { phoneNumber }),
+  verifyOtp: (phoneNumber: string, code: string) =>
+    post<{ success: true; data: PublicUser }>('/auth/otp/verify', { phoneNumber, code }),
 };
 
 /* ── Cars ─────────────────────────────────────────────────────────── */
@@ -149,6 +153,7 @@ export const bookingsApi = {
   create: (data: {
     carId: string; startTime: string; endTime: string; totalAmount: number;
     protectionPlan?: ProtectionPlan; deliveryRequested?: boolean; promoCode?: string;
+    coDriverRequested?: boolean; coDriverName?: string; coDriverLicenseNumber?: string;
   }) => post<{ success: true; bookingId: string }>('/booking', data),
   createCheckoutSession: (id: string) => post<{ success: true; data: PayuCheckoutSession }>(`/booking/${id}/checkout-session`),
   start: (id: string) => post<{ success: true; data: Booking }>(`/booking/${id}/start`),

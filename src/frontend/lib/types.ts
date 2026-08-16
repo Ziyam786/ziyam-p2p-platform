@@ -107,6 +107,9 @@ export interface Booking {
   hostPayoutAmount: number;
   protectionPlan: ProtectionPlan;
   deliveryRequested: boolean;
+  coDriverRequested?: boolean;
+  coDriverName?: string | null;
+  coDriverLicenseNumber?: string | null;
   promoCode?: string | null;
   status: BookingStatus;
   paymentIntentId?: string | null;

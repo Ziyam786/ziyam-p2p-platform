@@ -43,11 +43,14 @@ async function creditReferralRewardIfFirstTrip(customerId: string) {
 
 // Create a booking (no payment yet — the checkout page starts a PayU session separately)
 router.post('/booking', requireAuth, async (req: Request, res: Response) => {
-  const { carId, startTime, endTime, totalAmount, protectionPlan, deliveryRequested, promoCode } = req.body;
+  const { carId, startTime, endTime, totalAmount, protectionPlan, deliveryRequested, promoCode, coDriverRequested, coDriverName, coDriverLicenseNumber } = req.body;
   const customerId = req.user!.userId;
 
   if (!carId || !startTime || !endTime || !totalAmount) {
     return res.status(400).json({ error: 'carId, startTime, endTime, and totalAmount are required' });
+  }
+  if (coDriverRequested && (!String(coDriverName ?? '').trim() || !String(coDriverLicenseNumber ?? '').trim())) {
+    return res.status(400).json({ error: 'Co-driver name and license number are required when adding a co-driver' });
   }
 
   const start = new Date(startTime);
@@ -120,6 +123,9 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
         hostPayoutAmount: hostPayout,
         protectionPlan: VALID_PLANS.includes(protectionPlan) ? protectionPlan : 'BASIC',
         deliveryRequested: Boolean(deliveryRequested),
+        coDriverRequested: Boolean(coDriverRequested),
+        coDriverName: coDriverRequested ? String(coDriverName).trim() : null,
+        coDriverLicenseNumber: coDriverRequested ? String(coDriverLicenseNumber).trim() : null,
         promoCode: normalizedPromo,
         status: BookingStatus.PENDING_PAYMENT,
       },

@@ -30,6 +30,10 @@ const PROTECTION_PLANS = [
   { value: 'PREMIUM', label: 'Premium', ratePerDay: 349, desc: 'Lowest deposit hold + 24/7 priority support.' },
 ] as const;
 
+// Flat one-time fee, not per-day — a second named driver covered on the
+// lease agreement and the host's insurance for this trip.
+const CODRIVER_FEE = 500;
+
 const LONG_RENTAL_DISCOUNTS_FALLBACK: LongRentalDiscount[] = [
   { minDays: 3, percent: 0.05 },
   { minDays: 5, percent: 0.10 },
@@ -52,6 +56,9 @@ export default function CarDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [longRentalDiscounts, setLongRentalDiscounts] = useState<LongRentalDiscount[]>(LONG_RENTAL_DISCOUNTS_FALLBACK);
   const [deliveryMode, setDeliveryMode] = useState<'PICKUP' | 'DELIVERY'>('PICKUP');
+  const [coDriverRequested, setCoDriverRequested] = useState(false);
+  const [coDriverName, setCoDriverName] = useState('');
+  const [coDriverLicenseNumber, setCoDriverLicenseNumber] = useState('');
   const [promoInput, setPromoInput] = useState('');
   const [appliedPromo, setAppliedPromo] = useState<{ code: string; discount: number } | null>(null);
   const [promoError, setPromoError] = useState('');
@@ -116,8 +123,9 @@ export default function CarDetailPage() {
 
   const protectionFee = days * (PROTECTION_PLANS.find((p) => p.value === plan)?.ratePerDay ?? 0);
   const deliveryFee = deliveryMode === 'DELIVERY' ? (car?.deliveryFee ?? 0) : 0;
+  const coDriverFee = coDriverRequested ? CODRIVER_FEE : 0;
   const promoDiscount = appliedPromo?.discount ?? 0;
-  const preFeeSubtotal = Math.max(0, baseFare + protectionFee + deliveryFee - promoDiscount);
+  const preFeeSubtotal = Math.max(0, baseFare + protectionFee + deliveryFee + coDriverFee - promoDiscount);
   const platformFee = Math.round(preFeeSubtotal * 0.08);
   const securityDeposit = car?.securityDeposit ?? 0;
   const total = preFeeSubtotal + platformFee + securityDeposit;
@@ -127,7 +135,7 @@ export default function CarDetailPage() {
     setPromoChecking(true);
     setPromoError('');
     try {
-      const res = await promoApi.validate(promoInput.trim(), baseFare + protectionFee + deliveryFee);
+      const res = await promoApi.validate(promoInput.trim(), baseFare + protectionFee + deliveryFee + coDriverFee);
       setAppliedPromo(res.data);
       show(`Promo applied — ₹${res.data.discount.toLocaleString()} off`, 'success');
     } catch (err: any) {
@@ -145,6 +153,10 @@ export default function CarDetailPage() {
       return;
     }
     if (days === 0) return;
+    if (coDriverRequested && (!coDriverName.trim() || !coDriverLicenseNumber.trim())) {
+      show('Enter the co-driver\'s name and license number, or turn off the co-driver add-on', 'error');
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -155,6 +167,9 @@ export default function CarDetailPage() {
         totalAmount: preFeeSubtotal + platformFee,
         protectionPlan: plan,
         deliveryRequested: deliveryMode === 'DELIVERY',
+        coDriverRequested,
+        coDriverName: coDriverRequested ? coDriverName.trim() : undefined,
+        coDriverLicenseNumber: coDriverRequested ? coDriverLicenseNumber.trim() : undefined,
         promoCode: appliedPromo?.code,
       });
       router.push(`/checkout/${res.bookingId}`);
@@ -503,6 +518,41 @@ export default function CarDetailPage() {
                 </div>
               )}
 
+              {/* Co-driver add-on */}
+              {days > 0 && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setCoDriverRequested(!coDriverRequested)}
+                    className={`w-full text-left p-3 rounded-xl border-2 transition ${
+                      coDriverRequested ? 'border-amber-500 bg-amber-50' : 'border-gray-100 hover:border-gray-200'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-sm text-gray-900">👤 Add a co-driver</span>
+                      <span className="text-xs font-bold text-gray-700">+₹{CODRIVER_FEE}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">A second named driver, covered on the lease agreement and insurance for this trip.</p>
+                  </button>
+                  {coDriverRequested && (
+                    <div className="mt-2 space-y-2">
+                      <input
+                        value={coDriverName}
+                        onChange={(e) => setCoDriverName(e.target.value)}
+                        placeholder="Co-driver's full name"
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      />
+                      <input
+                        value={coDriverLicenseNumber}
+                        onChange={(e) => setCoDriverLicenseNumber(e.target.value)}
+                        placeholder="Co-driver's driving license number"
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Promo code */}
               {days > 0 && (
                 <div>
@@ -575,6 +625,12 @@ export default function CarDetailPage() {
                     <div className="flex justify-between text-gray-500">
                       <span>Doorstep delivery</span>
                       <span>₹{deliveryFee.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {coDriverFee > 0 && (
+                    <div className="flex justify-between text-gray-500">
+                      <span>Co-driver add-on</span>
+                      <span>₹{coDriverFee.toLocaleString()}</span>
                     </div>
                   )}
                   {promoDiscount > 0 && (

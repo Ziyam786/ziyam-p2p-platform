@@ -63,6 +63,7 @@ router.post('/admin/bookings', async (req: Request, res: Response) => {
   const {
     customerId, customerName, customerPhone, customerEmail,
     carId, startTime, endTime, totalAmount, protectionPlan, status,
+    coDriverRequested, coDriverName, coDriverLicenseNumber,
   } = req.body;
 
   if (!carId || !startTime || !endTime || !totalAmount) {
@@ -70,6 +71,9 @@ router.post('/admin/bookings', async (req: Request, res: Response) => {
   }
   if (!customerId && (!customerName || !customerPhone || !customerEmail)) {
     return res.status(400).json({ error: 'Provide either customerId, or customerName + customerPhone + customerEmail for a new customer' });
+  }
+  if (coDriverRequested && (!String(coDriverName ?? '').trim() || !String(coDriverLicenseNumber ?? '').trim())) {
+    return res.status(400).json({ error: 'Co-driver name and license number are required when adding a co-driver' });
   }
 
   const start = new Date(startTime);
@@ -121,6 +125,9 @@ router.post('/admin/bookings', async (req: Request, res: Response) => {
         platformFee,
         hostPayoutAmount: hostPayout,
         protectionPlan: protectionPlan || 'BASIC',
+        coDriverRequested: Boolean(coDriverRequested),
+        coDriverName: coDriverRequested ? String(coDriverName).trim() : null,
+        coDriverLicenseNumber: coDriverRequested ? String(coDriverLicenseNumber).trim() : null,
         status: bookingStatus,
       },
       include: { car: { select: { make: true, model: true, city: true } }, customer: { select: { fullName: true, email: true } } },
