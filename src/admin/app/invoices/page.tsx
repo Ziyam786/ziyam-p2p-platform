@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import AdminShell from '../../components/AdminShell';
+import { useToast } from '../../components/Toast';
 import { opsInvoiceApi } from '../../lib/api';
 import type { OpsInvoiceRow, OpsInvoiceStatus, OpsInvoiceType } from '../../lib/types';
 
@@ -16,15 +17,42 @@ const STATUS_STYLES: Record<OpsInvoiceStatus, string> = {
   PAID: 'bg-emerald-500/10 text-emerald-400',
 };
 
+const NEXT_STATUS: Record<OpsInvoiceStatus, OpsInvoiceStatus | null> = {
+  DRAFT: 'PENDING',
+  PENDING: 'SENT',
+  SENT: 'PAID',
+  PAID: null,
+};
+
 export default function InvoicesPage() {
+  const { show } = useToast();
   const [invoices, setInvoices] = useState<OpsInvoiceRow[]>([]);
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  useEffect(() => {
+  function load() {
     setLoading(true);
     opsInvoiceApi.list({ type: typeFilter || undefined }).then((res) => setInvoices(res.data)).finally(() => setLoading(false));
-  }, [typeFilter]);
+  }
+
+  useEffect(load, [typeFilter]);
+
+  async function advanceStatus(inv: OpsInvoiceRow, e: React.MouseEvent) {
+    e.stopPropagation();
+    const next = NEXT_STATUS[inv.status];
+    if (!next) return;
+    setBusyId(inv.id);
+    try {
+      await opsInvoiceApi.updateStatus(inv.id, next);
+      show(`Marked ${next}`, 'success');
+      load();
+    } catch (err: any) {
+      show(err.message ?? 'Failed to update status', 'error');
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
     <AdminShell title="Invoices" subtitle="Vehicle Rental & Vehicle Service invoices, with GST breakdown">
@@ -57,12 +85,14 @@ export default function InvoicesPage() {
                 <th className="py-3 px-4">GST</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4">Issued</th>
+                <th className="py-3 px-4">Actions</th>
               </tr>
             </thead>
             <tbody>
               {invoices.map((inv) => {
                 const car = inv.trip?.car ?? inv.service?.car;
                 const gst = (inv.cgstAmount ?? 0) + (inv.sgstAmount ?? 0) + (inv.igstAmount ?? 0);
+                const next = NEXT_STATUS[inv.status];
                 return (
                   <tr key={inv.id} className="border-b border-slate-800/60 last:border-0 hover:bg-slate-800/30 cursor-pointer" onClick={() => window.location.href = `/invoices/${inv.id}`}>
                     <td className="py-3 px-4 font-mono text-brand-400">{inv.invoiceNumber}</td>
@@ -73,6 +103,17 @@ export default function InvoicesPage() {
                     <td className="py-3 px-4 text-slate-500">{gst > 0 ? inr(gst) : '—'}</td>
                     <td className="py-3 px-4"><span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLES[inv.status]}`}>{inv.status}</span></td>
                     <td className="py-3 px-4 text-slate-500">{new Date(inv.issuedAt).toLocaleDateString()}</td>
+                    <td className="py-3 px-4">
+                      {next && (
+                        <button
+                          disabled={busyId === inv.id}
+                          onClick={(e) => advanceStatus(inv, e)}
+                          className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition"
+                        >
+                          Mark {next}
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 );
               })}

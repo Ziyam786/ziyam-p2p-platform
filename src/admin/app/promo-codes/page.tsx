@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import AdminShell from '../../components/AdminShell';
+import Modal from '../../components/Modal';
 import { useToast } from '../../components/Toast';
 import { adminApi } from '../../lib/api';
 import type { PromoCode } from '../../lib/types';
@@ -78,6 +79,39 @@ export default function PromoCodesPage() {
     }
   }
 
+  const [editing, setEditing] = useState<PromoCode | null>(null);
+  const [editForm, setEditForm] = useState({ discountPercent: '', discountFlat: '', maxUses: '', expiresAt: '' });
+
+  function openEdit(p: PromoCode) {
+    setEditing(p);
+    setEditForm({
+      discountPercent: p.discountPercent ? String(Math.round(p.discountPercent * 100)) : '',
+      discountFlat: p.discountFlat ? String(p.discountFlat) : '',
+      maxUses: p.maxUses ? String(p.maxUses) : '',
+      expiresAt: p.expiresAt ? p.expiresAt.slice(0, 10) : '',
+    });
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    setBusy(true);
+    try {
+      await adminApi.updatePromoCode(editing.code, {
+        discountPercent: editForm.discountPercent ? Number(editForm.discountPercent) / 100 : null,
+        discountFlat: editForm.discountFlat ? Number(editForm.discountFlat) : null,
+        maxUses: editForm.maxUses ? Number(editForm.maxUses) : null,
+        expiresAt: editForm.expiresAt || null,
+      });
+      show('Promo code updated', 'success');
+      setEditing(null);
+      load();
+    } catch (err: any) {
+      show(err.message ?? 'Update failed', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <AdminShell title="Promo Codes" subtitle={`${codes.length} codes · renters apply these at checkout`}>
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-6">
@@ -141,6 +175,9 @@ export default function PromoCodesPage() {
                     </span>
                   </td>
                   <td className="py-3 px-4 flex gap-2">
+                    <button disabled={busy} onClick={() => openEdit(p)} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition">
+                      Edit
+                    </button>
                     <button disabled={busy} onClick={() => toggle(p)} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition">
                       {p.active ? 'Disable' : 'Enable'}
                     </button>
@@ -154,6 +191,36 @@ export default function PromoCodesPage() {
           </table>
         </div>
       )}
+
+      <Modal open={Boolean(editing)} onClose={() => setEditing(null)} title={editing ? `Edit ${editing.code}` : 'Edit promo code'}>
+        <div className="space-y-4">
+          <p className="text-xs text-slate-500">The code itself can't be changed once created — delete and recreate if you need a different code. Usage count ({editing?.usedCount ?? 0} so far) is preserved by editing in place instead.</p>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400 mb-1 block">% Off</span>
+              <input type="number" min={0} max={100} className={`${rowInput} w-full`} value={editForm.discountPercent} onChange={(e) => setEditForm({ ...editForm, discountPercent: e.target.value, discountFlat: '' })} />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400 mb-1 block">or ₹ Flat Off</span>
+              <input type="number" min={0} className={`${rowInput} w-full`} value={editForm.discountFlat} onChange={(e) => setEditForm({ ...editForm, discountFlat: e.target.value, discountPercent: '' })} />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400 mb-1 block">Max Uses</span>
+              <input type="number" min={1} className={`${rowInput} w-full`} value={editForm.maxUses} onChange={(e) => setEditForm({ ...editForm, maxUses: e.target.value })} placeholder="Unlimited" />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400 mb-1 block">Expires</span>
+              <input type="date" className={`${rowInput} w-full`} value={editForm.expiresAt} onChange={(e) => setEditForm({ ...editForm, expiresAt: e.target.value })} />
+            </label>
+          </div>
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+            <button onClick={() => setEditing(null)} className="text-sm font-semibold px-4 py-2 rounded-lg text-slate-400 hover:text-white transition">Cancel</button>
+            <button disabled={busy} onClick={saveEdit} className="text-sm font-semibold px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white transition">
+              {busy ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </AdminShell>
   );
 }

@@ -1,8 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, Role, BookingStatus, PayoutStatus } from '@prisma/client';
+import { v4 as uuidv4 } from 'uuid';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { recordAudit } from '../middleware/auditLog';
 import { PayoutEngine } from '../services/payoutEngine';
+import { hashPassword } from '../utils/password';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -45,6 +47,93 @@ router.get('/admin/bookings', async (req: Request, res: Response) => {
     take: 200,
   });
   res.json({ success: true, count: bookings.length, data: bookings });
+});
+
+// Admin-created booking — for walk-in or phone bookings where the customer
+// isn't self-serving through the app. Mirrors the real customer-facing
+// POST /booking (booking.routes.ts) for availability/blackout checks and
+// the payout split, with two differences: (1) it accepts either an existing
+// customerId or inline name/phone/email to create one on the spot, since a
+// walk-in customer usually has no account yet, and (2) it skips the
+// self-serve KYC gate — the ops staff creating this booking is verifying
+// the customer's ID in person, which is what the reference app's Handover
+// flow (DL/Aadhaar capture) does explicitly; the new customer record is
+// marked isKycVerified for that reason, not left permanently blocked.
+router.post('/admin/bookings', async (req: Request, res: Response) => {
+  const {
+    customerId, customerName, customerPhone, customerEmail,
+    carId, startTime, endTime, totalAmount, protectionPlan, status,
+  } = req.body;
+
+  if (!carId || !startTime || !endTime || !totalAmount) {
+    return res.status(400).json({ error: 'carId, startTime, endTime, and totalAmount are required' });
+  }
+  if (!customerId && (!customerName || !customerPhone || !customerEmail)) {
+    return res.status(400).json({ error: 'Provide either customerId, or customerName + customerPhone + customerEmail for a new customer' });
+  }
+
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  if (end <= start) return res.status(400).json({ error: 'endTime must be after startTime' });
+
+  const bookingStatus: BookingStatus = status && Object.values(BookingStatus).includes(status) ? status : BookingStatus.CONFIRMED;
+
+  try {
+    const car = await prisma.car.findUnique({ where: { id: carId }, include: { owner: true } });
+    if (!car) return res.status(404).json({ error: 'Car not found' });
+    if (!car.isAvailable) return res.status(409).json({ error: 'Car is not available for booking' });
+    if (!car.owner.payoutAccountId) return res.status(422).json({ error: 'Host payout account not configured' });
+
+    const conflictingBooking = await prisma.booking.findFirst({
+      where: { carId, status: { notIn: [BookingStatus.CANCELLED] }, startTime: { lt: end }, endTime: { gt: start } },
+    });
+    if (conflictingBooking) return res.status(409).json({ error: 'This car is already booked for part of the selected dates' });
+
+    const conflictingBlackout = await prisma.blackout.findFirst({ where: { carId, startDate: { lt: end }, endDate: { gt: start } } });
+    if (conflictingBlackout) return res.status(409).json({ error: 'The host has blocked out part of the selected dates' });
+
+    let finalCustomerId = customerId;
+    if (!finalCustomerId) {
+      const existingByContact = await prisma.user.findFirst({ where: { OR: [{ email: customerEmail }, { phoneNumber: customerPhone }] } });
+      if (existingByContact) {
+        return res.status(409).json({ error: 'A customer with that email or phone already exists — search for them instead of creating a new one.' });
+      }
+      const passwordHash = await hashPassword(uuidv4());
+      const newCustomer = await prisma.user.create({
+        data: {
+          id: uuidv4(), fullName: customerName, email: customerEmail, phoneNumber: customerPhone,
+          passwordHash, role: Role.CUSTOMER, isKycVerified: true,
+        },
+      });
+      finalCustomerId = newCustomer.id;
+    }
+
+    const { platformFee, hostPayout } = await PayoutEngine.splitAmount(Number(totalAmount));
+
+    const booking = await prisma.booking.create({
+      data: {
+        id: uuidv4(),
+        carId,
+        customerId: finalCustomerId,
+        startTime: start,
+        endTime: end,
+        totalAmount: Number(totalAmount),
+        platformFee,
+        hostPayoutAmount: hostPayout,
+        protectionPlan: protectionPlan || 'BASIC',
+        status: bookingStatus,
+      },
+      include: { car: { select: { make: true, model: true, city: true } }, customer: { select: { fullName: true, email: true } } },
+    });
+    await recordAudit(req.user!.userId, 'CREATE_BOOKING', 'Booking', booking.id, { carId, customerId: finalCustomerId, totalAmount, status: bookingStatus });
+    res.status(201).json({ success: true, data: booking });
+  } catch (err: any) {
+    if (err.code === 'P2002') {
+      return res.status(409).json({ error: `That ${err.meta?.target?.[0] ?? 'value'} is already in use by another account.` });
+    }
+    console.error('[ADMIN] Create booking failed:', err);
+    res.status(500).json({ error: 'Could not create the booking. Please try again.' });
+  }
 });
 
 router.patch('/admin/bookings/:id', async (req: Request, res: Response) => {

@@ -1,7 +1,7 @@
 import type {
   AdminBooking, AdminCar, AdminPayout, AdminReview, AdminStats, AdminUser, AuditEntry,
-  BalanceSheetData, ChatConversationSummary, ChatMessageRow, CommandCenterData, CustomRoleRow, FleetExpenseRow,
-  FleetSummary, JournalEntryRow, MonthlyBalanceRow, OpsInvoiceRow, OpsTripRow, OutstandingFrequency, OutstandingRow,
+  BalanceSheetData, BookingStatus, ChatConversationSummary, ChatMessageRow, CommandCenterData, CustomRoleRow, FleetExpenseRow,
+  FleetSummary, JournalEntryRow, MonthlyBalanceRow, OpsInvoiceRow, OpsInvoiceStatus, OpsTripRow, OutstandingFrequency, OutstandingRow,
   OutstandingType, PlatformBookingEntry, PromoCode, SessionUser, SettingRow,
 } from './types';
 
@@ -64,6 +64,10 @@ export const adminApi = {
 
   bookings: (status?: string) => get<{ success: true; data: AdminBooking[] }>(`/admin/bookings${status ? `?status=${status}` : ''}`),
   updateBooking: (id: string, status: string) => patch<{ success: true; data: AdminBooking }>(`/admin/bookings/${id}`, { status }),
+  createBooking: (data: {
+    customerId?: string; customerName?: string; customerPhone?: string; customerEmail?: string;
+    carId: string; startTime: string; endTime: string; totalAmount: number; protectionPlan?: string; status?: BookingStatus;
+  }) => post<{ success: true; data: AdminBooking }>('/admin/bookings', data),
 
   reviews: () => get<{ success: true; data: AdminReview[] }>('/admin/reviews'),
   deleteReview: (id: string) => del<{ success: true }>(`/admin/reviews/${id}`),
@@ -83,6 +87,8 @@ export const adminApi = {
   createPromoCode: (data: { code: string; discountPercent?: number; discountFlat?: number; maxUses?: number; expiresAt?: string }) =>
     post<{ success: true; data: PromoCode }>('/admin/promo-codes', data),
   togglePromoCode: (code: string, active: boolean) => patch<{ success: true; data: PromoCode }>(`/admin/promo-codes/${code}`, { active }),
+  updatePromoCode: (code: string, data: Partial<Pick<PromoCode, 'discountPercent' | 'discountFlat' | 'maxUses' | 'expiresAt'>>) =>
+    patch<{ success: true; data: PromoCode }>(`/admin/promo-codes/${code}`, data),
   deletePromoCode: (code: string) => del<{ success: true }>(`/admin/promo-codes/${code}`),
 };
 
@@ -159,6 +165,8 @@ export const opsInvoiceApi = {
   list: (params: { type?: string; status?: string } = {}) =>
     get<{ success: true; count: number; data: OpsInvoiceRow[] }>(`/ops-invoices${toQuery(params)}`),
   get: (id: string) => get<{ success: true; data: OpsInvoiceRow }>(`/ops-invoices/${id}`),
+  updateStatus: (id: string, status: OpsInvoiceStatus) =>
+    patch<{ success: true; data: OpsInvoiceRow }>(`/ops-invoices/${id}/status`, { status }),
 };
 
 export const financeApi = {

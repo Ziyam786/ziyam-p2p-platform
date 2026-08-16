@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, OpsInvoiceStatus } from '@prisma/client';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { computeGst } from '../services/gstService';
 import { getSetting } from '../services/settingsService';
+import { recordAudit } from '../middleware/auditLog';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -209,6 +210,25 @@ router.get('/ops-invoices/:id', async (req: Request, res: Response) => {
     include: { trip: { include: { car: true } }, service: { include: { car: true } }, payments: true },
   });
   if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+  res.json({ success: true, data: invoice });
+});
+
+// Admin-only lifecycle transition (DRAFT -> PENDING -> SENT -> PAID). Amount/GST
+// are intentionally not editable here — they're frozen at issue time from the
+// rate/GST settings in effect that day (see the OpsInvoice model comment); a
+// wrong invoice should be handled by generating a corrected one, not silently
+// mutating the financial figures on an issued document.
+router.patch('/ops-invoices/:id/status', requireAuth, requireRole('ADMIN', 'FLEET_ADMIN'), async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  if (!Object.values(OpsInvoiceStatus).includes(status)) {
+    return res.status(400).json({ error: `status must be one of ${Object.values(OpsInvoiceStatus).join(', ')}` });
+  }
+  const existing = await prisma.opsInvoice.findUnique({ where: { id } });
+  if (!existing) return res.status(404).json({ error: 'Invoice not found' });
+
+  const invoice = await prisma.opsInvoice.update({ where: { id }, data: { status } });
+  await recordAudit(req.user!.userId, 'UPDATE_INVOICE_STATUS', 'OpsInvoice', id, { from: existing.status, to: status });
   res.json({ success: true, data: invoice });
 });
 

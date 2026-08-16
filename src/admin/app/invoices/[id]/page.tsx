@@ -3,24 +3,52 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import ProtectedRoute from '../../../components/ProtectedRoute';
+import { useToast } from '../../../components/Toast';
 import { opsInvoiceApi } from '../../../lib/api';
-import type { OpsInvoiceRow } from '../../../lib/types';
+import type { OpsInvoiceRow, OpsInvoiceStatus } from '../../../lib/types';
 
 function inr(n: number) {
   return `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+const NEXT_STATUS: Record<OpsInvoiceStatus, OpsInvoiceStatus | null> = {
+  DRAFT: 'PENDING',
+  PENDING: 'SENT',
+  SENT: 'PAID',
+  PAID: null,
+};
+
 function InvoiceInner() {
   const params = useParams<{ id: string }>();
+  const { show } = useToast();
   const [invoice, setInvoice] = useState<OpsInvoiceRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     opsInvoiceApi.get(params.id).then((res) => setInvoice(res.data)).finally(() => setLoading(false));
   }, [params.id]);
 
+  async function advanceStatus() {
+    if (!invoice) return;
+    const next = NEXT_STATUS[invoice.status];
+    if (!next) return;
+    setBusy(true);
+    try {
+      const res = await opsInvoiceApi.updateStatus(invoice.id, next);
+      setInvoice(res.data);
+      show(`Marked ${next}`, 'success');
+    } catch (err: any) {
+      show(err.message ?? 'Failed to update status', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading) return <p className="text-center pt-32 text-slate-400">Loading…</p>;
   if (!invoice) return <p className="text-center pt-32 text-slate-400">Invoice not found.</p>;
+
+  const next = NEXT_STATUS[invoice.status];
 
   const car = invoice.trip?.car ?? invoice.service?.car;
   const gstTotal = (invoice.cgstAmount ?? 0) + (invoice.sgstAmount ?? 0) + (invoice.igstAmount ?? 0);
@@ -31,9 +59,16 @@ function InvoiceInner() {
       <div className="max-w-2xl mx-auto px-4 print:px-0">
         <div className="flex justify-between items-center mb-4 print:hidden">
           <a href="/invoices" className="text-xs text-slate-400 hover:text-brand-400">← Back to invoices</a>
-          <button onClick={() => window.print()} className="text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg transition">
-            Print / Save as PDF
-          </button>
+          <div className="flex gap-2">
+            {next && (
+              <button disabled={busy} onClick={advanceStatus} className="text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg transition">
+                {busy ? 'Saving…' : `Mark ${next}`}
+              </button>
+            )}
+            <button onClick={() => window.print()} className="text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg transition">
+              Print / Save as PDF
+            </button>
+          </div>
         </div>
 
         <div className="bg-white text-gray-900 rounded-2xl p-8 sm:p-10 print:rounded-none print:p-4">

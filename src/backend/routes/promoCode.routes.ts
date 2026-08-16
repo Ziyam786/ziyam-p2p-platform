@@ -54,10 +54,16 @@ router.post('/admin/promo-codes', requireAuth, requireRole(Role.ADMIN), async (r
 
 router.patch('/admin/promo-codes/:code', requireAuth, requireRole(Role.ADMIN), async (req: Request, res: Response) => {
   const { code } = req.params;
-  const { active } = req.body;
+  const { active, discountPercent, discountFlat, maxUses, expiresAt } = req.body;
   const promo = await prisma.promoCode.update({
     where: { code: code.toUpperCase() },
-    data: { ...(active !== undefined && { active: Boolean(active) }) },
+    data: {
+      ...(active !== undefined && { active: Boolean(active) }),
+      ...(discountPercent !== undefined && { discountPercent: discountPercent === null ? null : Number(discountPercent) }),
+      ...(discountFlat !== undefined && { discountFlat: discountFlat === null ? null : Number(discountFlat) }),
+      ...(maxUses !== undefined && { maxUses: maxUses === null ? null : Number(maxUses) }),
+      ...(expiresAt !== undefined && { expiresAt: expiresAt === null ? null : new Date(expiresAt) }),
+    },
   });
   await recordAudit(req.user!.userId, 'UPDATE_PROMO_CODE', 'PromoCode', code, req.body);
   res.json({ success: true, data: promo });
