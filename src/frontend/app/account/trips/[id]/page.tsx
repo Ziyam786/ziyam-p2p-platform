@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import Navbar from '../../../../components/Navbar';
 import Footer from '../../../../components/Footer';
@@ -132,7 +133,9 @@ function TripDetailInner() {
         </button>
 
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
-          <img src={trip.car?.images?.[0] ?? '/placeholder-car.jpg'} alt="" className="w-full h-56 object-cover" />
+          <div className="relative w-full h-56">
+            <Image src={trip.car?.images?.[0] ?? '/placeholder-car.jpg'} alt="" fill sizes="(max-width: 768px) 100vw, 700px" className="object-cover" />
+          </div>
           <div className="p-6">
             <div className="flex justify-between items-start flex-wrap gap-3">
               <div>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import Navbar from '../../../../../components/Navbar';
 import Footer from '../../../../../components/Footer';
@@ -71,7 +72,9 @@ function ManageCarInner() {
       </div>
 
       {car.images[0] && (
-        <img src={car.images[0]} alt="" className="w-full h-48 object-cover rounded-2xl bg-gray-100 mb-6" />
+        <div className="relative w-full h-48 rounded-2xl overflow-hidden bg-gray-100 mb-6">
+          <Image src={car.images[0]} alt="" fill sizes="(max-width: 768px) 100vw, 700px" className="object-cover" />
+        </div>
       )}
 
       {/* Lock/Unlock are decorative — real remote commands only fire during an active trip (see booking.routes.ts /unlock). Navigate is real, via Google Maps. */}

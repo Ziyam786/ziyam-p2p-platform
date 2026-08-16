@@ -1,6 +1,7 @@
 'use client';
 
 import React, { Suspense, useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import ProtectedRoute from '../../../components/ProtectedRoute';
 import Tabs from '../../../components/Tabs';
@@ -130,11 +131,9 @@ function DashboardInner() {
             ) : (
               cars.map((car) => (
                 <div key={car.id} className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex flex-wrap items-center gap-5">
-                  <img
-                    src={car.images?.[0] ?? '/placeholder-car.jpg'}
-                    alt=""
-                    className="w-24 h-16 rounded-lg object-cover bg-gray-800"
-                  />
+                  <div className="relative w-24 h-16 rounded-lg overflow-hidden bg-gray-800 shrink-0">
+                    <Image src={car.images?.[0] ?? '/placeholder-car.jpg'} alt="" fill sizes="96px" className="object-cover" />
+                  </div>
                   <div className="flex-1 min-w-[180px]">
                     <p className="font-bold">{car.make} {car.model} <span className="text-gray-500 font-normal text-sm">({car.year})</span></p>
                     <p className="text-xs text-gray-400">

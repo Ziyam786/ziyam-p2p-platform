@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import Navbar from '../../../../components/Navbar';
 import Footer from '../../../../components/Footer';
@@ -29,7 +30,9 @@ function ConfirmationInner() {
         {booking && (
           <div className="bg-white rounded-2xl border border-gray-100 p-6 text-left mb-8">
             <div className="flex items-center gap-4">
-              <img src={booking.car?.images?.[0] ?? '/placeholder-car.jpg'} alt="" className="w-20 h-14 rounded-lg object-cover bg-gray-100" />
+              <div className="relative w-20 h-14 rounded-lg overflow-hidden bg-gray-100 shrink-0">
+                <Image src={booking.car?.images?.[0] ?? '/placeholder-car.jpg'} alt="" fill sizes="80px" className="object-cover" />
+              </div>
               <div>
                 <p className="font-bold text-gray-900">{booking.car?.make} {booking.car?.model}</p>
                 <p className="text-xs text-gray-500">

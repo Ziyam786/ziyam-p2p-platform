@@ -1,6 +1,7 @@
 'use client';
 
 import React, { Suspense, useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import { useParams, useSearchParams } from 'next/navigation';
 import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
@@ -75,7 +76,9 @@ function CheckoutInner() {
 
         <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-5">
           <div className="flex items-center gap-4">
-            <img src={booking.car?.images?.[0] ?? '/placeholder-car.jpg'} alt="" className="w-20 h-14 rounded-lg object-cover bg-gray-100" />
+            <div className="relative w-20 h-14 rounded-lg overflow-hidden bg-gray-100 shrink-0">
+              <Image src={booking.car?.images?.[0] ?? '/placeholder-car.jpg'} alt="" fill sizes="80px" className="object-cover" />
+            </div>
             <div>
               <p className="font-bold text-gray-900">{booking.car?.make} {booking.car?.model}</p>
               <p className="text-xs text-gray-500">{days} day{days > 1 ? 's' : ''} · {booking.protectionPlan} protection</p>

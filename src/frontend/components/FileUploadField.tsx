@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
+import Image from 'next/image';
 import { uploadsApi, ApiError } from '../lib/api';
 
 interface FileUploadFieldProps {
@@ -43,7 +44,9 @@ export default function FileUploadField({ label, value, onChange, accept = 'imag
       <div className="flex items-center gap-3">
         {value ? (
           kind === 'image' && !isPdf ? (
-            <img src={value} alt={label} className="w-16 h-16 rounded-lg object-cover border border-gray-200" />
+            <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200 shrink-0">
+              <Image src={value} alt={label} fill sizes="64px" className="object-cover" />
+            </div>
           ) : (
             <a href={value} target="_blank" rel="noreferrer" className="w-16 h-16 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center text-2xl">
               📄
