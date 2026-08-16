@@ -732,6 +732,19 @@ model OpsInvoice {
   status            OpsInvoiceStatus @default(SENT)
   issuedAt          DateTime         @default(now())
 
+  // GST — computed at issue time from the admin-configurable company_gstin /
+  // default_gst_rate Settings, frozen onto the row like serviceChargePct
+  // (a later rate change shouldn't alter an already-issued invoice). Split
+  // into CGST+SGST when placeOfSupply matches the company's home state
+  // (intra-state), IGST otherwise — Ziyam is Bengaluru-only today so every
+  // real invoice is intra-state, but the split is modeled correctly for
+  // when that changes.
+  placeOfSupply     String?
+  gstRate           Float?
+  cgstAmount        Float?
+  sgstAmount        Float?
+  igstAmount        Float?
+
   customerName      String?
   customerMobile    String?
 

@@ -315,3 +315,32 @@ export interface MonthlyBalanceRow {
   closingBalance?: number | null;
   createdAt: string;
 }
+
+/* ── Invoicing (GST) ──────────────────────────────────────────────────── */
+export type OpsInvoiceType = 'RENTAL' | 'SERVICE';
+export type OpsInvoiceStatus = 'DRAFT' | 'PENDING' | 'SENT' | 'PAID';
+
+export interface OpsInvoiceRow {
+  id: string;
+  invoiceNumber: string;
+  type: OpsInvoiceType;
+  tripId?: string | null;
+  trip?: (OpsTripRow & { car: AdminCar }) | null;
+  serviceId?: string | null;
+  service?: { serviceType: string; car: AdminCar } | null;
+  amount: number;
+  serviceChargePct: number;
+  serviceCharge: number;
+  netToOwner: number;
+  status: OpsInvoiceStatus;
+  issuedAt: string;
+  placeOfSupply?: string | null;
+  gstRate?: number | null;
+  cgstAmount?: number | null;
+  sgstAmount?: number | null;
+  igstAmount?: number | null;
+  customerName?: string | null;
+  customerMobile?: string | null;
+  payments: { id: string; amount: number; status: string }[];
+  createdAt: string;
+}

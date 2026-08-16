@@ -1,9 +1,17 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { computeGst } from '../services/gstService';
+import { getSetting } from '../services/settingsService';
 
 const router = Router();
 const prisma = new PrismaClient();
+
+async function nextInvoiceNumber(): Promise<string> {
+  const year = new Date().getFullYear();
+  const count = await prisma.opsInvoice.count();
+  return `INV-${year}-${String(count + 1).padStart(5, '0')}`;
+}
 
 // Fleet Ops trip lifecycle — internal ops staff only (merged from the
 // standalone Fleet Ops Admin Dashboard). Operations Executives run check-in/
@@ -127,6 +135,44 @@ router.patch('/ops-trips/:id/cancel', async (req: Request, res: Response) => {
   res.json({ success: true, data: updated });
 });
 
+// Generates the "Vehicle Rental Invoice" for a completed trip — GST computed
+// via gstService (CGST+SGST or IGST depending on place of supply), the
+// facilitation-fee split frozen from the current fleet_facilitation_fee_pct
+// Setting so later config changes don't retroactively alter this invoice.
+router.post('/ops-trips/:id/invoice', async (req: Request, res: Response) => {
+  const trip = await prisma.opsTrip.findUnique({ where: { id: req.params.id }, include: { car: true } });
+  if (!trip) return res.status(404).json({ error: 'Trip not found' });
+  if (trip.status !== 'COMPLETED') return res.status(400).json({ error: 'Can only invoice a completed trip' });
+
+  const existing = await prisma.opsInvoice.findFirst({ where: { tripId: trip.id } });
+  if (existing) return res.status(409).json({ error: 'This trip has already been invoiced', data: existing });
+
+  const amount = trip.amount ?? 0;
+  const serviceChargePct = await getSetting<number>('fleet_facilitation_fee_pct', 20);
+  const serviceCharge = Number((amount * (serviceChargePct / 100)).toFixed(2));
+  const netToOwner = Number((amount - serviceCharge).toFixed(2));
+  const gst = await computeGst(amount, trip.car.city);
+
+  try {
+    const invoice = await prisma.opsInvoice.create({
+      data: {
+        invoiceNumber: await nextInvoiceNumber(),
+        type: 'RENTAL',
+        tripId: trip.id,
+        amount, serviceChargePct, serviceCharge, netToOwner,
+        placeOfSupply: gst.placeOfSupply, gstRate: gst.gstRate,
+        cgstAmount: gst.cgstAmount, sgstAmount: gst.sgstAmount, igstAmount: gst.igstAmount,
+        customerName: trip.customerName, customerMobile: trip.customerMobile,
+        createdById: req.user!.userId,
+      },
+    });
+    res.status(201).json({ success: true, data: invoice });
+  } catch (err: any) {
+    if (err.code === 'P2002') return res.status(409).json({ error: 'Invoice number collision — please try again' });
+    throw err;
+  }
+});
+
 router.post('/ops-trips/:id/images', async (req: Request, res: Response) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'url is required' });
@@ -134,6 +180,36 @@ router.post('/ops-trips/:id/images', async (req: Request, res: Response) => {
   if (!trip) return res.status(404).json({ error: 'Trip not found' });
   const image = await prisma.opsTripImage.create({ data: { tripId: req.params.id, url } });
   res.status(201).json({ success: true, data: image });
+});
+
+/* ── Invoices — "Vehicle Rental Invoice" (trip) / "Vehicle Service Invoice"
+   (maintenance job), same model+format, matching the real production system. */
+
+router.get('/ops-invoices', async (req: Request, res: Response) => {
+  const { type, status } = req.query;
+  const data = await prisma.opsInvoice.findMany({
+    where: {
+      ...(type && type !== 'All' && { type: String(type) as any }),
+      ...(status && status !== 'All' && { status: String(status) as any }),
+    },
+    include: {
+      trip: { include: { car: true } },
+      service: { include: { car: true } },
+      payments: true,
+    },
+    orderBy: { issuedAt: 'desc' },
+    take: 200,
+  });
+  res.json({ success: true, count: data.length, data });
+});
+
+router.get('/ops-invoices/:id', async (req: Request, res: Response) => {
+  const invoice = await prisma.opsInvoice.findUnique({
+    where: { id: req.params.id },
+    include: { trip: { include: { car: true } }, service: { include: { car: true } }, payments: true },
+  });
+  if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+  res.json({ success: true, data: invoice });
 });
 
 export default router;

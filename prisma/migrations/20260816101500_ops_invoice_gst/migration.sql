@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "OpsInvoice" ADD COLUMN     "placeOfSupply" TEXT,
+ADD COLUMN     "gstRate" DOUBLE PRECISION,
+ADD COLUMN     "cgstAmount" DOUBLE PRECISION,
+ADD COLUMN     "sgstAmount" DOUBLE PRECISION,
+ADD COLUMN     "igstAmount" DOUBLE PRECISION;

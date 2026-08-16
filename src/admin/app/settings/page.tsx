@@ -37,6 +37,11 @@ export default function SettingsPage() {
   const [holidaysText, setHolidaysText] = useState('');
   const [savingDemand, setSavingDemand] = useState(false);
 
+  const [gstin, setGstin] = useState('');
+  const [homeState, setHomeState] = useState('Karnataka');
+  const [gstRate, setGstRate] = useState(5);
+  const [savingGst, setSavingGst] = useState(false);
+
   useEffect(() => {
     adminApi
       .settings()
@@ -55,9 +60,28 @@ export default function SettingsPage() {
           setDemand(d);
           setHolidaysText(d.publicHolidays.join('\n'));
         }
+        setGstin((byKey.get('company_gstin') as string) ?? '');
+        setHomeState((byKey.get('company_home_state') as string) ?? 'Karnataka');
+        setGstRate(Math.round(((byKey.get('default_gst_rate') as number) ?? 0.05) * 100));
       })
       .finally(() => setLoading(false));
   }, []);
+
+  async function saveGstSettings() {
+    setSavingGst(true);
+    try {
+      await Promise.all([
+        adminApi.updateSetting('company_gstin', gstin),
+        adminApi.updateSetting('company_home_state', homeState),
+        adminApi.updateSetting('default_gst_rate', gstRate / 100),
+      ]);
+      show('GST settings updated', 'success');
+    } catch (err: any) {
+      show(err.message ?? 'Failed to save', 'error');
+    } finally {
+      setSavingGst(false);
+    }
+  }
 
   async function saveCompanySettings() {
     if (!company) return;
@@ -317,6 +341,32 @@ export default function SettingsPage() {
             </button>
           </div>
         )}
+
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+          <h2 className="font-bold text-slate-100 mb-1">GST / Invoicing</h2>
+          <p className="text-xs text-slate-500 mb-5">
+            Powers the tax breakdown on generated invoices. GSTIN is empty until you enter the real registered
+            number — the rate below is a placeholder; confirm your actual applicable rate with a tax advisor before
+            relying on invoices for filing.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">Company GSTIN</label>
+              <input value={gstin} onChange={(e) => setGstin(e.target.value)} placeholder="Not yet entered" className={`${rowInput} w-full`} />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">Home State (for CGST+SGST vs IGST)</label>
+              <input value={homeState} onChange={(e) => setHomeState(e.target.value)} className={`${rowInput} w-full`} />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">Default GST Rate (%)</label>
+              <input type="number" min={0} max={28} value={gstRate} onChange={(e) => setGstRate(Number(e.target.value))} className={`${rowInput} w-full`} />
+            </div>
+          </div>
+          <button onClick={saveGstSettings} disabled={savingGst} className="bg-brand-600 hover:bg-brand-700 disabled:bg-slate-700 text-white text-sm font-bold px-5 py-2.5 rounded-lg transition">
+            {savingGst ? 'Saving…' : 'Save GST Settings'}
+          </button>
+        </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-1">

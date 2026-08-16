@@ -146,6 +146,16 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     ],
   },
 
+  // GST invoicing — admin-only, deliberately left unset/placeholder rather
+  // than guessing at real values. gstin is empty until the real business
+  // GSTIN is entered from Settings; gst_rate defaults to a clearly-flagged
+  // placeholder (car rental/rent-a-cab services in India have several
+  // possible GST treatments depending on registration — confirm the real
+  // rate with a tax advisor before relying on invoices for filing).
+  company_gstin: '',
+  company_home_state: 'Karnataka',
+  default_gst_rate: 0.05, // PLACEHOLDER — confirm actual applicable rate before relying on this for filing
+
   // Financial ERP Command Center — admin-only. Starting cash injection the
   // cumulative cash-position/balance-sheet math builds on top of (see
   // financeErp.routes.ts, ground-truthed formulas from the real ERP).

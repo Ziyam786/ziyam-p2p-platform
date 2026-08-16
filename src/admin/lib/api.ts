@@ -1,7 +1,7 @@
 import type {
   AdminBooking, AdminCar, AdminPayout, AdminReview, AdminStats, AdminUser, AuditEntry,
   BalanceSheetData, ChatConversationSummary, ChatMessageRow, CommandCenterData, CustomRoleRow, FleetExpenseRow,
-  FleetSummary, JournalEntryRow, MonthlyBalanceRow, OpsTripRow, OutstandingFrequency, OutstandingRow,
+  FleetSummary, JournalEntryRow, MonthlyBalanceRow, OpsInvoiceRow, OpsTripRow, OutstandingFrequency, OutstandingRow,
   OutstandingType, PlatformBookingEntry, PromoCode, SessionUser, SettingRow,
 } from './types';
 
@@ -148,6 +148,13 @@ export const opsTripApi = {
   checkIn: (data: OpsTripCheckInPayload) => post<{ success: true; data: OpsTripRow }>('/ops-trips', data),
   checkOut: (id: string, data: OpsTripCheckOutPayload) => patch<{ success: true; data: OpsTripRow }>(`/ops-trips/${id}/checkout`, data),
   cancel: (id: string) => patch<{ success: true; data: OpsTripRow }>(`/ops-trips/${id}/cancel`),
+  generateInvoice: (tripId: string) => post<{ success: true; data: OpsInvoiceRow }>(`/ops-trips/${tripId}/invoice`),
+};
+
+export const opsInvoiceApi = {
+  list: (params: { type?: string; status?: string } = {}) =>
+    get<{ success: true; count: number; data: OpsInvoiceRow[] }>(`/ops-invoices${toQuery(params)}`),
+  get: (id: string) => get<{ success: true; data: OpsInvoiceRow }>(`/ops-invoices/${id}`),
 };
 
 export const financeApi = {

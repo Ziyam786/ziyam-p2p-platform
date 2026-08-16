@@ -97,6 +97,25 @@ export default function OpsTripsPage() {
                     Check Out
                   </button>
                 )}
+                {t.status === 'COMPLETED' && (
+                  <button
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      try {
+                        const res = await opsTripApi.generateInvoice(t.id);
+                        window.location.href = `/invoices/${res.data.id}`;
+                      } catch (err: any) {
+                        show(err.message ?? 'Failed to generate invoice', 'error');
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                    className="text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg transition"
+                  >
+                    Generate Invoice
+                  </button>
+                )}
                 {(t.status === 'RUNNING' || t.status === 'SCHEDULED') && (
                   <button
                     disabled={busy}
