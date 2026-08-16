@@ -5,6 +5,7 @@ import { config } from '../config';
 import { hashPassword, comparePassword } from '../utils/password';
 import { signAuthToken } from '../utils/jwt';
 import { requireAuth } from '../middleware/auth';
+import { requestOtp, verifyOtp } from '../services/otpService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -103,6 +104,55 @@ router.post('/auth/login', async (req: Request, res: Response) => {
   if (!user || !(await comparePassword(password, user.passwordHash))) {
     return res.status(401).json({ error: 'Invalid email or password' });
   }
+  if (user.isSuspended) {
+    return res.status(403).json({ error: 'This account has been suspended. Contact support@ziyam.in.' });
+  }
+
+  const token = signAuthToken({ userId: user.id, role: user.role });
+  res.cookie(config.auth.cookieName, token, cookieOptions());
+
+  const { passwordHash: _omit, ...publicUser } = user;
+  res.json({ success: true, data: publicUser });
+});
+
+// Request a login OTP for an existing account (guest or host — login is
+// role-agnostic, same as password login). Always returns the same generic
+// message regardless of whether the phone number has an account, so this
+// endpoint can't be used to enumerate registered numbers.
+router.post('/auth/otp/request', async (req: Request, res: Response) => {
+  const { phoneNumber } = req.body;
+  if (!phoneNumber) {
+    return res.status(400).json({ error: 'phoneNumber is required' });
+  }
+
+  const genericResponse = { success: true, message: 'If that phone number has an account, a code has been sent.' };
+
+  const user = await prisma.user.findUnique({ where: { phoneNumber }, select: { isSuspended: true } });
+  if (!user || user.isSuspended) {
+    return res.json(genericResponse);
+  }
+
+  try {
+    const { devCode } = await requestOtp(phoneNumber);
+    // devCode is only ever set outside production (see otpService) — no SMS
+    // provider is wired up yet, so this is how OTP login can be tested today.
+    res.json({ ...genericResponse, devCode });
+  } catch (err: any) {
+    res.status(429).json({ error: err.message });
+  }
+});
+
+router.post('/auth/otp/verify', async (req: Request, res: Response) => {
+  const { phoneNumber, code } = req.body;
+  if (!phoneNumber || !code) {
+    return res.status(400).json({ error: 'phoneNumber and code are required' });
+  }
+
+  const ok = await verifyOtp(phoneNumber, String(code));
+  if (!ok) return res.status(401).json({ error: 'Invalid or expired code' });
+
+  const user = await prisma.user.findUnique({ where: { phoneNumber } });
+  if (!user) return res.status(401).json({ error: 'Invalid or expired code' });
   if (user.isSuspended) {
     return res.status(403).json({ error: 'This account has been suspended. Contact support@ziyam.in.' });
   }
