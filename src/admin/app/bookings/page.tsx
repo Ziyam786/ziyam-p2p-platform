@@ -13,7 +13,7 @@ import type { AdminBooking, AdminCar, AdminUser, BookingStatus } from '../../lib
 // (cars/users/etc. are all single list pages), just with a tab bar instead
 // of a dropdown so the granular BharatCars-style buckets are one click away.
 const TABS: { key: string; label: string; statuses: BookingStatus[] | null }[] = [
-  { key: 'upcoming', label: 'Upcoming', statuses: ['PENDING', 'PENDING_PAYMENT', 'PENDING_HOST_REVIEW', 'CONFIRMED'] },
+  { key: 'upcoming', label: 'Upcoming', statuses: ['PENDING', 'PENDING_PAYMENT', 'RESERVED', 'PENDING_HOST_REVIEW', 'CONFIRMED'] },
   { key: 'ongoing', label: 'Ongoing', statuses: ['ACTIVE'] },
   { key: 'completed', label: 'Completed', statuses: ['COMPLETED'] },
   { key: 'rejected', label: 'Rejected', statuses: ['REJECTED'] },
@@ -213,7 +213,7 @@ export default function BookingsPage() {
                         >
                           View
                         </button>
-                        {['PENDING', 'PENDING_PAYMENT', 'PENDING_HOST_REVIEW', 'CONFIRMED', 'ACTIVE'].includes(b.status) && (
+                        {['PENDING', 'PENDING_PAYMENT', 'RESERVED', 'PENDING_HOST_REVIEW', 'CONFIRMED', 'ACTIVE'].includes(b.status) && (
                           <button
                             disabled={busyId === b.id}
                             onClick={() => forceCancel(b)}

@@ -48,7 +48,8 @@ model CustomRole {
 enum BookingStatus {
   PENDING
   PENDING_PAYMENT
-  PENDING_HOST_REVIEW // payment cleared, awaiting host accept/reject (see hostReview.routes.ts)
+  RESERVED // reservation fee paid, balance due within reservationDeadline (see booking.routes.ts)
+  PENDING_HOST_REVIEW // balance paid, awaiting host accept/reject (see hostReview.routes.ts)
   CONFIRMED
   ACTIVE
   COMPLETED
@@ -448,6 +449,12 @@ model Booking {
   hostPayoutAmount      Float
   protectionPlan        String        @default("BASIC") // BASIC, STANDARD, PREMIUM
   deliveryRequested     Boolean       @default(false)
+  // Snapshot of Car.deliveryFee at booking time (mutable on Car, so this is
+  // pinned the same way depositAmount pins Car.securityDeposit). Passed
+  // through 100% to whoever drives the car over — excluded from platform
+  // commission in PayoutEngine.splitAmount, since the platform doesn't do
+  // the driving.
+  deliveryFeeAmount     Float         @default(0)
   // Flat ₹500 add-on — a second named driver covered on the trip. Name +
   // license are required together whenever this is set, since an unnamed
   // co-driver isn't actually covered by the host's insurance or the lease
@@ -468,6 +475,16 @@ model Booking {
   depositAmount     Float                @default(0)
   depositStatus     BookingDepositStatus @default(HELD)
   depositReleasedAt DateTime?
+
+  // Two-stage checkout — guest pays this small fee first (see
+  // POST /booking/:id/checkout-session), reviews everything with the dates
+  // genuinely held, then pays the rest via /balance-checkout-session within
+  // reservationDeadline. 10% of totalAmount, min ₹299 — computed server-side
+  // at booking creation, same tamper-proof pattern as depositAmount.
+  reservationFeeAmount Float     @default(0)
+  reservationPaidAt    DateTime?
+  reservationDeadline  DateTime? // reservationPaidAt + 24h; auto-cancel cron watches this (payoutEngine.ts)
+
   damageClaim       DamageClaim?
   refundRequests    RefundRequest[]
   conditionPhotos   BookingConditionPhoto[]

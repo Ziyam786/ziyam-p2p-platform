@@ -8,6 +8,7 @@ import Footer from '../../../components/Footer';
 import Rating from '../../../components/Rating';
 import CarLocationMap from '../../../components/CarLocationMap';
 import PauseCalendar from '../../../components/PauseCalendar';
+import VerifiedConditionGallery from '../../../components/VerifiedConditionGallery';
 import { useAuth } from '../../../lib/auth-context';
 import { useToast } from '../../../components/Toast';
 import { carsApi, bookingsApi, settingsApi, promoApi, ApiError } from '../../../lib/api';
@@ -378,6 +379,8 @@ export default function CarDetailPage() {
                 </div>
               </a>
             )}
+
+            <VerifiedConditionGallery carId={car.id} />
 
             {/* Reviews */}
             <div className="bg-white rounded-2xl p-5 border border-gray-100">

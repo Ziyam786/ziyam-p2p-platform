@@ -92,7 +92,7 @@ export function HostDeliverySharePanel({ bookingId }: { bookingId: string }) {
 // and pans a live marker — kept as one persistent map instance rather than
 // CarLocationMap's recreate-on-change pattern, since that would flicker on
 // every poll tick here.
-export function GuestDeliveryTracker({ bookingId }: { bookingId: string }) {
+export function GuestDeliveryTracker({ bookingId, hostName, hostAvatarUrl }: { bookingId: string; hostName?: string; hostAvatarUrl?: string | null }) {
   const { loaded, configured } = useGoogleMaps();
   const [location, setLocation] = useState<DeliveryLocation | null>(null);
   const [checked, setChecked] = useState(false);
@@ -136,18 +136,35 @@ export function GuestDeliveryTracker({ bookingId }: { bookingId: string }) {
   if (!checked) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-6">
-      <h2 className="font-bold text-gray-900 mb-1">Track Your Delivery</h2>
-      {!location ? (
-        <p className="text-sm text-gray-500">Your host hasn't started sharing their location yet — check back shortly.</p>
-      ) : !configured ? (
-        <p className="text-sm text-gray-500">Live tracking is unavailable right now.</p>
-      ) : (
+    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
+      <div className="p-6 pb-4">
+        <h2 className="font-bold text-gray-900 mb-1">Track Your Delivery</h2>
+        {!location && <p className="text-sm text-gray-500">Your host hasn't started sharing their location yet — check back shortly.</p>}
+        {location && !configured && <p className="text-sm text-gray-500">Live tracking is unavailable right now.</p>}
+      </div>
+
+      {location && configured && (
         <>
-          <div ref={mapRef} className="w-full h-56 rounded-xl overflow-hidden bg-gray-100" />
-          <p className="text-xs text-gray-400 mt-2">
-            {location.source === 'TELEMATICS' ? 'Live vehicle GPS' : "Host's live location"} · updated {new Date(location.updatedAt).toLocaleTimeString()}
-          </p>
+          <div ref={mapRef} className="w-full h-56 bg-gray-100" />
+          <div className="flex items-center gap-3 px-6 py-4">
+            <div className="w-11 h-11 rounded-full bg-amber-100 text-amber-700 font-bold flex items-center justify-center shrink-0 overflow-hidden">
+              {hostAvatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={hostAvatarUrl} alt={hostName ?? 'Host'} className="w-full h-full object-cover" />
+              ) : (
+                (hostName ?? 'H').charAt(0).toUpperCase()
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-bold text-gray-900 text-sm truncate">{hostName ?? 'Your host'} is on the way</p>
+              <p className="text-xs text-gray-400">
+                {location.source === 'TELEMATICS' ? 'Live vehicle GPS' : "Live location"} · updated {new Date(location.updatedAt).toLocaleTimeString()}
+              </p>
+            </div>
+            <a href="#trip-chat" className="shrink-0 w-9 h-9 rounded-full bg-gray-900 hover:bg-black text-white flex items-center justify-center transition" aria-label="Message host">
+              💬
+            </a>
+          </div>
         </>
       )}
     </div>

@@ -70,6 +70,11 @@ export default function Footer() {
                 <a href={`tel:${info.phone.replace(/\s/g, '')}`} className="hover:text-amber-400 transition">{info.phone}</a>
               </p>
               <p className="text-gray-600">CIN {info.cin}</p>
+              {COMPANY.startupIndiaRecognized && (
+                <p className="text-gray-600">
+                  Startup India Recognized · {COMPANY.certifications.map((c) => c.standard).join(' · ')} Certified
+                </p>
+              )}
             </div>
           </div>
 

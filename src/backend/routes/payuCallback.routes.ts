@@ -10,6 +10,11 @@ import { ITINERARY_DESTINATIONS } from './itinerary.routes';
 const router = Router();
 const prisma = new PrismaClient();
 
+// How long a guest has to pay the balance after reserving before the dates
+// release and the reservation fee is forfeited — see the reservation-timeout
+// cron in payoutEngine.ts.
+const RESERVATION_WINDOW_HOURS = 24;
+
 /**
  * PayU posts here (both surl and furl point at this one route — `status`
  * tells us which branch we're in) after the user completes or abandons
@@ -62,36 +67,26 @@ router.post('/payments/payu/callback', async (req: Request, res: Response) => {
   }
 
   if (String(status).toLowerCase() === 'success') {
-    // Payment success doesn't confirm the trip outright — the host still has
-    // to verify the car is actually available. See hostReview.routes.ts,
-    // which moves PENDING_HOST_REVIEW -> CONFIRMED (or REJECTED with a full
-    // refund) and is where the lease-agreement eSign now fires from, not here
-    // — signing a lease for a booking that might still be rejected made no sense.
-    const reviewWindowHours = await getSetting<number>('host_review_window_hours', 2);
+    // This confirms STAGE 1 (the reservation fee) only — it holds the dates,
+    // it doesn't send anything to the host yet. The guest reviews everything
+    // and pays the balance via /balance-checkout-session below, which is
+    // what actually enters host review (see RESERVATION_TIMEOUT_HOURS' cron
+    // in payoutEngine.ts for what happens if they never do).
     const updated = await prisma.booking.update({
       where: { id: bookingId },
       data: {
-        status: BookingStatus.PENDING_HOST_REVIEW,
-        hostReviewDeadline: new Date(Date.now() + reviewWindowHours * 60 * 60 * 1000),
+        status: BookingStatus.RESERVED,
+        reservationPaidAt: new Date(),
+        reservationDeadline: new Date(Date.now() + RESERVATION_WINDOW_HOURS * 60 * 60 * 1000),
       },
       include: { car: true },
     });
-    if (booking.promoCode) {
-      await prisma.promoCode.update({ where: { code: booking.promoCode }, data: { usedCount: { increment: 1 } } });
-    }
     await notify(
       updated.customerId,
       'GENERIC',
-      'Booking request sent',
-      `Your request for the ${updated.car.make} ${updated.car.model} is awaiting host confirmation.`,
+      'Reservation confirmed',
+      `You've reserved the ${updated.car.make} ${updated.car.model} — pay the balance within ${RESERVATION_WINDOW_HOURS}h to lock in your trip.`,
       `/account/trips/${updated.id}`
-    );
-    await notify(
-      updated.car.ownerId,
-      'GENERIC',
-      'New booking request',
-      `A guest wants to book your ${updated.car.make} ${updated.car.model} — accept or decline within ${reviewWindowHours}h.`,
-      '/host/dashboard?tab=requests'
     );
 
     return res.redirect(303, `${redirectBase}/bookings/${bookingId}/confirmation`);
@@ -99,6 +94,89 @@ router.post('/payments/payu/callback', async (req: Request, res: Response) => {
 
   await prisma.booking.update({ where: { id: bookingId }, data: { status: BookingStatus.CANCELLED } });
   return res.redirect(303, `${redirectBase}/checkout/${bookingId}?payment=failed`);
+});
+
+// STAGE 2 callback — confirms the balance payment (see
+// POST /booking/:id/balance-checkout-session), which is the real commitment
+// point: this is what actually enters the host-review queue. Same
+// hash-verification/idempotency discipline as the callback above, kept in
+// its own route so the two payment stages can never be confused, same
+// separate-route pattern the itinerary-unlock flow already established.
+router.post('/payments/payu/balance-callback', async (req: Request, res: Response) => {
+  const body = req.body ?? {};
+  const { status, txnid, amount, productinfo, firstname, email, udf1, hash } = body;
+  const bookingId = udf1;
+
+  const redirectBase = config.clientUrl.replace(/\/$/, '');
+
+  if (!bookingId || !hash || !txnid) {
+    console.error('[PAYU BALANCE CALLBACK] Missing required fields', body);
+    return res.redirect(303, `${redirectBase}/checkout/error?reason=malformed_callback`);
+  }
+
+  const hashValid = verifyPayuResponseHash({
+    status: String(status ?? ''),
+    txnid: String(txnid),
+    amount: String(amount ?? ''),
+    productinfo: String(productinfo ?? ''),
+    firstname: String(firstname ?? ''),
+    email: String(email ?? ''),
+    udf1: String(udf1 ?? ''),
+    hash: String(hash),
+  });
+
+  if (!hashValid) {
+    console.error(`[PAYU BALANCE CALLBACK] Hash verification FAILED for txnid ${txnid} — possible tampering, refusing to confirm.`);
+    return res.redirect(303, `${redirectBase}/account/trips/${bookingId}?payment=unverified`);
+  }
+
+  const booking = await prisma.booking.findUnique({ where: { id: bookingId }, include: { car: true } });
+  if (!booking) {
+    console.error(`[PAYU BALANCE CALLBACK] No booking found for id ${bookingId} (txnid ${txnid})`);
+    return res.redirect(303, `${redirectBase}/checkout/error?reason=booking_not_found`);
+  }
+  if (booking.paymentIntentId !== txnid) {
+    console.error(`[PAYU BALANCE CALLBACK] txnid mismatch for booking ${bookingId}: expected ${booking.paymentIntentId}, got ${txnid}`);
+    return res.redirect(303, `${redirectBase}/account/trips/${bookingId}?payment=unverified`);
+  }
+
+  // Idempotent — PayU may retry the postback, and the browser redirect can also land here twice.
+  if (booking.status !== BookingStatus.RESERVED) {
+    return res.redirect(303, `${redirectBase}/bookings/${bookingId}/confirmation`);
+  }
+
+  if (String(status).toLowerCase() !== 'success') {
+    return res.redirect(303, `${redirectBase}/account/trips/${bookingId}?payment=failed`);
+  }
+
+  const reviewWindowHours = await getSetting<number>('host_review_window_hours', 2);
+  const updated = await prisma.booking.update({
+    where: { id: bookingId },
+    data: {
+      status: BookingStatus.PENDING_HOST_REVIEW,
+      hostReviewDeadline: new Date(Date.now() + reviewWindowHours * 60 * 60 * 1000),
+    },
+    include: { car: true },
+  });
+  if (booking.promoCode) {
+    await prisma.promoCode.update({ where: { code: booking.promoCode }, data: { usedCount: { increment: 1 } } });
+  }
+  await notify(
+    updated.customerId,
+    'GENERIC',
+    'Booking request sent',
+    `Your request for the ${updated.car.make} ${updated.car.model} is awaiting host confirmation.`,
+    `/account/trips/${updated.id}`
+  );
+  await notify(
+    updated.car.ownerId,
+    'GENERIC',
+    'New booking request',
+    `A guest wants to book your ${updated.car.make} ${updated.car.model} — accept or decline within ${reviewWindowHours}h.`,
+    '/host/dashboard?tab=requests'
+  );
+
+  return res.redirect(303, `${redirectBase}/bookings/${bookingId}/confirmation`);
 });
 
 /**

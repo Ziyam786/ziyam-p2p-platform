@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth';
 import { notify } from '../services/notificationService';
 import { startLeaseAgreementEsign } from '../services/leaseAgreementEsign';
 import { isSetuConfigured } from '../services/setuService';
+import { sendBookingConfirmedNotifications } from '../services/bookingConfirmationService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -45,6 +46,11 @@ router.post('/bookings/:id/host-review', requireAuth, async (req: Request, res: 
         console.error(`[HOST REVIEW] Auto eSign trigger failed for booking ${id}:`, err.response?.data ?? err.message);
       });
     }
+    // Best-effort SMS/WhatsApp/email to both parties — this is "the car is
+    // booked" moment (see bookingConfirmationService.ts). Never blocks the response.
+    sendBookingConfirmedNotifications(id).catch((err) => {
+      console.error(`[HOST REVIEW] Booking-confirmed notifications failed for booking ${id}:`, err.message);
+    });
     return res.json({ success: true, data: updated });
   }
 

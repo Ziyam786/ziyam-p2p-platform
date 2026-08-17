@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import paymentGateway from '../services/paymentGateway';
+import { safeErrorMessage } from '../utils/errorResponse';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -50,7 +51,8 @@ router.post('/itineraries/unlock', async (req: Request, res: Response) => {
 
     res.status(201).json({ success: true, data: { id: unlock.id, url: checkout.checkoutUrl, fields: checkout.fields } });
   } catch (error: any) {
-    res.status(502).json({ error: `Could not start payment: ${error.message}` });
+    console.error('[itineraries/unlock] payment init failed:', error);
+    res.status(502).json({ error: `Could not start payment: ${safeErrorMessage(error)}` });
   }
 });
 

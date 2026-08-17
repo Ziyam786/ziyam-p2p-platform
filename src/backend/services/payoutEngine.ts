@@ -38,12 +38,19 @@ export class PayoutEngine {
     }
   }
 
-  /** Splits a gross booking amount into platform fee + host payout, using the live (admin-editable) split if set. */
-  static async splitAmount(totalAmount: number) {
+  /**
+   * Splits a gross booking amount into platform fee + host payout, using the
+   * live (admin-editable) split if set. `passthroughAmount` (e.g. a
+   * doorstep-delivery fee) is excluded from commission entirely and paid
+   * 100% to the host/fleet operator — the platform doesn't do the driving,
+   * so it doesn't take a cut of that fee.
+   */
+  static async splitAmount(totalAmount: number, passthroughAmount = 0) {
+    const commissionable = Math.max(0, totalAmount - passthroughAmount);
     const commission = await getSetting<number>('commission_percentage', config.payout.platformCommission);
     const hostShare = await getSetting<number>('host_share_percentage', config.payout.hostShare);
-    const platformFee = Number((totalAmount * commission).toFixed(2));
-    const hostPayout = Number((totalAmount * hostShare).toFixed(2));
+    const platformFee = Number((commissionable * commission).toFixed(2));
+    const hostPayout = Number((commissionable * hostShare).toFixed(2)) + passthroughAmount;
     return { platformFee, hostPayout };
   }
 
@@ -73,7 +80,7 @@ export class PayoutEngine {
     if (!host) throw new Error('Host account not found');
     this.assertPayoutEligible(host);
 
-    const { platformFee, hostPayout } = await this.splitAmount(booking.totalAmount);
+    const { platformFee, hostPayout } = await this.splitAmount(booking.totalAmount, booking.deliveryFeeAmount);
 
     let scheduledFor: Date;
     if (host?.payoutFrequency === 'WEEKLY') {
@@ -116,7 +123,7 @@ export class PayoutEngine {
     if (!host) throw new Error('Host account not found');
     this.assertPayoutEligible(host);
 
-    const { platformFee, hostPayout } = await this.splitAmount(booking.totalAmount);
+    const { platformFee, hostPayout } = await this.splitAmount(booking.totalAmount, booking.deliveryFeeAmount);
     const scheduledFor = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     await prisma.booking.update({
@@ -297,6 +304,46 @@ export class PayoutEngine {
           console.log(`[HOST REVIEW TIMEOUT] Booking ${booking.id} auto-rejected — ₹${refundAmount} queued for admin refund`);
         } catch (error: any) {
           console.error(`[HOST REVIEW TIMEOUT ERROR] Booking ${booking.id}:`, error.message);
+        }
+      }
+    });
+  }
+
+  /**
+   * Runs hourly alongside the other crons — a booking that sat RESERVED past
+   * its 24h reservationDeadline with the balance unpaid auto-cancels: dates
+   * release for other guests, and the reservation fee is forfeited by design
+   * (no RefundRequest — see booking.routes.ts/payuCallback.routes.ts's
+   * two-stage checkout). This is the guest-paced counterpart to
+   * initializeHostReviewTimeoutCron above.
+   */
+  static initializeReservationTimeoutCron() {
+    cron.schedule('0 * * * *', async () => {
+      const expired = await prisma.booking.findMany({
+        where: { status: BookingStatus.RESERVED, reservationDeadline: { lt: new Date() } },
+        include: { car: true },
+      });
+
+      for (const booking of expired) {
+        try {
+          await prisma.booking.update({
+            where: { id: booking.id },
+            data: {
+              status: BookingStatus.CANCELLED,
+              cancellationReason: 'Reservation expired — balance not paid within 24h',
+              cancelledBy: CancelledBy.SYSTEM,
+            },
+          });
+          await notify(
+            booking.customerId,
+            'GENERIC',
+            'Reservation expired',
+            `Your reservation for the ${booking.car.make} ${booking.car.model} expired before the balance was paid — the ₹${booking.reservationFeeAmount} reservation fee isn't refundable, and the dates are open to other guests now.`,
+            `/account/trips/${booking.id}`
+          );
+          console.log(`[RESERVATION TIMEOUT] Booking ${booking.id} auto-cancelled — ₹${booking.reservationFeeAmount} reservation fee forfeited`);
+        } catch (error: any) {
+          console.error(`[RESERVATION TIMEOUT ERROR] Booking ${booking.id}:`, error.message);
         }
       }
     });

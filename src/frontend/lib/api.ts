@@ -132,6 +132,8 @@ export const carsApi = {
   incentives: (carId: string) => get<{ success: true; data: IncentiveProgress | null }>(`/cars/${carId}/incentives`),
   availability: (carId: string) => get<{ success: true; data: AvailabilityRange[] }>(`/cars/${carId}/availability`),
   bookings: (carId: string) => get<{ success: true; count: number; data: Booking[] }>(`/cars/${carId}/bookings`),
+  latestConditionPhotos: (carId: string) =>
+    get<{ success: true; data: { asOf: string; photos: BookingConditionPhoto[] } | null }>(`/cars/${carId}/latest-condition-photos`),
   marketPulse: (city?: string) =>
     get<{ success: true; data: { city: string | null; availableCount: number; averageDailyRate: number | null; popularCategory: string | null } }>(
       `/cars/market-pulse${city ? `?city=${encodeURIComponent(city)}` : ''}`
@@ -181,6 +183,7 @@ export const bookingsApi = {
     coDriverRequested?: boolean; coDriverName?: string; coDriverLicenseNumber?: string;
   }) => post<{ success: true; bookingId: string }>('/booking', data),
   createCheckoutSession: (id: string) => post<{ success: true; data: PayuCheckoutSession }>(`/booking/${id}/checkout-session`),
+  balanceCheckoutSession: (id: string) => post<{ success: true; data: PayuCheckoutSession }>(`/booking/${id}/balance-checkout-session`),
   start: (id: string) => post<{ success: true; data: Booking }>(`/booking/${id}/start`),
   complete: (id: string, otp: string) => post<{ success: true; message: string }>(`/booking/${id}/complete`, { otp }),
   endOtp: (id: string) => get<{ success: true; data: { otp: string | null } }>(`/booking/${id}/end-otp`),

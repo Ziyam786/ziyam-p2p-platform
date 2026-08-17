@@ -12,3 +12,15 @@ export const authRateLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many attempts. Please try again later.' },
 });
+
+// Baseline limiter for every other route — generous enough that no real
+// user session hits it (well above normal browsing/booking traffic), but
+// stops basic scraping/DoS against public endpoints like /cars search that
+// authRateLimiter (auth-only) doesn't cover. Keyed by IP.
+export const apiRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please slow down and try again shortly.' },
+});

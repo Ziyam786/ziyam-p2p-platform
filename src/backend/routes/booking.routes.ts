@@ -7,6 +7,7 @@ import { TelematicsService } from '../services/telematicsService';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { notify } from '../services/notificationService';
 import { pickLeastLoadedAgent } from '../services/agentAssignment';
+import { safeErrorMessage } from '../utils/errorResponse';
 
 const WASH_SERVICE_PRICE = 349;
 
@@ -21,6 +22,10 @@ const REFERRAL_REWARD = 500; // ₹ credited to the referrer once their referred
 // shown in the checkout UI's plan picker (src/frontend/app/cars/[id]/page.tsx),
 // which until now was description text only with no backing calculation.
 const DEPOSIT_HOLD_FRACTION: Record<string, number> = { BASIC: 1, STANDARD: 0.6, PREMIUM: 0.3 };
+
+// Two-stage checkout — see /checkout-session and /balance-checkout-session below.
+const RESERVATION_FEE_PERCENT = 0.10;
+const RESERVATION_FEE_MIN = 299;
 
 // Late-return fee — see the /complete handler below.
 const LATE_FEE_GRACE_HOURS = 0.5;
@@ -135,7 +140,11 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
       normalizedPromo = promo.code;
     }
 
-    const { platformFee, hostPayout } = await PayoutEngine.splitAmount(totalAmount);
+    // Snapshot now — Car.deliveryFee is host-editable, so this pins what was
+    // actually quoted at booking time. Passed through 100% to the host/fleet
+    // operator, never commissioned (see PayoutEngine.splitAmount).
+    const deliveryFeeAmount = deliveryRequested ? car.deliveryFee : 0;
+    const { platformFee, hostPayout } = await PayoutEngine.splitAmount(totalAmount, deliveryFeeAmount);
 
     // Server-computed, not client-supplied — the deposit fraction can't be
     // tampered with by sending a lower totalAmount. Charged alongside
@@ -144,6 +153,9 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
     // at trip completion and the deposit isn't host revenue to split).
     const resolvedPlan = VALID_PLANS.includes(protectionPlan) ? protectionPlan : 'BASIC';
     const depositAmount = Math.round((car.securityDeposit ?? 0) * (DEPOSIT_HOLD_FRACTION[resolvedPlan] ?? 1));
+    // Small reservation fee charged first — see /checkout-session below and
+    // RESERVATION_FEE_MIN/PERCENT. Server-computed, same tamper-proofing as depositAmount.
+    const reservationFeeAmount = Math.max(RESERVATION_FEE_MIN, Math.round(totalAmount * RESERVATION_FEE_PERCENT));
 
     const booking = await prisma.booking.create({
       data: {
@@ -156,8 +168,10 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
         platformFee,
         hostPayoutAmount: hostPayout,
         depositAmount,
+        reservationFeeAmount,
         protectionPlan: resolvedPlan,
         deliveryRequested: Boolean(deliveryRequested),
+        deliveryFeeAmount,
         coDriverRequested: Boolean(coDriverRequested),
         coDriverName: coDriverRequested ? String(coDriverName).trim() : null,
         coDriverLicenseNumber: coDriverRequested ? String(coDriverLicenseNumber).trim() : null,
@@ -168,14 +182,17 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
 
     res.status(201).json({ success: true, bookingId: booking.id });
   } catch (error: any) {
-    res.status(500).json({ error: `Booking failed: ${error.message}` });
+    console.error('[POST /booking] failed:', error);
+    res.status(500).json({ error: `Booking failed: ${safeErrorMessage(error)}` });
   }
 });
 
-// Starts (or restarts) a PayU Hosted Checkout session for a pending booking.
-// The checkout page POSTs the returned {url, fields} straight to PayU — real
-// confirmation only ever happens via the hash-verified callback in
-// payuCallback.routes.ts, never from this endpoint.
+// Starts (or restarts) a PayU Hosted Checkout session for a pending booking —
+// STAGE 1 of the two-stage checkout: charges only reservationFeeAmount, not
+// the full trip cost. Holds the dates so the guest can review everything
+// with real confidence before committing the rest of the money (see
+// /balance-checkout-session below). Real confirmation only ever happens via
+// the hash-verified callback in payuCallback.routes.ts, never from here.
 router.post('/booking/:id/checkout-session', requireAuth, async (req: Request, res: Response) => {
   const { id } = req.params;
   const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true, customer: true } });
@@ -186,24 +203,60 @@ router.post('/booking/:id/checkout-session', requireAuth, async (req: Request, r
   }
 
   try {
-    // Deposit is charged in the same PayU transaction as the trip cost, not
-    // held separately — booking.totalAmount itself stays deposit-exclusive
-    // since PayoutEngine.splitAmount reads it at trip completion, and the
-    // deposit isn't host revenue to split.
     const checkout = await paymentGateway.initiateCheckout({
       bookingId: booking.id,
-      amount: booking.totalAmount + booking.depositAmount,
+      amount: booking.reservationFeeAmount,
       customerName: booking.customer.fullName,
       customerEmail: booking.customer.email,
       customerPhone: booking.customer.phoneNumber,
-      productInfo: `${booking.car.make} ${booking.car.model} — ${booking.car.city}`,
+      productInfo: `Reservation fee — ${booking.car.make} ${booking.car.model}`,
     });
 
     await prisma.booking.update({ where: { id }, data: { paymentIntentId: checkout.txnid } });
 
     res.json({ success: true, data: { url: checkout.checkoutUrl, fields: checkout.fields } });
   } catch (error: any) {
-    res.status(502).json({ error: `Could not start payment: ${error.message}` });
+    console.error('[checkout-session] payment init failed:', error);
+    res.status(502).json({ error: `Could not start payment: ${safeErrorMessage(error)}` });
+  }
+});
+
+// STAGE 2 of the two-stage checkout — charges the remaining balance
+// (trip cost + platform fee + full deposit, minus the reservation fee
+// already paid) once the guest is ready to commit. Only valid from RESERVED;
+// success moves the booking into the existing host-review flow (see the
+// /payments/payu/balance-callback handler).
+router.post('/booking/:id/balance-checkout-session', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true, customer: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  if (booking.customerId !== req.user!.userId) return res.status(403).json({ error: 'Not your booking' });
+  if (booking.status !== BookingStatus.RESERVED) {
+    return res.status(400).json({ error: `Cannot pay the balance from status ${booking.status}` });
+  }
+
+  try {
+    // Deposit is charged in the same PayU transaction as the trip cost, not
+    // held separately — booking.totalAmount itself stays deposit-exclusive
+    // since PayoutEngine.splitAmount reads it at trip completion, and the
+    // deposit isn't host revenue to split.
+    const balanceAmount = booking.totalAmount + booking.depositAmount - booking.reservationFeeAmount;
+    const checkout = await paymentGateway.initiateCheckout({
+      bookingId: booking.id,
+      amount: balanceAmount,
+      customerName: booking.customer.fullName,
+      customerEmail: booking.customer.email,
+      customerPhone: booking.customer.phoneNumber,
+      productInfo: `Balance payment — ${booking.car.make} ${booking.car.model}`,
+      callbackPath: '/api/payments/payu/balance-callback',
+    });
+
+    await prisma.booking.update({ where: { id }, data: { paymentIntentId: checkout.txnid } });
+
+    res.json({ success: true, data: { url: checkout.checkoutUrl, fields: checkout.fields } });
+  } catch (error: any) {
+    console.error('[checkout-session] payment init failed:', error);
+    res.status(502).json({ error: `Could not start payment: ${safeErrorMessage(error)}` });
   }
 });
 
@@ -310,7 +363,8 @@ router.post('/booking/:id/complete', requireAuth, async (req: Request, res: Resp
       res.json({ success: true, message: 'Trip completed. N+1 payout scheduled.' });
     }
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('[booking/:id/complete] failed:', error);
+    res.status(500).json({ error: safeErrorMessage(error) });
   }
 });
 
@@ -322,7 +376,8 @@ router.post('/booking/:id/fleet-receipt', requireAuth, requireRole('FLEET_OPERAT
     const ledger = await PayoutEngine.confirmFleetReceipt(id, req.user!.userId);
     res.json({ success: true, message: 'Receipt confirmed. Host payout scheduled within 1 day.', data: ledger });
   } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    console.error('[booking/:id/fleet-receipt] failed:', error);
+    res.status(400).json({ error: safeErrorMessage(error) });
   }
 });
 
@@ -361,7 +416,8 @@ router.post('/booking/:id/wash-service', requireAuth, async (req: Request, res: 
     }
     res.status(201).json({ success: true, data: request, message: agentId ? 'An agent has been assigned.' : 'No agents are on duty right now — this will be picked up shortly.' });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('[booking/:id/wash-service] failed:', error);
+    res.status(500).json({ error: safeErrorMessage(error) });
   }
 });
 
@@ -605,7 +661,8 @@ router.post('/booking/:id/unlock', requireAuth, async (req: Request, res: Respon
     const success = await TelematicsService.unlockVehicle(booking.car.telematicsImei, req.user!.userId);
     res.json({ success, message: success ? 'Vehicle unlocked' : 'Unlock failed' });
   } catch (error: any) {
-    res.status(502).json({ error: error.message ?? 'Hardware command failed' });
+    console.error('[booking/:id/unlock] failed:', error);
+    res.status(502).json({ error: safeErrorMessage(error, 'Hardware command failed') });
   }
 });
 

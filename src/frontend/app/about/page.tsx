@@ -74,6 +74,39 @@ export default function AboutPage() {
         </div>
       </section>
 
+      <section className="py-16 bg-white">
+        <div className="max-w-4xl mx-auto px-4">
+          <ScrollReveal>
+            <h2 className="text-2xl font-extrabold text-gray-900 mb-2 text-center">Recognition & Certifications</h2>
+            <p className="text-gray-500 text-sm text-center mb-10">Real credentials, not marketing claims</p>
+          </ScrollReveal>
+          <StaggerGroup className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
+            {COMPANY.startupIndiaRecognized && (
+              <StaggerItem>
+                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 h-full">
+                  <span className="text-2xl block mb-2">🇮🇳</span>
+                  <h3 className="font-bold text-gray-900 text-sm">Startup India Recognized</h3>
+                  <p className="text-xs text-gray-500 mt-1">DPIIT-recognized under the Government of India's Startup India initiative.</p>
+                </div>
+              </StaggerItem>
+            )}
+            {COMPANY.certifications.map((c) => (
+              <StaggerItem key={c.standard}>
+                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 h-full">
+                  <span className="text-2xl block mb-2">📋</span>
+                  <h3 className="font-bold text-gray-900 text-sm">{c.standard}</h3>
+                  <p className="text-xs text-gray-500 mt-1">{c.name}</p>
+                  <p className="text-[11px] text-gray-400 mt-2 font-mono">Cert No. {c.certNumber}</p>
+                </div>
+              </StaggerItem>
+            ))}
+          </StaggerGroup>
+          <p className="text-center text-xs text-gray-400 mb-6">
+            Certified by {COMPANY.certifyingBody}, IAF-accredited · Valid {COMPANY.certificationValidFrom} – {COMPANY.certificationExpiry}
+          </p>
+        </div>
+      </section>
+
       <section className="py-16 bg-gray-50">
         <div className="max-w-4xl mx-auto px-4">
           <ScrollReveal>

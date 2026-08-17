@@ -35,15 +35,35 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
 
   const isWishlisted = useCallback((carId: string) => ids.has(carId), [ids]);
 
+  // Optimistic — the heart flips instantly on click rather than waiting for
+  // the round trip, since this is exactly the kind of rapid-fire interaction
+  // (browsing many cars, tapping several hearts) that feels sluggish
+  // otherwise. Rolled back to the pre-click state if the request fails.
   const toggle = useCallback(async (carId: string) => {
-    const res = await carsApi.toggleWishlist(carId);
+    const wasWishlisted = ids.has(carId);
     setIds((prev) => {
       const next = new Set(prev);
-      if (res.wishlisted) next.add(carId);
-      else next.delete(carId);
+      if (wasWishlisted) next.delete(carId);
+      else next.add(carId);
       return next;
     });
-  }, []);
+    try {
+      const res = await carsApi.toggleWishlist(carId);
+      setIds((prev) => {
+        const next = new Set(prev);
+        if (res.wishlisted) next.add(carId);
+        else next.delete(carId);
+        return next;
+      });
+    } catch {
+      setIds((prev) => {
+        const next = new Set(prev);
+        if (wasWishlisted) next.add(carId);
+        else next.delete(carId);
+        return next;
+      });
+    }
+  }, [ids]);
 
   return <WishlistContext.Provider value={{ ids, isWishlisted, toggle }}>{children}</WishlistContext.Provider>;
 }
