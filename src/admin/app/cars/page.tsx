@@ -11,6 +11,20 @@ const CATEGORIES = ['Hatchback', 'Sedan', 'SUV', 'Luxury', 'EV', 'MUV'];
 const FUEL_TYPES = ['PETROL', 'DIESEL', 'EV'];
 const TRANSMISSIONS = ['MANUAL', 'AUTOMATIC'];
 
+const VERIFICATION_STYLES: Record<string, string> = {
+  VERIFIED: 'bg-emerald-500/10 text-emerald-400',
+  REJECTED: 'bg-red-500/10 text-red-400',
+  PENDING: 'bg-amber-500/10 text-amber-400',
+};
+
+function isExpired(date?: string | null) {
+  return Boolean(date && new Date(date) < new Date());
+}
+
+function fmtDate(date?: string | null) {
+  return date ? new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+}
+
 type EditForm = {
   make: string; model: string; year: string; category: string; fuelType: string; transmission: string; seats: string;
   city: string; address: string; dailyRate: string; securityDeposit: string; kmIncludedPerDay: string; extraKmCharge: string;
@@ -48,6 +62,9 @@ export default function CarsPage() {
   const [editing, setEditing] = useState<AdminCar | null>(null);
   const [form, setForm] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
+  const [reviewing, setReviewing] = useState<AdminCar | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [docsBusy, setDocsBusy] = useState(false);
 
   function load() {
     setLoading(true);
@@ -124,6 +141,26 @@ export default function CarsPage() {
     }
   }
 
+  async function setVerification(status: 'VERIFIED' | 'REJECTED') {
+    if (!reviewing) return;
+    if (status === 'REJECTED' && !rejectReason.trim()) {
+      show('A reason is required to reject documents', 'error');
+      return;
+    }
+    setDocsBusy(true);
+    try {
+      await adminApi.setCarVerification(reviewing.id, { verificationStatus: status, reason: rejectReason.trim() || undefined });
+      show(status === 'VERIFIED' ? 'Documents approved' : 'Documents rejected — host notified', 'success');
+      setReviewing(null);
+      setRejectReason('');
+      load();
+    } catch (err: any) {
+      show(err.message ?? 'Action failed', 'error');
+    } finally {
+      setDocsBusy(false);
+    }
+  }
+
   async function approveGoLive(c: AdminCar) {
     if (!confirm(`Confirm the Fleet Partner Agreement has actually been signed with the owner of ${c.make} ${c.model}? This makes the car fleet-managed and live immediately.`)) return;
     setBusyId(c.id);
@@ -153,6 +190,7 @@ export default function CarsPage() {
                 <th className="py-3 px-4">Rate</th>
                 <th className="py-3 px-4">Bookings</th>
                 <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4">Documents</th>
                 <th className="py-3 px-4">Actions</th>
               </tr>
             </thead>
@@ -168,6 +206,17 @@ export default function CarsPage() {
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${c.isAvailable ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
                       {c.isAvailable ? 'Live' : 'Delisted'}
                     </span>
+                  </td>
+                  <td className="py-3 px-4">
+                    <button
+                      onClick={() => { setReviewing(c); setRejectReason(''); }}
+                      className={`text-xs font-semibold px-2.5 py-1 rounded-full transition hover:opacity-80 ${VERIFICATION_STYLES[c.verificationStatus] ?? VERIFICATION_STYLES.PENDING}`}
+                    >
+                      {c.verificationStatus === 'VERIFIED' ? 'Verified' : c.verificationStatus === 'REJECTED' ? 'Rejected' : 'Pending Review'}
+                    </button>
+                    {(isExpired(c.rcExpiry) || isExpired(c.insuranceExpiry) || isExpired(c.pucExpiry)) && (
+                      <span className="block text-[10px] font-semibold text-red-400 mt-1">⚠ Expired doc</span>
+                    )}
                   </td>
                   <td className="py-3 px-4 flex flex-wrap gap-2">
                     <button
@@ -286,6 +335,57 @@ export default function CarsPage() {
               <button onClick={() => { setEditing(null); setForm(null); }} className="text-sm font-semibold px-4 py-2 rounded-lg text-slate-400 hover:text-white transition">Cancel</button>
               <button disabled={saving} onClick={saveEdit} className="text-sm font-semibold px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white transition">
                 {saving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal open={Boolean(reviewing)} onClose={() => { setReviewing(null); setRejectReason(''); }} title={reviewing ? `Documents — ${reviewing.make} ${reviewing.model} (${reviewing.registrationNo})` : 'Documents'}>
+        {reviewing && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500">Owner:</span>
+              <span className="text-sm text-slate-200">{reviewing.owner?.fullName ?? '—'}</span>
+              <span className="text-xs text-slate-500">·</span>
+              <span className="text-sm text-slate-400">{reviewing.owner?.email}</span>
+            </div>
+
+            <div className="space-y-2">
+              {[
+                { label: 'RC', url: reviewing.rcDocUrl, expiry: reviewing.rcExpiry },
+                { label: 'Insurance', url: reviewing.insuranceDocUrl, expiry: reviewing.insuranceExpiry },
+                { label: 'Pollution Certificate', url: reviewing.pollutionCertUrl, expiry: reviewing.pucExpiry },
+              ].map((doc) => (
+                <div key={doc.label} className="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-lg px-4 py-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-200">{doc.label}</p>
+                    <p className={`text-xs mt-0.5 ${isExpired(doc.expiry) ? 'text-red-400 font-semibold' : 'text-slate-500'}`}>
+                      {doc.expiry ? `Expires ${fmtDate(doc.expiry)}${isExpired(doc.expiry) ? ' — EXPIRED' : ''}` : 'No expiry on file'}
+                    </p>
+                  </div>
+                  {doc.url ? (
+                    <a href={`${process.env.NEXT_PUBLIC_API_URL?.replace(/\/api$/, '') ?? ''}${doc.url}`} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-brand-400 hover:text-brand-300">
+                      View →
+                    </a>
+                  ) : (
+                    <span className="text-xs text-slate-600">Not uploaded</span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <Field label="Rejection reason (required to reject)">
+              <textarea className={`${inputCls} min-h-[70px]`} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="e.g. Insurance document image is unreadable" />
+            </Field>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <button onClick={() => { setReviewing(null); setRejectReason(''); }} className="text-sm font-semibold px-4 py-2 rounded-lg text-slate-400 hover:text-white transition">Close</button>
+              <button disabled={docsBusy} onClick={() => setVerification('REJECTED')} className="text-sm font-semibold px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white transition">
+                Reject
+              </button>
+              <button disabled={docsBusy} onClick={() => setVerification('VERIFIED')} className="text-sm font-semibold px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white transition">
+                Approve
               </button>
             </div>
           </div>

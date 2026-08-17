@@ -4,8 +4,8 @@ import { AuthProvider } from '../lib/auth-context';
 import { ToastProvider } from '../components/Toast';
 
 export const metadata: Metadata = {
-  title: 'Ziyam Control Panel',
-  description: 'Internal admin panel for ZiyamSelfDrive — not indexed, not public.',
+  title: 'Ziyam Agent',
+  description: 'Ground-staff app for ZiyamSelfDrive — trip check-in/out and service jobs. Not indexed, not public.',
   robots: { index: false, follow: false },
 };
 

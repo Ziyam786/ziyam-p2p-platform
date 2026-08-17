@@ -8,10 +8,10 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Marc8's Essence Blue (#183eeb, 25% brand usage) — matches the exact
-        // ramp used by src/frontend's "amber" key and src/agent's "brand" key
-        // so all three apps read as the same product family. This replaces a
-        // stale generic Tailwind blue left over from before the Marc8 rebrand.
+        // Marc8's exact Essence Blue (#183eeb), matching the renter/host
+        // app's brand color — anchored at brand-600 since this app's dark
+        // (slate-950) surfaces read best with a slightly richer accent than
+        // the light-background renter app uses at amber-500.
         brand: {
           50: '#eef1fd',
           100: '#dbe2fb',

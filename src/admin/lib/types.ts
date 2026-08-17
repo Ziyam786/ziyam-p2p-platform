@@ -77,6 +77,13 @@ export interface AdminCar {
   currentOdo?: number | null;
   fleetManaged: boolean;
   fleetOnboardingStep: number;
+  verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  rcDocUrl?: string | null;
+  pollutionCertUrl?: string | null;
+  insuranceDocUrl?: string | null;
+  rcExpiry?: string | null;
+  insuranceExpiry?: string | null;
+  pucExpiry?: string | null;
   createdAt: string;
   _count?: { bookings: number; reviews: number };
 }
@@ -282,6 +289,7 @@ export interface OpsTripRow {
   status: OpsTripStatus;
   notes?: string | null;
   createdBy?: { fullName: string };
+  agent?: { fullName: string } | null;
   createdAt: string;
 }
 

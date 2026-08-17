@@ -86,6 +86,7 @@ export default function OpsTripsPage() {
                 <p className="font-bold text-slate-100">{t.car ? `${t.car.make} ${t.car.model}` : t.carId} <span className="text-slate-500 font-normal text-xs">{t.car?.registrationNo}</span></p>
                 <p className="text-xs text-slate-400 mt-0.5">{t.customerName} · {t.customerMobile}{t.bookingPlatform ? ` · ${t.bookingPlatform}` : ''}</p>
                 <p className="text-xs text-slate-500 mt-0.5">{new Date(t.startTime).toLocaleString()}{t.endTime ? ` → ${new Date(t.endTime).toLocaleString()}` : ''}</p>
+                {t.agent?.fullName && <p className="text-xs text-brand-400 mt-0.5">Agent: {t.agent.fullName}</p>}
               </div>
               <div className="text-right text-xs text-slate-400 shrink-0">
                 <p>{inr(t.amount)}</p>

@@ -145,9 +145,24 @@ function DashboardInner() {
                     </p>
                     <div className="mt-1"><Rating value={car.rating} count={car.reviewCount} /></div>
                   </div>
-                  <span className={`text-xs font-semibold px-3 py-1 rounded-full ${car.isAvailable ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
-                    {car.isAvailable ? 'Live' : 'Delisted'}
-                  </span>
+                  <div className="flex flex-col items-end gap-1.5">
+                    <span className={`text-xs font-semibold px-3 py-1 rounded-full ${car.isAvailable ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                      {car.isAvailable ? 'Live' : 'Delisted'}
+                    </span>
+                    {car.verificationStatus === 'REJECTED' ? (
+                      <span className="text-xs font-semibold px-3 py-1 rounded-full bg-red-500/10 text-red-400" title="Re-upload corrected documents from Edit">
+                        Docs rejected
+                      </span>
+                    ) : car.verificationStatus === 'PENDING' ? (
+                      <span className="text-xs font-semibold px-3 py-1 rounded-full bg-amber-500/10 text-amber-400">
+                        Docs pending review
+                      </span>
+                    ) : (
+                      <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400">
+                        Docs verified
+                      </span>
+                    )}
+                  </div>
                   <div className="flex gap-2">
                     <a href={`/host/cars/${car.id}/manage`} className="text-xs font-semibold border border-amber-500/50 hover:border-amber-500 text-amber-400 px-3 py-2 rounded-lg transition">
                       Manage

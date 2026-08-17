@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-/** Branded full-screen loader — matches the renter app's splash treatment (see src/frontend/components/LoadingScreen.tsx). */
+/** Branded full-screen loader — matches the renter/admin apps' splash treatment, using the corrected weaving Z geometry (see src/frontend/components/Logo.tsx). */
 export default function LoadingScreen({ label }: { label?: string }) {
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#2B1E17]">
@@ -20,7 +20,7 @@ export default function LoadingScreen({ label }: { label?: string }) {
         </svg>
         <div className="text-center">
           <p className="text-[#F3E9D8] text-lg font-extrabold tracking-tight">
-            Ziyam<span className="font-medium opacity-90">Control</span>
+            Ziyam<span className="font-medium opacity-90">Agent</span>
           </p>
           {label && <p className="text-[#F3E9D8]/60 text-xs mt-1">{label}</p>}
         </div>

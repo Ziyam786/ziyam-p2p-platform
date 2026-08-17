@@ -61,6 +61,8 @@ export const adminApi = {
     'offersPickup' | 'pickupFee'
   >>) => patch<{ success: true; data: AdminCar }>(`/admin/cars/${id}`, data),
   approveFleetGoLive: (carId: string) => post<{ success: true; data: AdminCar; message: string }>(`/admin/cars/${carId}/fleet-onboarding/go-live`),
+  setCarVerification: (carId: string, data: { verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED'; reason?: string }) =>
+    patch<{ success: true; data: AdminCar }>(`/admin/cars/${carId}/verification`, data),
 
   bookings: (status?: string) => get<{ success: true; data: AdminBooking[] }>(`/admin/bookings${status ? `?status=${status}` : ''}`),
   updateBooking: (id: string, status: string) => patch<{ success: true; data: AdminBooking }>(`/admin/bookings/${id}`, { status }),
