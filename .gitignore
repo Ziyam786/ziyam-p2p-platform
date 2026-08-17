@@ -34,5 +34,9 @@ logs/
 *.db
 dev.db
 
+# User-uploaded files (car photos, RC/insurance docs, KYC selfies, signatures)
+# — local dev storage only; production uses a Docker volume, never git.
+/uploads/
+
 # Prisma
 .env.local

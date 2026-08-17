@@ -207,6 +207,11 @@ model Car {
   extraKmCharge    Float     @default(10)
   description      String?
   images           String[]  @default([])
+  // Admin-only unblurred originals, same array index as `images` (images[i]
+  // is the public/blurred version of originalImages[i]) — used to verify a
+  // listing's photo genuinely matches its registrationNo. Never exposed on
+  // any public-facing route.
+  originalImages   String[]  @default([])
   features         String[]  @default([])
   city             String
   address          String?

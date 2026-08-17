@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import AdminShell from '../../components/AdminShell';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/Toast';
@@ -373,6 +374,33 @@ export default function CarsPage() {
                   )}
                 </div>
               ))}
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-slate-400 mb-2">Vehicle Photos (Unblurred — Admin Only)</p>
+              {reviewing.originalImages && reviewing.originalImages.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {reviewing.originalImages.map((url, i) => (
+                    <a
+                      key={url + i}
+                      href={`${process.env.NEXT_PUBLIC_API_URL?.replace(/\/api$/, '') ?? ''}${url}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-800 shrink-0"
+                    >
+                      <Image
+                        src={`${process.env.NEXT_PUBLIC_API_URL?.replace(/\/api$/, '') ?? ''}${url}`}
+                        alt={`Unblurred vehicle photo ${i + 1}`}
+                        fill
+                        sizes="64px"
+                        className="object-cover"
+                      />
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-600">No unblurred originals on file</p>
+              )}
             </div>
 
             <Field label="Rejection reason (required to reject)">

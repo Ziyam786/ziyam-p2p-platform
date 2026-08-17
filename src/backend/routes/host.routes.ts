@@ -19,7 +19,7 @@ router.post('/host/:hostId/cars', requireAuth, async (req: Request, res: Respons
   const {
     make, model, registrationNo, year, category, fuelType, transmission, seats,
     dailyRate, securityDeposit, kmIncludedPerDay, extraKmCharge,
-    description, images, features, city, address, latitude, longitude, telematicsImei, instantBook,
+    description, images, originalImages, features, city, address, latitude, longitude, telematicsImei, instantBook,
     offersDelivery, deliveryFee, offersPickup, pickupFee,
     rcDocUrl, pollutionCertUrl, insuranceDocUrl, onboardingStep,
   } = req.body;
@@ -52,6 +52,7 @@ router.post('/host/:hostId/cars', requireAuth, async (req: Request, res: Respons
       ...(extraKmCharge !== undefined && { extraKmCharge: Number(extraKmCharge) }),
       description,
       images: images ?? [],
+      originalImages: originalImages ?? [],
       features: features ?? [],
       city,
       ...(address !== undefined && { address }),

@@ -57,6 +57,9 @@ export interface Car {
   extraKmCharge: number;
   description?: string | null;
   images: string[];
+  // Admin-only unblurred originals, same array index as `images` — never
+  // rendered by any customer-facing page/component (see PlateBlurEditor.tsx).
+  originalImages?: string[];
   features: string[];
   city: string;
   address?: string | null;

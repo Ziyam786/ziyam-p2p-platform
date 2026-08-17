@@ -12,7 +12,12 @@ const router = Router();
 const prisma = new PrismaClient();
 
 function withRatingSummary<T extends { reviews: { rating: number }[] }>(car: T) {
-  const { reviews, ...rest } = car as any;
+  // originalImages holds the unblurred license plate — admin-only (see
+  // src/admin/app/cars/page.tsx's document review modal), never sent to a
+  // public listing endpoint. Stripped here rather than via a scoped
+  // Prisma `select` so this stays a one-line change instead of having to
+  // enumerate every other Car scalar field at each call site.
+  const { reviews, originalImages, ...rest } = car as any;
   const reviewCount = reviews.length;
   const rating = reviewCount === 0 ? 0 : Number((reviews.reduce((s: number, r: any) => s + r.rating, 0) / reviewCount).toFixed(1));
   return { ...rest, rating, reviewCount };
@@ -105,7 +110,8 @@ router.get('/cars/:id', async (req: Request, res: Response) => {
   });
   if (!car) return res.status(404).json({ error: 'Car not found' });
 
-  const { reviews, ...rest } = car;
+  // originalImages (unblurred plate) is admin-only — never sent to this public detail route.
+  const { reviews, originalImages, ...rest } = car;
   const reviewCount = reviews.length;
   const rating = reviewCount === 0 ? 0 : Number((reviews.reduce((s, r) => s + r.rating, 0) / reviewCount).toFixed(1));
   res.json({ success: true, data: { ...rest, rating, reviewCount, reviews } });
@@ -143,7 +149,7 @@ router.patch('/cars/:id', requireAuth, async (req: Request, res: Response) => {
   const {
     make, model, year, category, fuelType, transmission, seats,
     dailyRate, securityDeposit, kmIncludedPerDay, extraKmCharge,
-    description, images, features, city, address, latitude, longitude, isAvailable, instantBook,
+    description, images, originalImages, features, city, address, latitude, longitude, isAvailable, instantBook,
     offersDelivery, deliveryFee, offersPickup, pickupFee,
     rcDocUrl, pollutionCertUrl, insuranceDocUrl, onboardingStep,
     noNightBookings, nightBookingStart, nightBookingEnd,
@@ -180,6 +186,7 @@ router.patch('/cars/:id', requireAuth, async (req: Request, res: Response) => {
       ...(extraKmCharge !== undefined && { extraKmCharge }),
       ...(description !== undefined && { description }),
       ...(images !== undefined && { images }),
+      ...(originalImages !== undefined && { originalImages }),
       ...(features !== undefined && { features }),
       ...(city !== undefined && { city }),
       ...(address !== undefined && { address }),

@@ -60,6 +60,23 @@ export const uploadsApi = {
     }
     return { url: `${API_ORIGIN}${body.data.url}` };
   },
+  // Manually blurs a host-drawn rectangle (license plate) on an
+  // already-uploaded photo. `originalUrl` is whatever upload() returned
+  // (an absolute URL); x/y/width/height are fractional [0,1] coordinates
+  // relative to the rendered image element, resolution-independent — see
+  // PlateBlurEditor.tsx. Returns a NEW absolute URL for the blurred copy;
+  // the original stays untouched on disk for admin verification.
+  blurRegion: async (
+    originalUrl: string,
+    region: { x: number; y: number; width: number; height: number }
+  ): Promise<{ url: string }> => {
+    const relativeUrl = originalUrl.startsWith(API_ORIGIN) ? originalUrl.slice(API_ORIGIN.length) : originalUrl;
+    const body = await post<{ success: true; data: { url: string } }>('/uploads/blur-region', {
+      url: relativeUrl,
+      ...region,
+    });
+    return { url: `${API_ORIGIN}${body.data.url}` };
+  },
 };
 
 /* ── Auth ─────────────────────────────────────────────────────────── */
