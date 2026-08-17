@@ -80,7 +80,7 @@ export default function AboutPage() {
             <h2 className="text-2xl font-extrabold text-gray-900 mb-2 text-center">Recognition & Certifications</h2>
             <p className="text-gray-500 text-sm text-center mb-10">Real credentials, not marketing claims</p>
           </ScrollReveal>
-          <StaggerGroup className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
+          <StaggerGroup className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
             {COMPANY.startupIndiaRecognized && (
               <StaggerItem>
                 <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 h-full">
@@ -90,20 +90,20 @@ export default function AboutPage() {
                 </div>
               </StaggerItem>
             )}
-            <StaggerItem>
-              <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 h-full">
-                <span className="text-2xl block mb-2">📋</span>
-                <h3 className="font-bold text-gray-900 text-sm">IAF-Accredited Certifications</h3>
-                <ul className="text-xs text-gray-500 mt-1 space-y-1">
-                  {COMPANY.certifications.map((c) => (
-                    <li key={c.standard}>
-                      <span className="font-semibold text-gray-700">{c.standard}</span> — {c.name}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </StaggerItem>
+            {COMPANY.certifications.map((c) => (
+              <StaggerItem key={c.standard}>
+                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 h-full">
+                  <span className="text-2xl block mb-2">📋</span>
+                  <h3 className="font-bold text-gray-900 text-sm">{c.standard}</h3>
+                  <p className="text-xs text-gray-500 mt-1">{c.name}</p>
+                  <p className="text-[11px] text-gray-400 mt-2 font-mono">Cert No. {c.certNumber}</p>
+                </div>
+              </StaggerItem>
+            ))}
           </StaggerGroup>
+          <p className="text-center text-xs text-gray-400 mb-6">
+            Certified by {COMPANY.certifyingBody}, IAF-accredited · Valid {COMPANY.certificationValidFrom} – {COMPANY.certificationExpiry}
+          </p>
         </div>
       </section>
 

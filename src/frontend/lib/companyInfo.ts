@@ -14,11 +14,19 @@ export const COMPANY = {
   scopeNote: 'Currently operating in Bengaluru only — expanding pan-India as the fleet grows.',
   jurisdiction: 'Courts at Bengaluru, Karnataka',
   startupIndiaRecognized: true,
+  // Certified by QRO (Quality Research Organization / QRO Certification LLP),
+  // IAF-accredited. Scope of activities on all three: "Providing
+  // technology-driven fleet logistics, asset aggregation platforms,
+  // peer-to-peer mobility routing, B2B corporate vehicle rental management,
+  // and high-end event & luxury hospitality transport operations."
   certifications: [
-    { standard: 'ISO 9001', name: 'Quality Management System' },
-    { standard: 'ISO 27001', name: 'Information Security Management System' },
-    { standard: 'ISO 14001', name: 'Environmental Management System' },
+    { standard: 'ISO 9001:2015', name: 'Quality Management System', certNumber: '305026060181Q' },
+    { standard: 'ISO/IEC 27001:2022', name: 'Information Security Management System', certNumber: '305026060183IS' },
+    { standard: 'ISO 14001:2015', name: 'Environmental Management System', certNumber: '305026060182E' },
   ],
+  certifyingBody: 'QRO Certification LLP',
+  certificationValidFrom: '1 June 2026',
+  certificationExpiry: '31 May 2029',
   team: [
     { name: 'Syed Fardeen', role: 'Founder & Director' },
     { name: 'Junaid Khan', role: 'Co-founder & Director' },
