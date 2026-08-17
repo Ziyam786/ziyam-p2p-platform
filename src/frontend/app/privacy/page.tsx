@@ -11,49 +11,114 @@ export default function PrivacyPage() {
         {
           heading: '1. Overview',
           body: [
-            `${COMPANY.legalName}, Bengaluru, Karnataka, processes personal data under the Information Technology Act, 2000 and the Digital Personal Data Protection Act, 2023.`,
+            `${COMPANY.legalName}, incorporated under the Companies Act, 2013 and registered at ${COMPANY.address}, operates ${COMPANY.brandFull} — a technology platform for discovering, reserving, and renting self-drive vehicles (CIN ${COMPANY.cin}). ${COMPANY.scopeNote}`,
+            'This Privacy Policy explains how we collect, use, store, share, and protect your personal data when you use the platform, in accordance with the Information Technology Act, 2000 and the Digital Personal Data Protection Act, 2023. By registering on or using the platform, you consent to the data practices described here.',
           ],
         },
         {
-          heading: '2. What We Collect',
+          heading: '2. Information We Collect',
           body: [
-            'Account data: name, date of birth, email, phone, address, and login credentials.',
-            'Identity verification: driving license, Aadhaar (masked only), passport, PAN, other government IDs, and facial verification records.',
-            'Booking information: reservation details, locations, rental duration, and trip history.',
-            'Location & telematics: real-time GPS, speed, acceleration, braking patterns, fuel consumption, and driving behaviour metrics. Vehicles may be monitored in real time during the rental period for safety, theft prevention, legal, and operational purposes.',
-            'Payment information: billing address and transaction records — card details are not stored by the Company.',
+            'Account data: full name, date of birth, gender, email, phone number, address, and login credentials.',
+            'Identity verification: your driving licence, and Aadhaar verified through DigiLocker or Aadhaar eKYC — we only ever receive a masked Aadhaar detail or a verified name from these providers, never your full Aadhaar number or biometric data.',
+            'Extended verification: where you sign a rental agreement, we capture your signature; a liveness selfie and an alternate contact number may also be collected as part of profile verification.',
+            'Booking information: reservation dates, pickup and drop-off details, protection plan selection, co-driver details (if added), and trip history.',
+            'Vehicle location & telematics: for the subset of vehicles fitted with our IoT hardware, we can retrieve on-demand GPS location, odometer, and fuel level, and issue remote lock/unlock commands during an active trip — used for keyless access, safety, and theft recovery. Cars without this hardware are not remotely tracked.',
+            'Payment & payout information: billing details and transaction records processed through our payment partner, PayU — we do not store your full card number. Hosts additionally provide bank account, IFSC, and payout details, verified with a penny-drop check before payouts are enabled.',
             'Device information: device ID, IP address, browser, and operating system.',
-            'Communications: support interactions, call recordings, chats, feedback, and reviews.',
+            'Communications: support conversations, in-app messages exchanged with your host or guest about a specific booking, reviews, and AI chat-support transcripts.',
+            'Referral & wallet data: your referral code, who referred you (if anyone), and your platform credits balance.',
           ],
         },
         {
-          heading: '3. How We Use Your Data',
+          heading: '3. How We Collect Information',
           body: [
-            'Service delivery, identity verification, safety and theft prevention, legal compliance, business operations, and marketing (with consent).',
+            'We collect information directly from you during registration, KYC verification, and booking; automatically through the app and, where fitted, vehicle telematics hardware; and from our verification and payment partners — DigiLocker and Aadhaar eKYC providers for identity checks, and PayU for payments. Where legally required, we may also receive information from government databases, insurers, or law enforcement.',
           ],
         },
         {
-          heading: '4. Your Rights',
+          heading: '4. How We Use Your Data',
           body: [
-            'You may request to access, correct, update, or delete your personal data, withdraw consent, and lodge complaints with India\'s Data Protection Board.',
+            'We use your data to deliver the service — account creation, bookings, and customer support; to verify identity and prevent fraud and theft; to keep you informed with booking, security, and policy communications; to comply with legal, tax, and regulatory obligations; and, with your consent, for marketing communications about products and offers.',
           ],
         },
         {
-          heading: '5. Data Security & Breach Response',
+          heading: '5. Legal Basis for Processing',
           body: [
-            'We use encryption, access controls, and secure infrastructure — though no system can be guaranteed completely secure. Data breaches trigger investigation, regulator notification, and affected-user notification per legal timelines.',
+            'We process personal data on the basis of your consent, performance of our contract with you, compliance with legal obligations, and certain legitimate uses permitted under Section 7 of the Digital Personal Data Protection Act, 2023, such as fraud prevention and safety.',
           ],
         },
         {
-          heading: '6. Cookies',
-          body: ['We use cookies for authentication (session tokens) and basic analytics.'],
-        },
-        {
-          heading: '7. Grievance Officer',
+          heading: '6. Vehicle Location & Telematics',
           body: [
-            `Syed Fardeen  ·  ${COMPANY.email}  ·  ${COMPANY.phone}`,
-            'Acknowledgment within 48 hours; resolution within 30 days.',
+            'Only vehicles fitted with our telematics/IoT hardware can be located or remotely locked and unlocked — not every listing carries this equipment. Where fitted, it is used to support keyless access during your trip and to help recover a vehicle in the event of theft or an unreported breakdown. This is vehicle-level telemetry rather than continuous tracking of your personal device.',
           ],
+        },
+        {
+          heading: '7. Cookies',
+          body: [
+            'We use a single, essential session cookie to keep you signed in, plus lightweight, privacy-respecting analytics to understand how the platform is used. We do not use advertising trackers or sell data to advertisers. See our full Cookie Policy for details.',
+          ],
+        },
+        {
+          heading: '8. How We Share Your Information',
+          body: [
+            'We share information with the partners needed to run the platform: PayU for payments, our identity-verification providers for KYC (DigiLocker and Aadhaar eKYC), our telematics hardware vendor, fleet operators (only for cars under their management), insurers, and cloud/infrastructure providers. Where legally required, we may share information with government authorities, regulators, courts, or law enforcement. We do not sell personal data.',
+          ],
+        },
+        {
+          heading: '9. International Data Transfers',
+          body: [
+            'Your personal data may be processed or stored by service providers operating outside India. Such transfers are subject to appropriate safeguards and shall not be made to any country restricted by the Central Government under Section 16 of the Digital Personal Data Protection Act, 2023.',
+          ],
+        },
+        {
+          heading: '10. Data Retention',
+          body: [
+            'We retain personal data only as long as necessary to provide the service, comply with legal obligations, resolve disputes, enforce our agreements, and prevent fraud. Once retention is no longer required, data is deleted, anonymized, or securely archived.',
+          ],
+        },
+        {
+          heading: '11. Data Security',
+          body: [
+            'We use encryption, access controls, and secure cloud infrastructure to protect your data, along with monitoring and regular vulnerability assessments — though no system can be guaranteed completely secure.',
+          ],
+        },
+        {
+          heading: '12. Data Breach Response',
+          body: [
+            'In the event of a personal data breach, we investigate and contain the incident, and notify the Data Protection Board of India and affected users within the timelines prescribed under the Digital Personal Data Protection Act, 2023 and the Information Technology Act, 2000.',
+          ],
+        },
+        {
+          heading: '13. Your Rights',
+          body: [
+            'Subject to applicable law, you may request to access, correct, or update your personal data, withdraw consent, request deletion, nominate another individual to exercise your rights, seek grievance redressal, and lodge a complaint with the Data Protection Board of India. Requests can be submitted using the contact details below.',
+          ],
+        },
+        {
+          heading: '14. Eligibility & Minors',
+          body: [
+            'The platform is intended only for individuals who are at least 18 years old. Persons under 18 may not create an account or rent a vehicle. If we learn that a minor\'s personal data has been collected unlawfully, we will delete it.',
+          ],
+        },
+        {
+          heading: '15. Third-Party Links',
+          body: ['The platform may link to third-party websites or services. We are not responsible for their privacy practices, and you should review their policies independently.'],
+        },
+        {
+          heading: '16. Changes to This Policy',
+          body: ['We may amend this Privacy Policy at any time. Updated versions take effect upon publication on the platform.'],
+        },
+        {
+          heading: '17. Grievance Officer',
+          body: [
+            `${COMPANY.team[0].name}  ·  ${COMPANY.email}  ·  ${COMPANY.phone}`,
+            'Complaints are acknowledged within 48 hours and, wherever possible, resolved within 30 days, in accordance with applicable law.',
+          ],
+        },
+        {
+          heading: '18. Governing Law & Jurisdiction',
+          body: [`This Privacy Policy is governed by Indian law. Disputes arising from or relating to it are subject to the exclusive jurisdiction of the ${COMPANY.jurisdiction}.`],
         },
       ]}
     />
