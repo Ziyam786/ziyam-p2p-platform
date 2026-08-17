@@ -117,6 +117,27 @@ router.get('/cars/:id', async (req: Request, res: Response) => {
   res.json({ success: true, data: { ...rest, rating, reviewCount, reviews } });
 });
 
+// Public "verified condition" gallery — real drop-off photos from the car's
+// most recently completed trip, shown to prospective guests (and, since it's
+// the same car, the fleet-opted host) before they book. Deliberately real
+// photos, not a fabricated 3D model — nothing in this stack can generate an
+// actual 3D reconstruction from a handful of angle photos, so this shows
+// exactly what pickup/drop-off condition photos already capture, honestly
+// labeled by when the trip that produced them ended.
+router.get('/cars/:id/latest-condition-photos', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const lastCompletedWithPhotos = await prisma.booking.findFirst({
+    where: { carId: id, status: 'COMPLETED', conditionPhotos: { some: { stage: 'POST_TRIP' } } },
+    orderBy: { endTime: 'desc' },
+    select: { id: true, endTime: true, conditionPhotos: { where: { stage: 'POST_TRIP' }, orderBy: { createdAt: 'asc' } } },
+  });
+  if (!lastCompletedWithPhotos) return res.json({ success: true, data: null });
+  res.json({
+    success: true,
+    data: { asOf: lastCompletedWithPhotos.endTime, photos: lastCompletedWithPhotos.conditionPhotos },
+  });
+});
+
 // Public read-only availability calendar — merged booked + host-paused date
 // ranges, with no booking/customer details exposed, so renters can see which
 // days are unavailable before picking dates (see AvailabilityCalendar.tsx).
