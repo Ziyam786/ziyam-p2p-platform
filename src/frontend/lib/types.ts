@@ -135,7 +135,17 @@ export interface Booking {
   rejectionReason?: string | null;
   cancellationReason?: string | null;
   cancelledBy?: CancelledBy | null;
+  deliveryLatitude?: number | null;
+  deliveryLongitude?: number | null;
+  deliveryLocationUpdatedAt?: string | null;
   createdAt: string;
+}
+
+export interface DeliveryLocation {
+  latitude: number;
+  longitude: number;
+  updatedAt: string;
+  source: 'TELEMATICS' | 'HOST_APP';
 }
 
 export interface BookingConditionPhoto {

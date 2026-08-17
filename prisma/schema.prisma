@@ -472,6 +472,16 @@ model Booking {
   refundRequests    RefundRequest[]
   conditionPhotos   BookingConditionPhoto[]
 
+  // Live doorstep-delivery tracking (Uber/Zepto-style) — the host's own
+  // device reports its GPS position via POST /bookings/:id/delivery-location
+  // while driving the car to the guest; only meaningful when
+  // deliveryRequested is true and only shown to the guest pre-pickup.
+  // Last-known-position only, not a route history — a new model would be
+  // overkill for "where is the car right now."
+  deliveryLatitude          Float?
+  deliveryLongitude         Float?
+  deliveryLocationUpdatedAt DateTime?
+
   // Host review — inserted between payment success and CONFIRMED (see
   // hostReview.routes.ts). hostReviewDeadline drives the auto-reject cron in
   // payoutEngine.ts once the review window (host_review_window_hours setting)

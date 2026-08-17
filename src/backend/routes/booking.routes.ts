@@ -445,6 +445,64 @@ router.get('/bookings/:id/condition-photos', requireAuth, async (req: Request, r
   res.json({ success: true, data: photos });
 });
 
+// Live doorstep-delivery tracking (Uber/Zepto-style) — the host's own device
+// reports its GPS position while driving the car over; the guest polls the
+// GET below to watch it move on a map. Only meaningful pre-pickup, so scoped
+// to CONFIRMED bookings with deliveryRequested set.
+router.post('/bookings/:id/delivery-location', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { latitude, longitude } = req.body;
+  if (typeof latitude !== 'number' || typeof longitude !== 'number' || Number.isNaN(latitude) || Number.isNaN(longitude)) {
+    return res.status(400).json({ error: 'latitude and longitude must be numbers' });
+  }
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return res.status(400).json({ error: 'latitude/longitude out of range' });
+  }
+
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  if (booking.car.ownerId !== req.user!.userId) return res.status(403).json({ error: 'Only the host can share this delivery\'s location' });
+  if (!booking.deliveryRequested) return res.status(400).json({ error: 'This booking was not requested for doorstep delivery' });
+  if (booking.status !== BookingStatus.CONFIRMED) {
+    return res.status(400).json({ error: `Cannot share delivery location for a booking with status ${booking.status}` });
+  }
+
+  const updated = await prisma.booking.update({
+    where: { id },
+    data: { deliveryLatitude: latitude, deliveryLongitude: longitude, deliveryLocationUpdatedAt: new Date() },
+    select: { deliveryLatitude: true, deliveryLongitude: true, deliveryLocationUpdatedAt: true },
+  });
+  res.json({ success: true, data: updated });
+});
+
+router.get('/bookings/:id/delivery-location', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  if (booking.customerId !== req.user!.userId) return res.status(403).json({ error: 'Not your booking' });
+
+  // Prefer live vehicle telemetry when the car actually has telematics
+  // hardware wired up (rare — most self-hosted listings don't); otherwise
+  // fall back to the host-app-reported position, which is what every
+  // delivery gets regardless of hardware.
+  if (booking.car.telematicsImei) {
+    try {
+      const state = await TelematicsService.getVehicleState(booking.car.telematicsImei);
+      return res.json({ success: true, data: { latitude: state.latitude, longitude: state.longitude, updatedAt: new Date(), source: 'TELEMATICS' } });
+    } catch {
+      // Fall through to the host-reported position below.
+    }
+  }
+
+  if (booking.deliveryLatitude == null || booking.deliveryLongitude == null) {
+    return res.json({ success: true, data: null });
+  }
+  res.json({
+    success: true,
+    data: { latitude: booking.deliveryLatitude, longitude: booking.deliveryLongitude, updatedAt: booking.deliveryLocationUpdatedAt, source: 'HOST_APP' },
+  });
+});
+
 // Guest<->host messaging, scoped to this booking. Either party can read/send;
 // no general DM system, just pickup coordination and pre-trip questions.
 router.get('/bookings/:id/messages', requireAuth, async (req: Request, res: Response) => {

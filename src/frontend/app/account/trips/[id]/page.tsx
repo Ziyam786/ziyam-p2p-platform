@@ -11,6 +11,7 @@ import { useToast } from '../../../../components/Toast';
 import { useAuth } from '../../../../lib/auth-context';
 import TripChat from '../../../../components/TripChat';
 import ConditionPhotoCapture from '../../../../components/ConditionPhotoCapture';
+import { HostDeliverySharePanel, GuestDeliveryTracker } from '../../../../components/LiveDeliveryTracker';
 import { bookingsApi, reviewsApi } from '../../../../lib/api';
 import type { Booking, BookingConditionPhoto, PhotoAngle, TripStage } from '../../../../lib/types';
 
@@ -323,6 +324,8 @@ function TripDetailInner() {
               </div>
             )}
 
+            {trip.status === 'CONFIRMED' && trip.deliveryRequested && isHost && <HostDeliverySharePanel bookingId={trip.id} />}
+
             {trip.status === 'ACTIVE' && isHost && (
               <div className="mt-6 bg-amber-50 border border-amber-100 rounded-xl p-5 text-center">
                 <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider mb-2">Trip-End Handover Code</p>
@@ -368,6 +371,8 @@ function TripDetailInner() {
             )}
           </div>
         </div>
+
+        {trip.status === 'CONFIRMED' && trip.deliveryRequested && !isHost && <GuestDeliveryTracker bookingId={trip.id} />}
 
         {['ACTIVE', 'COMPLETED'].includes(trip.status) && conditionPhotos.length > 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-6">

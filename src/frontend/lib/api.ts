@@ -1,6 +1,7 @@
 import type {
-  AdminStats, AppNotification, Blackout, Booking, BookingConditionPhoto, Car, DamageClaim, EarningsOverview, IncentiveProgress, PhotoAngle,
-  ProtectionPlan, PublicSettings, PublicUser, Review, ServiceCatalogEntry, ServiceRequest, TripStage, UtilizationEntry,
+  AdminStats, AppNotification, Blackout, Booking, BookingConditionPhoto, Car, DamageClaim, DeliveryLocation, EarningsOverview,
+  IncentiveProgress, PhotoAngle, ProtectionPlan, PublicSettings, PublicUser, Review, ServiceCatalogEntry, ServiceRequest, TripStage,
+  UtilizationEntry,
 } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api';
@@ -197,6 +198,9 @@ export const bookingsApi = {
   conditionPhotos: (id: string) => get<{ success: true; data: BookingConditionPhoto[] }>(`/bookings/${id}/condition-photos`),
   uploadConditionPhotos: (id: string, stage: TripStage, photos: { angle: PhotoAngle; url: string }[]) =>
     post<{ success: true; data: BookingConditionPhoto[] }>(`/bookings/${id}/condition-photos`, { stage, photos }),
+  shareDeliveryLocation: (id: string, latitude: number, longitude: number) =>
+    post<{ success: true }>(`/bookings/${id}/delivery-location`, { latitude, longitude }),
+  deliveryLocation: (id: string) => get<{ success: true; data: DeliveryLocation | null }>(`/bookings/${id}/delivery-location`),
 };
 
 /* ── Host booking review (accept/reject a paid, pending-review booking) ── */
