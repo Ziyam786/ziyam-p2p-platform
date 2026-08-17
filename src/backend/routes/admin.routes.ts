@@ -114,6 +114,12 @@ router.post('/admin/bookings', async (req: Request, res: Response) => {
     }
 
     const { platformFee, hostPayout } = await PayoutEngine.splitAmount(Number(totalAmount));
+    // Same fractions as the guest-facing POST /booking (booking.routes.ts) —
+    // an admin-entered booking (e.g. a phone booking) should carry the same
+    // real deposit tracking as a self-service one.
+    const DEPOSIT_HOLD_FRACTION: Record<string, number> = { BASIC: 1, STANDARD: 0.6, PREMIUM: 0.3 };
+    const resolvedPlan = protectionPlan || 'BASIC';
+    const depositAmount = Math.round((car.securityDeposit ?? 0) * (DEPOSIT_HOLD_FRACTION[resolvedPlan] ?? 1));
 
     const booking = await prisma.booking.create({
       data: {
@@ -125,7 +131,8 @@ router.post('/admin/bookings', async (req: Request, res: Response) => {
         totalAmount: Number(totalAmount),
         platformFee,
         hostPayoutAmount: hostPayout,
-        protectionPlan: protectionPlan || 'BASIC',
+        depositAmount,
+        protectionPlan: resolvedPlan,
         coDriverRequested: Boolean(coDriverRequested),
         coDriverName: coDriverRequested ? String(coDriverName).trim() : null,
         coDriverLicenseNumber: coDriverRequested ? String(coDriverLicenseNumber).trim() : null,

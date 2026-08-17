@@ -150,7 +150,13 @@ function TripDetailInner() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6">
               <Stat label="Protection Plan" value={trip.protectionPlan} />
               <Stat label="Platform Fee" value={`₹${trip.platformFee.toLocaleString()}`} />
-              <Stat label="Total Paid" value={`₹${trip.totalAmount.toLocaleString()}`} />
+              {trip.depositAmount > 0 && (
+                <Stat
+                  label={`Deposit (${trip.depositStatus.replace(/_/g, ' ').toLowerCase()})`}
+                  value={`₹${trip.depositAmount.toLocaleString()}`}
+                />
+              )}
+              <Stat label="Total Paid" value={`₹${(trip.totalAmount + trip.depositAmount).toLocaleString()}`} />
             </div>
 
             <div className="flex flex-wrap gap-3 mt-6">

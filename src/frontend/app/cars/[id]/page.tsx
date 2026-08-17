@@ -35,6 +35,12 @@ const PROTECTION_PLANS = [
 // lease agreement and the host's insurance for this trip.
 const CODRIVER_FEE = 500;
 
+// What fraction of the car's security deposit is actually held per plan —
+// mirrors DEPOSIT_HOLD_FRACTION in booking.routes.ts (the server recomputes
+// this itself rather than trusting the client, this copy is display-only so
+// the number shown here matches what's actually charged).
+const DEPOSIT_HOLD_FRACTION: Record<string, number> = { BASIC: 1, STANDARD: 0.6, PREMIUM: 0.3 };
+
 const LONG_RENTAL_DISCOUNTS_FALLBACK: LongRentalDiscount[] = [
   { minDays: 3, percent: 0.05 },
   { minDays: 5, percent: 0.10 },
@@ -128,7 +134,7 @@ export default function CarDetailPage() {
   const promoDiscount = appliedPromo?.discount ?? 0;
   const preFeeSubtotal = Math.max(0, baseFare + protectionFee + deliveryFee + coDriverFee - promoDiscount);
   const platformFee = Math.round(preFeeSubtotal * 0.08);
-  const securityDeposit = car?.securityDeposit ?? 0;
+  const securityDeposit = Math.round((car?.securityDeposit ?? 0) * (DEPOSIT_HOLD_FRACTION[plan] ?? 1));
   const total = preFeeSubtotal + platformFee + securityDeposit;
 
   async function applyPromo() {

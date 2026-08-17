@@ -8,6 +8,8 @@ export type BookingStatus = 'PENDING' | 'PENDING_PAYMENT' | 'CONFIRMED' | 'ACTIV
 export type PayoutStatus = 'HELD_IN_ESCROW' | 'QUEUED_FOR_N1' | 'SETTLED' | 'FAILED';
 
 export type ProtectionPlan = 'BASIC' | 'STANDARD' | 'PREMIUM';
+export type BookingDepositStatus = 'HELD' | 'RELEASED' | 'PARTIALLY_DEDUCTED' | 'FORFEITED';
+export type DamageClaimStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
 
 export type CarVerificationStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
 
@@ -120,7 +122,26 @@ export interface Booking {
   esignRequestId?: string | null;
   esignStatus?: string | null;
   esignDownloadUrl?: string | null;
+  depositAmount: number;
+  depositStatus: BookingDepositStatus;
+  depositReleasedAt?: string | null;
+  damageClaim?: DamageClaim | null;
   createdAt: string;
+}
+
+export interface DamageClaim {
+  id: string;
+  bookingId: string;
+  reportedById: string;
+  description: string;
+  images: string[];
+  estimatedCost: number;
+  status: DamageClaimStatus;
+  approvedDeduction?: number | null;
+  adminNotes?: string | null;
+  reviewedByAdminId?: string | null;
+  createdAt: string;
+  resolvedAt?: string | null;
 }
 
 export interface Review {

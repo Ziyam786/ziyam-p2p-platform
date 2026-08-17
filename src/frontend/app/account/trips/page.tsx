@@ -85,7 +85,7 @@ function TripsInner() {
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <span className="font-bold text-gray-900">₹{trip.totalAmount.toLocaleString()}</span>
+                    <span className="font-bold text-gray-900">₹{(trip.totalAmount + trip.depositAmount).toLocaleString()}</span>
                     <span className={`text-xs font-semibold px-3 py-1 rounded-full ${STATUS_STYLES[trip.status]}`}>
                       {trip.status.replace('_', ' ')}
                     </span>

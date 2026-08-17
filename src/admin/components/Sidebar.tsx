@@ -14,6 +14,8 @@ const NAV = [
   { href: '/invoices', label: 'Invoices', icon: '🧾' },
   { href: '/reviews', label: 'Reviews', icon: '⭐' },
   { href: '/payouts', label: 'Payouts', icon: '💸' },
+  { href: '/damage-claims', label: 'Damage Claims', icon: '🛠️' },
+  { href: '/refund-requests', label: 'Refund Requests', icon: '↩️' },
   { href: '/fleet-ledger', label: 'Fleet Ledger', icon: '📒' },
   { href: '/finance', label: 'Financial ERP', icon: '🏦' },
   { href: '/team-access', label: 'Team & Access', icon: '🔐' },

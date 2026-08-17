@@ -256,7 +256,9 @@ function AgreementInner() {
               {booking.car.chassis && <Row label="Chassis No." value={booking.car.chassis} />}
               <Row label="Rental Period" value={`${new Date(booking.startTime).toLocaleString()} → ${new Date(booking.endTime).toLocaleString()}`} />
               <Row label="Protection Plan" value={booking.protectionPlan} />
-              <Row label="Total Amount" value={`₹${booking.totalAmount.toLocaleString('en-IN')}`} />
+              <Row label="Rental Amount" value={`₹${booking.totalAmount.toLocaleString('en-IN')}`} />
+              <Row label="Security Deposit" value={`₹${booking.depositAmount.toLocaleString('en-IN')}`} />
+              <Row label="Total Charged" value={`₹${(booking.totalAmount + booking.depositAmount).toLocaleString('en-IN')}`} />
             </tbody>
           </table>
 

@@ -136,6 +136,38 @@ export interface AdminPayout {
   createdAt: string;
 }
 
+export type DamageClaimStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
+export type RefundRequestStatus = 'PENDING' | 'COMPLETED';
+export type RefundRequestType = 'DEPOSIT_RELEASE' | 'DEPOSIT_PARTIAL' | 'CANCELLATION';
+
+export interface AdminDamageClaim {
+  id: string;
+  bookingId: string;
+  booking?: { car: { make: string; model: string }; customer: { fullName: string; email: string }; depositAmount: number };
+  reportedById: string;
+  reportedBy?: { fullName: string; email: string };
+  description: string;
+  images: string[];
+  estimatedCost: number;
+  status: DamageClaimStatus;
+  approvedDeduction?: number | null;
+  adminNotes?: string | null;
+  createdAt: string;
+  resolvedAt?: string | null;
+}
+
+export interface AdminRefundRequest {
+  id: string;
+  bookingId: string;
+  booking?: { car: { make: string; model: string }; customer: { fullName: string; email: string; phoneNumber: string } };
+  type: RefundRequestType;
+  amount: number;
+  status: RefundRequestStatus;
+  notes?: string | null;
+  createdAt: string;
+  completedAt?: string | null;
+}
+
 export interface AdminStats {
   userCount: number;
   carCount: number;

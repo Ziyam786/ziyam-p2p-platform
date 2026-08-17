@@ -66,6 +66,9 @@ function CheckoutInner() {
   }
 
   const days = Math.max(1, Math.round((new Date(booking.endTime).getTime() - new Date(booking.startTime).getTime()) / (1000 * 60 * 60 * 24)));
+  // Charged in the same PayU transaction as the trip cost — see
+  // booking.routes.ts's /checkout-session (amount: totalAmount + depositAmount).
+  const amountToPay = booking.totalAmount + booking.depositAmount;
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
@@ -100,10 +103,16 @@ function CheckoutInner() {
               <span>Platform fee</span>
               <span>₹{booking.platformFee.toLocaleString()}</span>
             </div>
+            {booking.depositAmount > 0 && (
+              <div className="flex justify-between text-gray-700">
+                <span>Security deposit (refundable)</span>
+                <span>₹{booking.depositAmount.toLocaleString()}</span>
+              </div>
+            )}
             <hr className="border-gray-100" />
             <div className="flex justify-between font-bold text-gray-900 text-base">
               <span>Total to pay</span>
-              <span className="text-amber-600">₹{booking.totalAmount.toLocaleString()}</span>
+              <span className="text-amber-600">₹{amountToPay.toLocaleString()}</span>
             </div>
           </div>
 
@@ -123,7 +132,7 @@ function CheckoutInner() {
             disabled={paying}
             className="w-full btn-gradient active:scale-[0.98] disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none disabled:active:scale-100 text-white font-bold py-3.5 rounded-xl transition-transform"
           >
-            {paying ? 'Redirecting to PayU…' : `Pay ₹${booking.totalAmount.toLocaleString()}`}
+            {paying ? 'Redirecting to PayU…' : `Pay ₹${amountToPay.toLocaleString()}`}
           </button>
         </div>
       </div>
