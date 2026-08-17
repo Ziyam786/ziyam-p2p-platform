@@ -131,6 +131,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 PayoutEngine.initializePayoutCron();
 PayoutEngine.initializeDepositReleaseCron();
 PayoutEngine.initializeHostReviewTimeoutCron();
+PayoutEngine.initializeReservationTimeoutCron();
 
 app.listen(config.port, () => {
   console.log(`🚀 ZiyamSelfDrive API running on port ${config.port} (${config.nodeEnv})`);

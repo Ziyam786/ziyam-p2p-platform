@@ -302,6 +302,46 @@ export class PayoutEngine {
     });
   }
 
+  /**
+   * Runs hourly alongside the other crons — a booking that sat RESERVED past
+   * its 24h reservationDeadline with the balance unpaid auto-cancels: dates
+   * release for other guests, and the reservation fee is forfeited by design
+   * (no RefundRequest — see booking.routes.ts/payuCallback.routes.ts's
+   * two-stage checkout). This is the guest-paced counterpart to
+   * initializeHostReviewTimeoutCron above.
+   */
+  static initializeReservationTimeoutCron() {
+    cron.schedule('0 * * * *', async () => {
+      const expired = await prisma.booking.findMany({
+        where: { status: BookingStatus.RESERVED, reservationDeadline: { lt: new Date() } },
+        include: { car: true },
+      });
+
+      for (const booking of expired) {
+        try {
+          await prisma.booking.update({
+            where: { id: booking.id },
+            data: {
+              status: BookingStatus.CANCELLED,
+              cancellationReason: 'Reservation expired — balance not paid within 24h',
+              cancelledBy: CancelledBy.SYSTEM,
+            },
+          });
+          await notify(
+            booking.customerId,
+            'GENERIC',
+            'Reservation expired',
+            `Your reservation for the ${booking.car.make} ${booking.car.model} expired before the balance was paid — the ₹${booking.reservationFeeAmount} reservation fee isn't refundable, and the dates are open to other guests now.`,
+            `/account/trips/${booking.id}`
+          );
+          console.log(`[RESERVATION TIMEOUT] Booking ${booking.id} auto-cancelled — ₹${booking.reservationFeeAmount} reservation fee forfeited`);
+        } catch (error: any) {
+          console.error(`[RESERVATION TIMEOUT ERROR] Booking ${booking.id}:`, error.message);
+        }
+      }
+    });
+  }
+
   /** Admin-triggered retry of a single FAILED payout ledger entry. */
   static async retryPayout(ledgerId: string) {
     const payout = await prisma.payoutLedger.findUnique({ where: { id: ledgerId }, include: { host: true, booking: true } });

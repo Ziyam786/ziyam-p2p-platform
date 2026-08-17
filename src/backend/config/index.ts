@@ -94,6 +94,29 @@ export const config = {
     model: process.env.AI_MODEL ?? 'claude-haiku-4-5-20251001',
   },
 
+  // MSG91 — SMS + WhatsApp, one vendor for both (see smsService.ts / whatsappService.ts).
+  // Real transactional SMS in India requires a separate DLT-registered
+  // template per distinct message (OTP vs. booking-confirmed are two
+  // different registrations) — each templateId env var is that template's
+  // MSG91 ID, not free-form text.
+  sms: {
+    authKey: process.env.MSG91_AUTH_KEY ?? '',
+    senderId: process.env.MSG91_SENDER_ID ?? 'ZIYAM',
+    otpTemplateId: process.env.MSG91_OTP_TEMPLATE_ID ?? '',
+    bookingConfirmedTemplateId: process.env.MSG91_BOOKING_CONFIRMED_TEMPLATE_ID ?? '',
+  },
+  whatsapp: {
+    authKey: process.env.MSG91_AUTH_KEY ?? '',
+    integratedNumber: process.env.MSG91_WHATSAPP_NUMBER ?? '',
+  },
+
+  // Resend — transactional email (see emailService.ts). Called via axios, no SDK
+  // dependency, same as every other provider integration in this file.
+  email: {
+    apiKey: process.env.RESEND_API_KEY ?? '',
+    fromAddress: process.env.EMAIL_FROM ?? 'Ziyam <noreply@ziyam.in>',
+  },
+
   // Supabase is used only for "Continue with Google" — the OAuth dance
   // happens entirely client-side via @supabase/supabase-js, and this backend
   // just verifies the resulting access token against Supabase's own /auth/v1/user

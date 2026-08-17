@@ -1,4 +1,6 @@
 import { PrismaClient } from '@prisma/client';
+import { sendTemplateSms } from './smsService';
+import { config } from '../config';
 
 const prisma = new PrismaClient();
 
@@ -11,14 +13,15 @@ function generateCode(): string {
 }
 
 /**
- * Delivers an OTP to a phone number. No SMS provider (Twilio/MSG91/AWS SNS/etc.)
- * is configured yet, so this only logs server-side for now — swap in a real
- * gateway call here once credentials exist. Must never throw: a delivery
- * failure should not be distinguishable from "no account with that number"
- * to the caller (see the generic response in auth.routes.ts).
+ * Delivers an OTP to a phone number via MSG91 (see smsService.ts) — real
+ * delivery needs MSG91_AUTH_KEY + a DLT-registered OTP template
+ * (MSG91_OTP_TEMPLATE_ID); until both are set, sendTemplateSms logs instead
+ * of sending. Must never throw: a delivery failure should not be
+ * distinguishable from "no account with that number" to the caller (see the
+ * generic response in auth.routes.ts).
  */
 async function deliverOtp(phoneNumber: string, code: string): Promise<void> {
-  console.log(`[OTP] Code for ${phoneNumber}: ${code} (no SMS provider configured yet — logged only)`);
+  await sendTemplateSms(phoneNumber, config.sms.otpTemplateId, { otp: code });
 }
 
 /**

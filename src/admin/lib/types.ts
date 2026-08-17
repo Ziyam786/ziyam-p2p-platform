@@ -2,7 +2,7 @@ export type Role =
   | 'CUSTOMER' | 'SELF_HOST' | 'FLEET_OPERATOR' | 'AGENT'
   | 'FLEET_ADMIN' | 'OPERATIONS_EXECUTIVE' | 'MECHANICAL_EXECUTIVE' | 'TECHNICIAN'
   | 'ADMIN';
-export type BookingStatus = 'PENDING' | 'PENDING_PAYMENT' | 'PENDING_HOST_REVIEW' | 'CONFIRMED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'REJECTED';
+export type BookingStatus = 'PENDING' | 'PENDING_PAYMENT' | 'RESERVED' | 'PENDING_HOST_REVIEW' | 'CONFIRMED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'REJECTED';
 export type PayoutStatus = 'HELD_IN_ESCROW' | 'QUEUED_FOR_N1' | 'SETTLED' | 'FAILED';
 export type CancelledBy = 'CUSTOMER' | 'HOST' | 'SYSTEM' | 'ADMIN';
 export type TripStage = 'PRE_TRIP' | 'POST_TRIP';
@@ -119,6 +119,9 @@ export interface AdminBooking {
   cancelledBy?: CancelledBy | null;
   lateFeeAmount: number;
   lateFeeHours: number;
+  reservationFeeAmount: number;
+  reservationPaidAt?: string | null;
+  reservationDeadline?: string | null;
   refundRequests?: { type: RefundRequestType; amount: number; status: RefundRequestStatus; createdAt: string }[];
   createdAt: string;
 }

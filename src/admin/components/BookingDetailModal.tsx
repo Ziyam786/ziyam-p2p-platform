@@ -63,6 +63,12 @@ export default function BookingDetailModal({ booking, onClose }: { booking: Admi
             </div>
           )}
 
+          {booking.status === 'RESERVED' && booking.reservationDeadline && (
+            <div className="bg-amber-500/10 text-amber-300 rounded-lg px-4 py-3 text-sm">
+              ₹{booking.reservationFeeAmount.toLocaleString()} reservation fee paid — balance due by {new Date(booking.reservationDeadline).toLocaleString()}
+            </div>
+          )}
+
           {booking.status === 'PENDING_HOST_REVIEW' && booking.hostReviewDeadline && (
             <div className="bg-amber-500/10 text-amber-300 rounded-lg px-4 py-3 text-sm">
               Awaiting host response by {new Date(booking.hostReviewDeadline).toLocaleString()}

@@ -48,7 +48,8 @@ model CustomRole {
 enum BookingStatus {
   PENDING
   PENDING_PAYMENT
-  PENDING_HOST_REVIEW // payment cleared, awaiting host accept/reject (see hostReview.routes.ts)
+  RESERVED // reservation fee paid, balance due within reservationDeadline (see booking.routes.ts)
+  PENDING_HOST_REVIEW // balance paid, awaiting host accept/reject (see hostReview.routes.ts)
   CONFIRMED
   ACTIVE
   COMPLETED
@@ -468,6 +469,16 @@ model Booking {
   depositAmount     Float                @default(0)
   depositStatus     BookingDepositStatus @default(HELD)
   depositReleasedAt DateTime?
+
+  // Two-stage checkout — guest pays this small fee first (see
+  // POST /booking/:id/checkout-session), reviews everything with the dates
+  // genuinely held, then pays the rest via /balance-checkout-session within
+  // reservationDeadline. 10% of totalAmount, min ₹299 — computed server-side
+  // at booking creation, same tamper-proof pattern as depositAmount.
+  reservationFeeAmount Float     @default(0)
+  reservationPaidAt    DateTime?
+  reservationDeadline  DateTime? // reservationPaidAt + 24h; auto-cancel cron watches this (payoutEngine.ts)
+
   damageClaim       DamageClaim?
   refundRequests    RefundRequest[]
   conditionPhotos   BookingConditionPhoto[]

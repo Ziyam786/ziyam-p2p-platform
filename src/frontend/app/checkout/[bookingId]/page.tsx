@@ -39,7 +39,7 @@ function CheckoutInner() {
     if (!booking) return;
     setPaying(true);
     try {
-      const res = await bookingsApi.createCheckoutSession(booking.id);
+      const res = booking.status === 'RESERVED' ? await bookingsApi.balanceCheckoutSession(booking.id) : await bookingsApi.createCheckoutSession(booking.id);
       setCheckout(res.data);
       // Wait a tick for the hidden form's inputs to render with the new fields, then submit.
       requestAnimationFrame(() => formRef.current?.submit());
@@ -52,7 +52,7 @@ function CheckoutInner() {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-400">Loading checkout…</div>;
   if (!booking) return null;
 
-  if (booking.status !== 'PENDING_PAYMENT') {
+  if (booking.status !== 'PENDING_PAYMENT' && booking.status !== 'RESERVED') {
     return (
       <div className="min-h-screen bg-gray-50 font-sans">
         <Navbar />
@@ -65,17 +65,24 @@ function CheckoutInner() {
     );
   }
 
+  const isReserved = booking.status === 'RESERVED';
   const days = Math.max(1, Math.round((new Date(booking.endTime).getTime() - new Date(booking.startTime).getTime()) / (1000 * 60 * 60 * 24)));
-  // Charged in the same PayU transaction as the trip cost — see
-  // booking.routes.ts's /checkout-session (amount: totalAmount + depositAmount).
-  const amountToPay = booking.totalAmount + booking.depositAmount;
+  // Two-stage checkout: reservation fee first (holds the dates), balance
+  // later — see booking.routes.ts's /checkout-session and /balance-checkout-session.
+  const fullAmount = booking.totalAmount + booking.depositAmount;
+  const balanceAmount = fullAmount - booking.reservationFeeAmount;
+  const amountToPayNow = isReserved ? balanceAmount : booking.reservationFeeAmount;
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       <Navbar />
       <div className="max-w-lg mx-auto px-4 pt-28 pb-24">
-        <h1 className="text-2xl font-extrabold text-gray-900 mb-1">Checkout</h1>
-        <p className="text-gray-500 text-sm mb-8">Review your trip and complete payment</p>
+        <h1 className="text-2xl font-extrabold text-gray-900 mb-1">{isReserved ? 'Pay the Balance' : 'Reserve These Dates'}</h1>
+        <p className="text-gray-500 text-sm mb-8">
+          {isReserved
+            ? 'Lock in your trip — this sends the request to the host.'
+            : 'A small reservation fee holds these dates while you review everything.'}
+        </p>
 
         <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-5">
           <div className="flex items-center gap-4">
@@ -110,11 +117,28 @@ function CheckoutInner() {
               </div>
             )}
             <hr className="border-gray-100" />
-            <div className="flex justify-between font-bold text-gray-900 text-base">
-              <span>Total to pay</span>
-              <span className="text-amber-600">₹{amountToPay.toLocaleString()}</span>
+            <div className="flex justify-between text-gray-700">
+              <span>{isReserved ? 'Reservation fee (already paid)' : 'Full trip cost'}</span>
+              <span className={isReserved ? 'line-through text-gray-400' : ''}>
+                {isReserved ? `₹${booking.reservationFeeAmount.toLocaleString()}` : `₹${fullAmount.toLocaleString()}`}
+              </span>
             </div>
+            <div className="flex justify-between font-bold text-gray-900 text-base">
+              <span>{isReserved ? 'Balance due now' : 'Reserve now'}</span>
+              <span className="text-amber-600">₹{amountToPayNow.toLocaleString()}</span>
+            </div>
+            {!isReserved && (
+              <p className="text-xs text-gray-400">
+                Balance of ₹{balanceAmount.toLocaleString()} is due within 24h of reserving — you'll review everything first.
+              </p>
+            )}
           </div>
+
+          {isReserved && booking.reservationDeadline && (
+            <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-xs text-red-600">
+              ⏱ Pay by {new Date(booking.reservationDeadline).toLocaleString()} or this reservation expires and the ₹{booking.reservationFeeAmount.toLocaleString()} fee isn't refunded.
+            </div>
+          )}
 
           <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-xs text-amber-700">
             🔒 You'll be redirected to PayU's secure checkout to complete payment.
@@ -132,7 +156,7 @@ function CheckoutInner() {
             disabled={paying}
             className="w-full btn-gradient active:scale-[0.98] disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none disabled:active:scale-100 text-white font-bold py-3.5 rounded-xl transition-transform"
           >
-            {paying ? 'Redirecting to PayU…' : `Pay ₹${amountToPay.toLocaleString()}`}
+            {paying ? 'Redirecting to PayU…' : `Pay ₹${amountToPayNow.toLocaleString()}`}
           </button>
         </div>
       </div>

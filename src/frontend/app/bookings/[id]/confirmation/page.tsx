@@ -21,7 +21,16 @@ function ConfirmationInner() {
     <div className="min-h-screen bg-gray-50 font-sans">
       <Navbar />
       <div className="max-w-lg mx-auto px-4 pt-32 pb-24 text-center">
-        {booking?.status === 'PENDING_HOST_REVIEW' ? (
+        {booking?.status === 'RESERVED' ? (
+          <>
+            <span className="text-6xl block mb-4">📌</span>
+            <h1 className="text-2xl font-extrabold text-gray-900 mb-2">Dates Reserved!</h1>
+            <p className="text-gray-500 text-sm mb-8">
+              ₹{booking.reservationFeeAmount.toLocaleString()} reservation fee received — these dates are held for you.
+              {booking.reservationDeadline && ` Pay the balance by ${new Date(booking.reservationDeadline).toLocaleString()} to lock in your trip.`}
+            </p>
+          </>
+        ) : booking?.status === 'PENDING_HOST_REVIEW' ? (
           <>
             <span className="text-6xl block mb-4">🕒</span>
             <h1 className="text-2xl font-extrabold text-gray-900 mb-2">Request Sent!</h1>
@@ -57,9 +66,15 @@ function ConfirmationInner() {
         )}
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <a href={`/account/trips/${params.id}`} className="btn-gradient text-white font-bold px-6 py-3 rounded-xl transition text-sm">
-            View Trip Details
-          </a>
+          {booking?.status === 'RESERVED' ? (
+            <a href={`/checkout/${params.id}`} className="btn-gradient text-white font-bold px-6 py-3 rounded-xl transition text-sm">
+              Pay Balance Now
+            </a>
+          ) : (
+            <a href={`/account/trips/${params.id}`} className="btn-gradient text-white font-bold px-6 py-3 rounded-xl transition text-sm">
+              View Trip Details
+            </a>
+          )}
           <a href="/cars" className="border border-gray-200 text-gray-700 hover:border-amber-400 font-bold px-6 py-3 rounded-xl transition text-sm">
             Browse More Cars
           </a>

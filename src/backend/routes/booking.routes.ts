@@ -22,6 +22,10 @@ const REFERRAL_REWARD = 500; // ₹ credited to the referrer once their referred
 // which until now was description text only with no backing calculation.
 const DEPOSIT_HOLD_FRACTION: Record<string, number> = { BASIC: 1, STANDARD: 0.6, PREMIUM: 0.3 };
 
+// Two-stage checkout — see /checkout-session and /balance-checkout-session below.
+const RESERVATION_FEE_PERCENT = 0.10;
+const RESERVATION_FEE_MIN = 299;
+
 // Late-return fee — see the /complete handler below.
 const LATE_FEE_GRACE_HOURS = 0.5;
 const MAX_LATE_FEE_HOURS = 24; // beyond this, admin/support handles it manually rather than auto-charging further
@@ -144,6 +148,9 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
     // at trip completion and the deposit isn't host revenue to split).
     const resolvedPlan = VALID_PLANS.includes(protectionPlan) ? protectionPlan : 'BASIC';
     const depositAmount = Math.round((car.securityDeposit ?? 0) * (DEPOSIT_HOLD_FRACTION[resolvedPlan] ?? 1));
+    // Small reservation fee charged first — see /checkout-session below and
+    // RESERVATION_FEE_MIN/PERCENT. Server-computed, same tamper-proofing as depositAmount.
+    const reservationFeeAmount = Math.max(RESERVATION_FEE_MIN, Math.round(totalAmount * RESERVATION_FEE_PERCENT));
 
     const booking = await prisma.booking.create({
       data: {
@@ -156,6 +163,7 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
         platformFee,
         hostPayoutAmount: hostPayout,
         depositAmount,
+        reservationFeeAmount,
         protectionPlan: resolvedPlan,
         deliveryRequested: Boolean(deliveryRequested),
         coDriverRequested: Boolean(coDriverRequested),
@@ -172,10 +180,12 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-// Starts (or restarts) a PayU Hosted Checkout session for a pending booking.
-// The checkout page POSTs the returned {url, fields} straight to PayU — real
-// confirmation only ever happens via the hash-verified callback in
-// payuCallback.routes.ts, never from this endpoint.
+// Starts (or restarts) a PayU Hosted Checkout session for a pending booking —
+// STAGE 1 of the two-stage checkout: charges only reservationFeeAmount, not
+// the full trip cost. Holds the dates so the guest can review everything
+// with real confidence before committing the rest of the money (see
+// /balance-checkout-session below). Real confirmation only ever happens via
+// the hash-verified callback in payuCallback.routes.ts, never from here.
 router.post('/booking/:id/checkout-session', requireAuth, async (req: Request, res: Response) => {
   const { id } = req.params;
   const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true, customer: true } });
@@ -186,17 +196,51 @@ router.post('/booking/:id/checkout-session', requireAuth, async (req: Request, r
   }
 
   try {
+    const checkout = await paymentGateway.initiateCheckout({
+      bookingId: booking.id,
+      amount: booking.reservationFeeAmount,
+      customerName: booking.customer.fullName,
+      customerEmail: booking.customer.email,
+      customerPhone: booking.customer.phoneNumber,
+      productInfo: `Reservation fee — ${booking.car.make} ${booking.car.model}`,
+    });
+
+    await prisma.booking.update({ where: { id }, data: { paymentIntentId: checkout.txnid } });
+
+    res.json({ success: true, data: { url: checkout.checkoutUrl, fields: checkout.fields } });
+  } catch (error: any) {
+    res.status(502).json({ error: `Could not start payment: ${error.message}` });
+  }
+});
+
+// STAGE 2 of the two-stage checkout — charges the remaining balance
+// (trip cost + platform fee + full deposit, minus the reservation fee
+// already paid) once the guest is ready to commit. Only valid from RESERVED;
+// success moves the booking into the existing host-review flow (see the
+// /payments/payu/balance-callback handler).
+router.post('/booking/:id/balance-checkout-session', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true, customer: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  if (booking.customerId !== req.user!.userId) return res.status(403).json({ error: 'Not your booking' });
+  if (booking.status !== BookingStatus.RESERVED) {
+    return res.status(400).json({ error: `Cannot pay the balance from status ${booking.status}` });
+  }
+
+  try {
     // Deposit is charged in the same PayU transaction as the trip cost, not
     // held separately — booking.totalAmount itself stays deposit-exclusive
     // since PayoutEngine.splitAmount reads it at trip completion, and the
     // deposit isn't host revenue to split.
+    const balanceAmount = booking.totalAmount + booking.depositAmount - booking.reservationFeeAmount;
     const checkout = await paymentGateway.initiateCheckout({
       bookingId: booking.id,
-      amount: booking.totalAmount + booking.depositAmount,
+      amount: balanceAmount,
       customerName: booking.customer.fullName,
       customerEmail: booking.customer.email,
       customerPhone: booking.customer.phoneNumber,
-      productInfo: `${booking.car.make} ${booking.car.model} — ${booking.car.city}`,
+      productInfo: `Balance payment — ${booking.car.make} ${booking.car.model}`,
+      callbackPath: '/api/payments/payu/balance-callback',
     });
 
     await prisma.booking.update({ where: { id }, data: { paymentIntentId: checkout.txnid } });

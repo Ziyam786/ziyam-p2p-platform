@@ -11,6 +11,7 @@ import type { Booking, BookingStatus } from '../../../lib/types';
 const STATUS_STYLES: Record<BookingStatus, string> = {
   PENDING: 'bg-gray-100 text-gray-600',
   PENDING_PAYMENT: 'bg-amber-100 text-amber-700',
+  RESERVED: 'bg-amber-100 text-amber-700',
   PENDING_HOST_REVIEW: 'bg-amber-100 text-amber-700',
   CONFIRMED: 'bg-blue-100 text-blue-700',
   ACTIVE: 'bg-emerald-100 text-emerald-700',
@@ -32,7 +33,7 @@ function TripsInner() {
   }, []);
 
   const filtered = trips.filter((t) => {
-    if (filter === 'upcoming') return ['PENDING', 'PENDING_PAYMENT', 'PENDING_HOST_REVIEW', 'CONFIRMED', 'ACTIVE'].includes(t.status);
+    if (filter === 'upcoming') return ['PENDING', 'PENDING_PAYMENT', 'RESERVED', 'PENDING_HOST_REVIEW', 'CONFIRMED', 'ACTIVE'].includes(t.status);
     if (filter === 'past') return ['COMPLETED', 'CANCELLED', 'REJECTED'].includes(t.status);
     return true;
   });

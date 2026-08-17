@@ -181,6 +181,7 @@ export const bookingsApi = {
     coDriverRequested?: boolean; coDriverName?: string; coDriverLicenseNumber?: string;
   }) => post<{ success: true; bookingId: string }>('/booking', data),
   createCheckoutSession: (id: string) => post<{ success: true; data: PayuCheckoutSession }>(`/booking/${id}/checkout-session`),
+  balanceCheckoutSession: (id: string) => post<{ success: true; data: PayuCheckoutSession }>(`/booking/${id}/balance-checkout-session`),
   start: (id: string) => post<{ success: true; data: Booking }>(`/booking/${id}/start`),
   complete: (id: string, otp: string) => post<{ success: true; message: string }>(`/booking/${id}/complete`, { otp }),
   endOtp: (id: string) => get<{ success: true; data: { otp: string | null } }>(`/booking/${id}/end-otp`),

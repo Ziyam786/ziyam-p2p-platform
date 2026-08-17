@@ -177,10 +177,10 @@ function TripDetailInner() {
   }
 
   const days = Math.max(1, Math.round((new Date(trip.endTime).getTime() - new Date(trip.startTime).getTime()) / (1000 * 60 * 60 * 24)));
-  const statusLabel = trip.status === 'PENDING_HOST_REVIEW' ? 'Awaiting host confirmation' : trip.status === 'REJECTED' ? 'Declined by host' : trip.status.replace(/_/g, ' ');
+  const statusLabel = trip.status === 'RESERVED' ? 'Reserved — balance due' : trip.status === 'PENDING_HOST_REVIEW' ? 'Awaiting host confirmation' : trip.status === 'REJECTED' ? 'Declined by host' : trip.status.replace(/_/g, ' ');
   const statusColor = trip.status === 'REJECTED' || trip.status === 'CANCELLED'
     ? 'bg-red-100 text-red-600'
-    : trip.status === 'PENDING_HOST_REVIEW' || trip.status === 'PENDING_PAYMENT'
+    : trip.status === 'PENDING_HOST_REVIEW' || trip.status === 'PENDING_PAYMENT' || trip.status === 'RESERVED'
     ? 'bg-amber-100 text-amber-700'
     : 'bg-gray-100 text-gray-700';
   const cancelPreview = computeCancelPreview(trip);
@@ -227,6 +227,11 @@ function TripDetailInner() {
               {trip.status === 'PENDING_PAYMENT' && (
                 <a href={`/checkout/${trip.id}`} className="btn-gradient text-white text-sm font-bold px-5 py-2.5 rounded-xl transition">
                   Complete Payment
+                </a>
+              )}
+              {trip.status === 'RESERVED' && (
+                <a href={`/checkout/${trip.id}`} className="btn-gradient text-white text-sm font-bold px-5 py-2.5 rounded-xl transition">
+                  Pay Balance{trip.reservationDeadline && ` (by ${new Date(trip.reservationDeadline).toLocaleTimeString()})`}
                 </a>
               )}
               {trip.status === 'CONFIRMED' && capturingStage !== 'PRE_TRIP' && (

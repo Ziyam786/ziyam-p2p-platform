@@ -4,7 +4,7 @@ export type Role =
   | 'ADMIN';
 
 export type BookingStatus =
-  | 'PENDING' | 'PENDING_PAYMENT' | 'PENDING_HOST_REVIEW' | 'CONFIRMED' | 'ACTIVE' | 'COMPLETED'
+  | 'PENDING' | 'PENDING_PAYMENT' | 'RESERVED' | 'PENDING_HOST_REVIEW' | 'CONFIRMED' | 'ACTIVE' | 'COMPLETED'
   | 'CANCELLED' | 'REJECTED';
 
 export type PayoutStatus = 'HELD_IN_ESCROW' | 'QUEUED_FOR_N1' | 'SETTLED' | 'FAILED';
@@ -140,6 +140,9 @@ export interface Booking {
   deliveryLocationUpdatedAt?: string | null;
   lateFeeAmount: number;
   lateFeeHours: number;
+  reservationFeeAmount: number;
+  reservationPaidAt?: string | null;
+  reservationDeadline?: string | null;
   createdAt: string;
 }
 
