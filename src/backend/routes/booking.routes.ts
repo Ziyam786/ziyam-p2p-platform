@@ -7,6 +7,7 @@ import { TelematicsService } from '../services/telematicsService';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { notify } from '../services/notificationService';
 import { pickLeastLoadedAgent } from '../services/agentAssignment';
+import { safeErrorMessage } from '../utils/errorResponse';
 
 const WASH_SERVICE_PRICE = 349;
 
@@ -181,7 +182,8 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
 
     res.status(201).json({ success: true, bookingId: booking.id });
   } catch (error: any) {
-    res.status(500).json({ error: `Booking failed: ${error.message}` });
+    console.error('[POST /booking] failed:', error);
+    res.status(500).json({ error: `Booking failed: ${safeErrorMessage(error)}` });
   }
 });
 
@@ -214,7 +216,8 @@ router.post('/booking/:id/checkout-session', requireAuth, async (req: Request, r
 
     res.json({ success: true, data: { url: checkout.checkoutUrl, fields: checkout.fields } });
   } catch (error: any) {
-    res.status(502).json({ error: `Could not start payment: ${error.message}` });
+    console.error('[checkout-session] payment init failed:', error);
+    res.status(502).json({ error: `Could not start payment: ${safeErrorMessage(error)}` });
   }
 });
 
@@ -252,7 +255,8 @@ router.post('/booking/:id/balance-checkout-session', requireAuth, async (req: Re
 
     res.json({ success: true, data: { url: checkout.checkoutUrl, fields: checkout.fields } });
   } catch (error: any) {
-    res.status(502).json({ error: `Could not start payment: ${error.message}` });
+    console.error('[checkout-session] payment init failed:', error);
+    res.status(502).json({ error: `Could not start payment: ${safeErrorMessage(error)}` });
   }
 });
 
@@ -359,7 +363,8 @@ router.post('/booking/:id/complete', requireAuth, async (req: Request, res: Resp
       res.json({ success: true, message: 'Trip completed. N+1 payout scheduled.' });
     }
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('[booking/:id/complete] failed:', error);
+    res.status(500).json({ error: safeErrorMessage(error) });
   }
 });
 
@@ -371,7 +376,8 @@ router.post('/booking/:id/fleet-receipt', requireAuth, requireRole('FLEET_OPERAT
     const ledger = await PayoutEngine.confirmFleetReceipt(id, req.user!.userId);
     res.json({ success: true, message: 'Receipt confirmed. Host payout scheduled within 1 day.', data: ledger });
   } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    console.error('[booking/:id/fleet-receipt] failed:', error);
+    res.status(400).json({ error: safeErrorMessage(error) });
   }
 });
 
@@ -410,7 +416,8 @@ router.post('/booking/:id/wash-service', requireAuth, async (req: Request, res: 
     }
     res.status(201).json({ success: true, data: request, message: agentId ? 'An agent has been assigned.' : 'No agents are on duty right now — this will be picked up shortly.' });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('[booking/:id/wash-service] failed:', error);
+    res.status(500).json({ error: safeErrorMessage(error) });
   }
 });
 
@@ -654,7 +661,8 @@ router.post('/booking/:id/unlock', requireAuth, async (req: Request, res: Respon
     const success = await TelematicsService.unlockVehicle(booking.car.telematicsImei, req.user!.userId);
     res.json({ success, message: success ? 'Vehicle unlocked' : 'Unlock failed' });
   } catch (error: any) {
-    res.status(502).json({ error: error.message ?? 'Hardware command failed' });
+    console.error('[booking/:id/unlock] failed:', error);
+    res.status(502).json({ error: safeErrorMessage(error, 'Hardware command failed') });
   }
 });
 

@@ -6,6 +6,7 @@ import { recordAudit } from '../middleware/auditLog';
 import { PayoutEngine } from '../services/payoutEngine';
 import { hashPassword } from '../utils/password';
 import { notify } from '../services/notificationService';
+import { safeErrorMessage } from '../utils/errorResponse';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -459,7 +460,8 @@ router.post('/admin/payouts/:id/retry', async (req: Request, res: Response) => {
     await recordAudit(req.user!.userId, 'RETRY_PAYOUT', 'PayoutLedger', id);
     res.json({ success: true, data: updated });
   } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    console.error('[admin/payouts/:id/retry] failed:', error);
+    res.status(400).json({ error: safeErrorMessage(error) });
   }
 });
 

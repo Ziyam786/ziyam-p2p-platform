@@ -11,18 +11,28 @@ const router = Router();
 
 fs.mkdirSync(config.uploadDir, { recursive: true });
 
-const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
+// file.mimetype is the client-declared Content-Type — trivially spoofable,
+// so it's only used to pick the allowlist bucket, never trusted for the
+// saved filename's extension (a spoofed "image/jpeg" upload with an
+// evil.html original filename must not end up saved as <uuid>.html) or as
+// proof the bytes are actually what they claim (see verifyFileContent below).
+const MIME_EXTENSION: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'application/pdf': '.pdf',
+};
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, config.uploadDir),
-  filename: (_req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname).toLowerCase()}`),
+  filename: (_req, file, cb) => cb(null, `${uuidv4()}${MIME_EXTENSION[file.mimetype] ?? ''}`),
 });
 
 const upload = multer({
   storage,
   limits: { fileSize: 8 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (!ALLOWED_MIME.has(file.mimetype)) {
+    if (!MIME_EXTENSION[file.mimetype]) {
       cb(new Error('Only JPEG, PNG, WebP images or PDF files are allowed'));
       return;
     }
@@ -30,13 +40,41 @@ const upload = multer({
   },
 });
 
+// Checks the file's actual bytes match what its declared mimetype claimed —
+// a declared Content-Type is just a client-supplied header, not proof of
+// content. Images are re-parsed with sharp (throws on anything that isn't a
+// genuinely decodable image); PDFs are checked for the real %PDF- magic
+// header. Deletes the file and returns false on any mismatch.
+async function verifyFileContent(filePath: string, mimetype: string): Promise<boolean> {
+  try {
+    if (mimetype === 'application/pdf') {
+      const head = Buffer.alloc(5);
+      const fd = fs.openSync(filePath, 'r');
+      fs.readSync(fd, head, 0, 5, 0);
+      fs.closeSync(fd);
+      return head.toString('ascii') === '%PDF-';
+    }
+    const metadata = await sharp(filePath).metadata();
+    return Boolean(metadata.format);
+  } catch {
+    return false;
+  }
+}
+
 // Used for car photos, RC/insurance/PUC documents, KYC selfies, and
 // signatures — hosts and guests upload the actual file rather than pasting a
 // URL. Returns a relative /uploads/<file> path, served statically by server.ts.
 router.post('/uploads', requireAuth, (req: Request, res: Response) => {
-  upload.single('file')(req, res, (err: any) => {
+  upload.single('file')(req, res, async (err: any) => {
     if (err) return res.status(400).json({ error: err.message ?? 'Upload failed' });
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
+
+    const valid = await verifyFileContent(req.file.path, req.file.mimetype);
+    if (!valid) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(400).json({ error: 'File content does not match its declared type.' });
+    }
+
     res.json({ success: true, data: { url: `/uploads/${req.file.filename}` } });
   });
 });
