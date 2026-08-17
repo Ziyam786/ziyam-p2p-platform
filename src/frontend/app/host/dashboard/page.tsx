@@ -10,6 +10,7 @@ import Rating from '../../../components/Rating';
 import { LogoBadge } from '../../../components/Logo';
 import BlackoutManager from '../../../components/BlackoutManager';
 import BookingRequestsPanel from '../../../components/BookingRequestsPanel';
+import YieldBadge from '../../../components/YieldBadge';
 import { useAuth } from '../../../lib/auth-context';
 import { useToast } from '../../../components/Toast';
 import { hostApi, carsApi, hostReviewApi, usersApi, ApiError } from '../../../lib/api';
@@ -191,6 +192,12 @@ function DashboardInner() {
                       </span>
                     </p>
                     <div className="mt-1"><Rating value={car.rating} count={car.reviewCount} /></div>
+                    <div className="mt-2">
+                      <YieldBadge
+                        car={car}
+                        onApplied={(newRate) => setCars((prev) => prev.map((c) => (c.id === car.id ? { ...c, dailyRate: newRate } : c)))}
+                      />
+                    </div>
                   </div>
                   <div className="flex flex-col items-end gap-1.5">
                     <span className={`text-xs font-semibold px-3 py-1 rounded-full ${car.isAvailable ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>

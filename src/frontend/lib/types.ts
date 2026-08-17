@@ -102,6 +102,19 @@ export interface Car {
   fleetOnboardingStep: number;
 
   chassis?: string | null;
+  yieldAutoApply: boolean;
+}
+
+export interface YieldSuggestion {
+  carId: string;
+  currentPrice: number;
+  suggestedPrice: number;
+  changePercent: number;
+  utilizationRate: number;
+  upcomingFillRate: number;
+  demandScore: number;
+  reason: string;
+  tier: 'high_demand' | 'above_average' | 'optimal' | 'below_average' | 'low_demand';
 }
 
 export interface Booking {
