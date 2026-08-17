@@ -38,12 +38,19 @@ export class PayoutEngine {
     }
   }
 
-  /** Splits a gross booking amount into platform fee + host payout, using the live (admin-editable) split if set. */
-  static async splitAmount(totalAmount: number) {
+  /**
+   * Splits a gross booking amount into platform fee + host payout, using the
+   * live (admin-editable) split if set. `passthroughAmount` (e.g. a
+   * doorstep-delivery fee) is excluded from commission entirely and paid
+   * 100% to the host/fleet operator — the platform doesn't do the driving,
+   * so it doesn't take a cut of that fee.
+   */
+  static async splitAmount(totalAmount: number, passthroughAmount = 0) {
+    const commissionable = Math.max(0, totalAmount - passthroughAmount);
     const commission = await getSetting<number>('commission_percentage', config.payout.platformCommission);
     const hostShare = await getSetting<number>('host_share_percentage', config.payout.hostShare);
-    const platformFee = Number((totalAmount * commission).toFixed(2));
-    const hostPayout = Number((totalAmount * hostShare).toFixed(2));
+    const platformFee = Number((commissionable * commission).toFixed(2));
+    const hostPayout = Number((commissionable * hostShare).toFixed(2)) + passthroughAmount;
     return { platformFee, hostPayout };
   }
 
@@ -73,7 +80,7 @@ export class PayoutEngine {
     if (!host) throw new Error('Host account not found');
     this.assertPayoutEligible(host);
 
-    const { platformFee, hostPayout } = await this.splitAmount(booking.totalAmount);
+    const { platformFee, hostPayout } = await this.splitAmount(booking.totalAmount, booking.deliveryFeeAmount);
 
     let scheduledFor: Date;
     if (host?.payoutFrequency === 'WEEKLY') {
@@ -116,7 +123,7 @@ export class PayoutEngine {
     if (!host) throw new Error('Host account not found');
     this.assertPayoutEligible(host);
 
-    const { platformFee, hostPayout } = await this.splitAmount(booking.totalAmount);
+    const { platformFee, hostPayout } = await this.splitAmount(booking.totalAmount, booking.deliveryFeeAmount);
     const scheduledFor = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     await prisma.booking.update({

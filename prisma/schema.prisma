@@ -449,6 +449,12 @@ model Booking {
   hostPayoutAmount      Float
   protectionPlan        String        @default("BASIC") // BASIC, STANDARD, PREMIUM
   deliveryRequested     Boolean       @default(false)
+  // Snapshot of Car.deliveryFee at booking time (mutable on Car, so this is
+  // pinned the same way depositAmount pins Car.securityDeposit). Passed
+  // through 100% to whoever drives the car over — excluded from platform
+  // commission in PayoutEngine.splitAmount, since the platform doesn't do
+  // the driving.
+  deliveryFeeAmount     Float         @default(0)
   // Flat ₹500 add-on — a second named driver covered on the trip. Name +
   // license are required together whenever this is set, since an unnamed
   // co-driver isn't actually covered by the host's insurance or the lease

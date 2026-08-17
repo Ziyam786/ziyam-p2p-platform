@@ -116,6 +116,12 @@ function CheckoutInner() {
                 <span>₹{booking.depositAmount.toLocaleString()}</span>
               </div>
             )}
+            {booking.deliveryFeeAmount > 0 && (
+              <div className="flex justify-between text-gray-700">
+                <span>Doorstep delivery <span className="text-gray-400">(100% to your host)</span></span>
+                <span>₹{booking.deliveryFeeAmount.toLocaleString()}</span>
+              </div>
+            )}
             <hr className="border-gray-100" />
             <div className="flex justify-between text-gray-700">
               <span>{isReserved ? 'Reservation fee (already paid)' : 'Full trip cost'}</span>

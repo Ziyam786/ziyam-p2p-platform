@@ -119,6 +119,7 @@ export interface AdminBooking {
   cancelledBy?: CancelledBy | null;
   lateFeeAmount: number;
   lateFeeHours: number;
+  deliveryFeeAmount: number;
   reservationFeeAmount: number;
   reservationPaidAt?: string | null;
   reservationDeadline?: string | null;

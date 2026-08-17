@@ -139,7 +139,11 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
       normalizedPromo = promo.code;
     }
 
-    const { platformFee, hostPayout } = await PayoutEngine.splitAmount(totalAmount);
+    // Snapshot now — Car.deliveryFee is host-editable, so this pins what was
+    // actually quoted at booking time. Passed through 100% to the host/fleet
+    // operator, never commissioned (see PayoutEngine.splitAmount).
+    const deliveryFeeAmount = deliveryRequested ? car.deliveryFee : 0;
+    const { platformFee, hostPayout } = await PayoutEngine.splitAmount(totalAmount, deliveryFeeAmount);
 
     // Server-computed, not client-supplied — the deposit fraction can't be
     // tampered with by sending a lower totalAmount. Charged alongside
@@ -166,6 +170,7 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
         reservationFeeAmount,
         protectionPlan: resolvedPlan,
         deliveryRequested: Boolean(deliveryRequested),
+        deliveryFeeAmount,
         coDriverRequested: Boolean(coDriverRequested),
         coDriverName: coDriverRequested ? String(coDriverName).trim() : null,
         coDriverLicenseNumber: coDriverRequested ? String(coDriverLicenseNumber).trim() : null,
