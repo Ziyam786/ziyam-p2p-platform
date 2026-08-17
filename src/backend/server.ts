@@ -24,6 +24,7 @@ import uploadRoutes from './routes/upload.routes';
 import agentRoutes from './routes/agent.routes';
 import opsTripRoutes from './routes/opsTrip.routes';
 import financeErpRoutes from './routes/financeErp.routes';
+import itineraryRoutes from './routes/itinerary.routes';
 
 const app = express();
 
@@ -108,6 +109,7 @@ app.use('/api', uploadRoutes);
 app.use('/api', agentRoutes);
 app.use('/api', opsTripRoutes);
 app.use('/api', financeErpRoutes);
+app.use('/api', itineraryRoutes);
 
 // 404 handler for unmatched API routes
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));

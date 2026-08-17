@@ -19,7 +19,10 @@ import { CarCardSkeleton } from '../components/Skeleton';
 import ScrollReveal, { StaggerGroup, StaggerItem } from '../components/ScrollReveal';
 import MotionButton from '../components/MotionButton';
 import TiltCard from '../components/TiltCard';
-import { carsApi, settingsApi } from '../lib/api';
+import Modal from '../components/Modal';
+import { useToast } from '../components/Toast';
+import { carsApi, settingsApi, itinerariesApi, ApiError } from '../lib/api';
+import type { ItineraryDestination } from '../lib/api';
 import { COMPANY } from '../lib/companyInfo';
 import { setStickyDates } from '../lib/searchDates';
 import type { Car, CategoryDef, CityDef, Testimonial, TrustBadge } from '../lib/types';
@@ -187,6 +190,35 @@ export default function HomePage() {
   // Host earnings calculator teaser state — same defaults as the full page
   const [calcDailyRate, setCalcDailyRate] = useState(1800);
   const [calcUtilization, setCalcUtilization] = useState(60);
+
+  // Itinerary unlock (real ₹49 PayU flow + AI-generated content on the callback)
+  const { show: showToast } = useToast();
+  const [unlockDestination, setUnlockDestination] = useState<ItineraryDestination | null>(null);
+  const [unlockName, setUnlockName] = useState('');
+  const [unlockEmail, setUnlockEmail] = useState('');
+  const [unlockPhone, setUnlockPhone] = useState('');
+  const [unlockSubmitting, setUnlockSubmitting] = useState(false);
+  const [unlockCheckout, setUnlockCheckout] = useState<{ url: string; fields: Record<string, string> } | null>(null);
+  const unlockFormRef = React.useRef<HTMLFormElement>(null);
+
+  async function handleUnlockSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!unlockDestination) return;
+    setUnlockSubmitting(true);
+    try {
+      const res = await itinerariesApi.unlock({
+        destination: unlockDestination,
+        customerName: unlockName.trim(),
+        customerEmail: unlockEmail.trim(),
+        customerPhone: unlockPhone.trim(),
+      });
+      setUnlockCheckout({ url: res.data.url, fields: res.data.fields });
+      requestAnimationFrame(() => unlockFormRef.current?.submit());
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : 'Could not start payment', 'error');
+      setUnlockSubmitting(false);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -929,14 +961,14 @@ export default function HomePage() {
       </section>
 
       {/* ── ROAD TRIP ITINERARIES TEASER ─────────────────────────────── */}
-      <section className="relative bg-slate-950 py-20 overflow-hidden">
+      <section id="itineraries" className="relative bg-slate-950 py-20 overflow-hidden">
         <Glow className="top-0 left-0 w-[30rem] h-[26rem] bg-amber-500/10" />
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-10">
-            <span className="text-amber-400 text-xs font-bold uppercase tracking-widest">Coming Soon</span>
+            <span className="text-amber-400 text-xs font-bold uppercase tracking-widest">AI-Generated · ₹49</span>
             <h2 className="text-3xl md:text-4xl font-extrabold text-white mt-2 mb-3">Smart road-trip itineraries</h2>
             <p className="text-slate-400 text-sm max-w-xl mx-auto">
-              Curated day-and-weekend routes out of Bengaluru — unlocked for a flat ₹49 once live. Distances are approximate.
+              A day-by-day route plan out of Bengaluru, generated for you the moment you unlock it — stops, timing, and self-drive tips included. Distances are approximate.
             </p>
           </ScrollReveal>
 
@@ -953,18 +985,19 @@ export default function HomePage() {
                   >
                     <div className="flex items-start justify-between">
                       <Icon className="w-7 h-7 text-white/90" />
-                      <span className="bg-black/25 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-1 rounded-full">₹49 · Soon</span>
+                      <span className="bg-black/25 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-1 rounded-full">₹49</span>
                     </div>
                     <div>
                       <p className="text-white/70 text-[11px] font-semibold uppercase tracking-wider mb-1">{trip.tag}</p>
                       <h3 className="text-white font-extrabold text-lg mb-1">Bengaluru → {trip.to}</h3>
                       <p className="text-white/70 text-xs mb-3">{trip.distance}</p>
-                      <a
-                        href={`mailto:${COMPANY.email}?subject=${encodeURIComponent(`Notify me — ${trip.to} itinerary`)}`}
+                      <button
+                        type="button"
+                        onClick={() => setUnlockDestination(trip.to as ItineraryDestination)}
                         className="inline-flex items-center gap-1 text-white text-xs font-bold bg-white/15 hover:bg-white/25 backdrop-blur-sm px-3 py-1.5 rounded-lg transition-colors"
                       >
-                        Notify Me <ArrowUpRight className="w-3 h-3" />
-                      </a>
+                        Unlock Itinerary <ArrowUpRight className="w-3 h-3" />
+                      </button>
                     </div>
                   </motion.div>
                 </StaggerItem>
@@ -973,6 +1006,44 @@ export default function HomePage() {
           </StaggerGroup>
         </div>
       </section>
+
+      <Modal open={Boolean(unlockDestination)} onClose={() => { if (!unlockSubmitting) { setUnlockDestination(null); setUnlockCheckout(null); } }} title={`Unlock: Bengaluru → ${unlockDestination}`}>
+        <form onSubmit={handleUnlockSubmit} className="space-y-4">
+          <p className="text-sm text-gray-500">
+            ₹49 unlocks an AI-generated day-by-day itinerary for this route — stops, timing, attractions, and self-drive tips, ready right after payment.
+          </p>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Full Name</label>
+            <input required value={unlockName} onChange={(e) => setUnlockName(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Email</label>
+            <input type="email" required value={unlockEmail} onChange={(e) => setUnlockEmail(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Mobile Number</label>
+            <input type="tel" required value={unlockPhone} onChange={(e) => setUnlockPhone(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
+          </div>
+
+          <button
+            type="submit"
+            disabled={unlockSubmitting}
+            className="w-full btn-gradient text-white font-bold py-3 rounded-xl transition disabled:opacity-60"
+          >
+            {unlockSubmitting ? 'Redirecting to PayU…' : 'Pay ₹49 & Unlock'}
+          </button>
+          <p className="text-[11px] text-gray-400 text-center">🔒 Secure checkout via PayU. No account needed.</p>
+        </form>
+
+        {/* Hidden auto-submitting form to PayU's hosted checkout — a sibling of
+            the form above, never nested inside it (nested <form> is invalid
+            HTML and browsers will hoist/break it unpredictably). */}
+        <form ref={unlockFormRef} action={unlockCheckout?.url} method="POST" className="hidden">
+          {unlockCheckout && Object.entries(unlockCheckout.fields).map(([name, value]) => (
+            <input key={name} type="hidden" name={name} value={value} />
+          ))}
+        </form>
+      </Modal>
 
       {/* ── TOP CITIES ───────────────────────────────────────────────── */}
       <section className="py-16 bg-marc8cream">

@@ -919,6 +919,32 @@ model OpsPayment {
   @@index([invoiceId])
 }
 
+enum ItineraryUnlockStatus {
+  PENDING_PAYMENT
+  PAID
+  FAILED
+}
+
+// A one-off ₹49 AI-generated road-trip itinerary purchase — deliberately not
+// tied to a User (no signup required for this impulse-buy homepage teaser,
+// same "walk-in, plain contact fields" pattern as OpsTrip). generatedContent
+// is produced once via aiService.generateChatReply and cached on the row so
+// a customer never pays twice to re-view the same itinerary.
+model ItineraryUnlock {
+  id               String                @id @default(uuid())
+  destination      String                // "Ooty" | "Coorg" | "Chikmagalur" | "Gokarna"
+  customerName     String
+  customerEmail    String
+  customerPhone    String
+  amount           Float                 @default(49)
+  paymentIntentId  String?               @unique // PayU txnid
+  status           ItineraryUnlockStatus @default(PENDING_PAYMENT)
+  generatedContent String?
+  createdAt        DateTime              @default(now())
+
+  @@index([status])
+}
+
 // Traceability for admin mutations (suspend, feature, refund, etc).
 model AuditLog {
   id         String   @id @default(uuid())
