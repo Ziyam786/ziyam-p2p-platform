@@ -218,6 +218,9 @@ function TripDetailInner() {
                 />
               )}
               <Stat label="Total Paid" value={`₹${(trip.totalAmount + trip.depositAmount).toLocaleString()}`} />
+              {trip.lateFeeAmount > 0 && (
+                <Stat label={`Late Fee (${Math.round(trip.lateFeeHours)}h late)`} value={`₹${trip.lateFeeAmount.toLocaleString()}`} />
+              )}
             </div>
 
             <div className="flex flex-wrap gap-3 mt-6">

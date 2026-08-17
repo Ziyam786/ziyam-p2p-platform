@@ -22,6 +22,11 @@ const REFERRAL_REWARD = 500; // ₹ credited to the referrer once their referred
 // which until now was description text only with no backing calculation.
 const DEPOSIT_HOLD_FRACTION: Record<string, number> = { BASIC: 1, STANDARD: 0.6, PREMIUM: 0.3 };
 
+// Late-return fee — see the /complete handler below.
+const LATE_FEE_GRACE_HOURS = 0.5;
+const MAX_LATE_FEE_HOURS = 24; // beyond this, admin/support handles it manually rather than auto-charging further
+const LATE_FEE_MULTIPLIER = 1.5;
+
 // The 4 angles a pickup/drop-off photo set must cover before /start or
 // /complete will succeed — mirrors and odometer are captured too (see
 // PhotoAngle) but stay optional, since only these four are load-bearing for
@@ -263,10 +268,37 @@ router.post('/booking/:id/complete', requireAuth, async (req: Request, res: Resp
       return res.status(400).json({ error: 'Upload all 4 required drop-off photos (front, rear, left, right) before completing the trip.' });
     }
 
+    // Late-return fee — published in terms/page.tsx §5 ("late fees") but
+    // never actually charged until now. Grace period before anything's
+    // charged; capped at MAX_LATE_HOURS so an extreme overrun (days late)
+    // gets flagged for admin/support rather than auto-charging a runaway
+    // amount. Rate is derived from the car's own listed dailyRate — not an
+    // invented platform-wide number — at a 1.5x multiplier, the standard
+    // "costs more than the normal rate" late-return structure.
+    const hoursLate = (Date.now() - existing.endTime.getTime()) / (60 * 60 * 1000);
+    const chargeableHours = Math.max(0, Math.min(hoursLate - LATE_FEE_GRACE_HOURS, MAX_LATE_FEE_HOURS));
+    const lateFeeAmount = chargeableHours > 0 ? Math.round(chargeableHours * (existing.car.dailyRate / 24) * LATE_FEE_MULTIPLIER) : 0;
+
     const booking = await prisma.booking.update({
       where: { id },
-      data: { status: BookingStatus.COMPLETED },
+      data: { status: BookingStatus.COMPLETED, lateFeeAmount, lateFeeHours: Math.max(0, hoursLate) },
     });
+    if (lateFeeAmount > 0) {
+      await notify(
+        booking.customerId,
+        'GENERIC',
+        'Late return fee applied',
+        `Returning the ${existing.car.make} ${existing.car.model} ${Math.round(hoursLate)}h late added a ₹${lateFeeAmount.toLocaleString('en-IN')} fee, deducted from your security deposit.`,
+        `/account/trips/${booking.id}`
+      );
+      await notify(
+        existing.car.ownerId,
+        'GENERIC',
+        'Guest returned the car late',
+        `${Math.round(hoursLate)}h late — a ₹${lateFeeAmount.toLocaleString('en-IN')} late fee was applied and will come out of the released deposit.`,
+        '/host/dashboard'
+      );
+    }
     await creditReferralRewardIfFirstTrip(booking.customerId);
 
     // Fleet-managed cars don't schedule a payout here — that only happens once

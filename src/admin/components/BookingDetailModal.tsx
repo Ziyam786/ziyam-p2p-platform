@@ -57,6 +57,12 @@ export default function BookingDetailModal({ booking, onClose }: { booking: Admi
             </div>
           </div>
 
+          {booking.lateFeeAmount > 0 && (
+            <div className="bg-orange-500/10 text-orange-300 rounded-lg px-4 py-3 text-sm">
+              ₹{booking.lateFeeAmount.toLocaleString()} late-return fee ({Math.round(booking.lateFeeHours)}h late) — deducted from the released deposit
+            </div>
+          )}
+
           {booking.status === 'PENDING_HOST_REVIEW' && booking.hostReviewDeadline && (
             <div className="bg-amber-500/10 text-amber-300 rounded-lg px-4 py-3 text-sm">
               Awaiting host response by {new Date(booking.hostReviewDeadline).toLocaleString()}

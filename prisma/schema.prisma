@@ -472,6 +472,15 @@ model Booking {
   refundRequests    RefundRequest[]
   conditionPhotos   BookingConditionPhoto[]
 
+  // Late-return fee — charged automatically at /complete when the trip ends
+  // more than the grace period past endTime (see LATE_FEE_GRACE_HOURS in
+  // booking.routes.ts). Real, published in terms/page.tsx §5 ("late fees")
+  // but never actually computed anywhere until now. Recovered by reducing
+  // what the deposit-release cron pays back, same mechanism a DamageClaim
+  // uses — not a new live payment charge.
+  lateFeeAmount Float @default(0)
+  lateFeeHours  Float @default(0)
+
   // Live doorstep-delivery tracking (Uber/Zepto-style) — the host's own
   // device reports its GPS position via POST /bookings/:id/delivery-location
   // while driving the car to the guest; only meaningful when

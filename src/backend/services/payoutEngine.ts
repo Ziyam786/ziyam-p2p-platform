@@ -219,16 +219,34 @@ export class PayoutEngine {
 
       for (const booking of releasable) {
         try {
+          // A late-return fee (see /booking/:id/complete) is recovered by
+          // reducing the release, same as a damage deduction would — not a
+          // separate live charge.
+          const releaseAmount = Math.max(0, booking.depositAmount - booking.lateFeeAmount);
+          const depositStatus = booking.lateFeeAmount > 0 ? BookingDepositStatus.PARTIALLY_DEDUCTED : BookingDepositStatus.RELEASED;
+
           await prisma.$transaction([
             prisma.booking.update({
               where: { id: booking.id },
-              data: { depositStatus: BookingDepositStatus.RELEASED, depositReleasedAt: new Date() },
+              data: { depositStatus, depositReleasedAt: new Date() },
             }),
-            prisma.refundRequest.create({
-              data: { bookingId: booking.id, type: RefundRequestType.DEPOSIT_RELEASE, amount: booking.depositAmount },
-            }),
+            ...(releaseAmount > 0
+              ? [
+                  prisma.refundRequest.create({
+                    data: {
+                      bookingId: booking.id,
+                      type: RefundRequestType.DEPOSIT_RELEASE,
+                      amount: releaseAmount,
+                      notes: booking.lateFeeAmount > 0 ? `₹${booking.lateFeeAmount} late-return fee deducted from the ₹${booking.depositAmount} deposit` : undefined,
+                    },
+                  }),
+                ]
+              : []),
           ]);
-          console.log(`[DEPOSIT RELEASE] Booking ${booking.id} — ₹${booking.depositAmount} queued for admin refund`);
+          console.log(
+            `[DEPOSIT RELEASE] Booking ${booking.id} — ₹${releaseAmount} queued for admin refund` +
+              (booking.lateFeeAmount > 0 ? ` (₹${booking.lateFeeAmount} late fee deducted)` : '')
+          );
         } catch (error: any) {
           console.error(`[DEPOSIT RELEASE ERROR] Booking ${booking.id}:`, error.message);
         }

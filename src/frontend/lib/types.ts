@@ -138,6 +138,8 @@ export interface Booking {
   deliveryLatitude?: number | null;
   deliveryLongitude?: number | null;
   deliveryLocationUpdatedAt?: string | null;
+  lateFeeAmount: number;
+  lateFeeHours: number;
   createdAt: string;
 }
 

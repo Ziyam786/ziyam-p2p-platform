@@ -117,6 +117,8 @@ export interface AdminBooking {
   rejectionReason?: string | null;
   cancellationReason?: string | null;
   cancelledBy?: CancelledBy | null;
+  lateFeeAmount: number;
+  lateFeeHours: number;
   refundRequests?: { type: RefundRequestType; amount: number; status: RefundRequestStatus; createdAt: string }[];
   createdAt: string;
 }
