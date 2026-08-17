@@ -94,6 +94,10 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
   commission_percentage: config.payout.platformCommission,
   host_share_percentage: config.payout.hostShare,
   settlement_hours: config.payout.settlementHours,
+  // How long a host has to Accept/Reject a paid booking before the
+  // auto-reject cron steps in (see hostReview.routes.ts, payoutEngine.ts's
+  // initializeHostReviewTimeoutCron). Admin-only, not in PUBLIC_KEYS.
+  host_review_window_hours: 2,
   ai_chat_enabled: true,
   ai_chat_system_prompt:
     'You are the ZiyamSelfDrive support assistant, a peer-to-peer self-drive car rental platform currently operating ' +
@@ -107,7 +111,7 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     'insurance, hosts recover damage costs directly from the lessee, and the platform helps by trying to cover up to ' +
     '₹20,000 of a claim and suggesting garages, with 24/7 roadside assistance for breakdowns or abandoned vehicles. ' +
     'Free cancellation up to 24 hours before pickup. Answer briefly and helpfully; if you do not know something ' +
-    'platform-specific, suggest contacting support@ziyam.in.',
+    'platform-specific, suggest contacting eightlinesfleet@gmail.com.',
 
   // Fleet Ops facilitation fee — admin-only (not in PUBLIC_KEYS). Ground-truthed
   // from the real production system: one configurable percentage (not the

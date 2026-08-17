@@ -48,10 +48,46 @@ model CustomRole {
 enum BookingStatus {
   PENDING
   PENDING_PAYMENT
+  PENDING_HOST_REVIEW // payment cleared, awaiting host accept/reject (see hostReview.routes.ts)
   CONFIRMED
   ACTIVE
   COMPLETED
   CANCELLED
+  REJECTED // host (or review-window timeout) declined — always a full refund, see refund-policy §5
+}
+
+enum CancelledBy {
+  CUSTOMER
+  HOST
+  SYSTEM // host-review timeout
+  ADMIN
+}
+
+enum TripStage {
+  PRE_TRIP
+  POST_TRIP
+}
+
+enum PhotoAngle {
+  FRONT
+  REAR
+  LEFT
+  RIGHT
+  MIRROR_LEFT
+  MIRROR_RIGHT
+  ODOMETER
+  OTHER
+}
+
+enum KycMethod {
+  AADHAAR_OTP
+  DIGILOCKER
+  DOC_UPLOAD
+}
+
+enum KycOutcome {
+  SUCCESS
+  FAILED
 }
 
 enum BookingDepositStatus {
@@ -71,7 +107,7 @@ enum DamageClaimStatus {
 enum RefundRequestType {
   DEPOSIT_RELEASE
   DEPOSIT_PARTIAL
-  CANCELLATION // unused until a future cancellation-flow phase
+  CANCELLATION // guest cancel or host reject/timeout, see booking.routes.ts and hostReview.routes.ts
 }
 
 enum RefundRequestStatus {
@@ -192,6 +228,8 @@ model User {
   reportedDamageClaims    DamageClaim[]     @relation("ReportedDamageClaims")
   reviewedDamageClaims    DamageClaim[]     @relation("ReviewedDamageClaims")
   completedRefundRequests RefundRequest[]   @relation("CompletedRefundRequests")
+  conditionPhotosUploaded BookingConditionPhoto[]
+  kycVerificationLogs     KycVerificationLog[]
   loggedCashLogEntries    CashLogEntry[]
   loggedOpsInvoices       OpsInvoice[]
   loggedOpsPayments       OpsPayment[]
@@ -215,6 +253,23 @@ model OtpCode {
   createdAt   DateTime  @default(now())
 
   @@index([phoneNumber])
+}
+
+// Per-attempt KYC history — kyc.routes.ts writes one row per terminal
+// outcome (success or failure) on each of the three verification paths.
+// Distinct from the User's current isKycVerified/aadhaarVerifiedName/
+// digilockerStatus snapshot fields: this is the append-only timeline behind
+// that snapshot, so an admin can see every attempt, not just the latest one.
+model KycVerificationLog {
+  id        String     @id @default(uuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id])
+  method    KycMethod
+  outcome   KycOutcome
+  detail    String? // verified name on success, error message on failure
+  createdAt DateTime   @default(now())
+
+  @@index([userId])
 }
 
 model Car {
@@ -415,6 +470,35 @@ model Booking {
   depositReleasedAt DateTime?
   damageClaim       DamageClaim?
   refundRequests    RefundRequest[]
+  conditionPhotos   BookingConditionPhoto[]
+
+  // Late-return fee — charged automatically at /complete when the trip ends
+  // more than the grace period past endTime (see LATE_FEE_GRACE_HOURS in
+  // booking.routes.ts). Real, published in terms/page.tsx §5 ("late fees")
+  // but never actually computed anywhere until now. Recovered by reducing
+  // what the deposit-release cron pays back, same mechanism a DamageClaim
+  // uses — not a new live payment charge.
+  lateFeeAmount Float @default(0)
+  lateFeeHours  Float @default(0)
+
+  // Live doorstep-delivery tracking (Uber/Zepto-style) — the host's own
+  // device reports its GPS position via POST /bookings/:id/delivery-location
+  // while driving the car to the guest; only meaningful when
+  // deliveryRequested is true and only shown to the guest pre-pickup.
+  // Last-known-position only, not a route history — a new model would be
+  // overkill for "where is the car right now."
+  deliveryLatitude          Float?
+  deliveryLongitude         Float?
+  deliveryLocationUpdatedAt DateTime?
+
+  // Host review — inserted between payment success and CONFIRMED (see
+  // hostReview.routes.ts). hostReviewDeadline drives the auto-reject cron in
+  // payoutEngine.ts once the review window (host_review_window_hours setting)
+  // elapses with no host response.
+  hostReviewDeadline DateTime?
+  rejectionReason    String?
+  cancellationReason String?
+  cancelledBy        CancelledBy?
 
   // Set by the fleet operator once they've confirmed receiving a clear payout
   // from the platform for this booking — starts the 1-day host payout window
@@ -467,8 +551,8 @@ model DamageClaim {
 
 // Money owed back to a guest that a human admin must action manually in the
 // PayU merchant portal — no live refund API integration yet. Covers deposit
-// releases/partial releases today; CANCELLATION is reserved for a future
-// cancellation-flow phase so the enum doesn't need a later migration.
+// releases/partial releases, and CANCELLATION (guest cancel or host
+// reject/timeout — see booking.routes.ts and hostReview.routes.ts).
 model RefundRequest {
   id                 String              @id @default(uuid())
   bookingId          String
@@ -483,6 +567,26 @@ model RefundRequest {
   completedAt        DateTime?
 
   @@index([status])
+}
+
+// Pickup (PRE_TRIP) and drop-off (POST_TRIP) vehicle-condition photos — one
+// row per angle. Required before /booking/:id/start and /booking/:id/complete
+// respectively (front/rear/left/right), so they're usable evidence in a
+// damage dispute rather than an optional, skippable extra. uploadedBy is
+// whichever party (host or guest) actually took the photo — either can, same
+// as today's Start Trip button having no host-only restriction.
+model BookingConditionPhoto {
+  id           String     @id @default(uuid())
+  bookingId    String
+  booking      Booking    @relation(fields: [bookingId], references: [id])
+  stage        TripStage
+  angle        PhotoAngle
+  url          String
+  uploadedById String
+  uploadedBy   User       @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime   @default(now())
+
+  @@index([bookingId])
 }
 
 // Guest<->host messaging, scoped to a specific booking (not a general DM

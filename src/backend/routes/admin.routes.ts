@@ -43,11 +43,18 @@ router.get('/admin/bookings', async (req: Request, res: Response) => {
     include: {
       car: { select: { make: true, model: true, city: true } },
       customer: { select: { fullName: true, email: true } },
+      refundRequests: { orderBy: { createdAt: 'desc' }, take: 1 },
     },
     orderBy: { createdAt: 'desc' },
     take: 200,
   });
   res.json({ success: true, count: bookings.length, data: bookings });
+});
+
+router.get('/admin/bookings/:id/condition-photos', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const photos = await prisma.bookingConditionPhoto.findMany({ where: { bookingId: id }, orderBy: { createdAt: 'asc' } });
+  res.json({ success: true, data: photos });
 });
 
 // Admin-created booking — for walk-in or phone bookings where the customer
@@ -184,6 +191,12 @@ router.get('/admin/users', async (req: Request, res: Response) => {
     take: 300,
   });
   res.json({ success: true, count: users.length, data: users });
+});
+
+router.get('/admin/users/:id/kyc-log', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const log = await prisma.kycVerificationLog.findMany({ where: { userId: id }, orderBy: { createdAt: 'desc' } });
+  res.json({ success: true, data: log });
 });
 
 router.patch('/admin/users/:id', async (req: Request, res: Response) => {

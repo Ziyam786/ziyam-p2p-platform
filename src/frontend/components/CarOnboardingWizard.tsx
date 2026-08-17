@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import FeaturePicker from './FeaturePicker';
 import AddressAutocomplete from './AddressAutocomplete';
 import FileUploadField from './FileUploadField';
+import PlateBlurEditor from './PlateBlurEditor';
 import SmartPriceSlider from './SmartPriceSlider';
 import { settingsApi } from '../lib/api';
 
@@ -11,14 +13,13 @@ const CATEGORIES_FALLBACK = ['Hatchback', 'Sedan', 'SUV', 'Luxury', 'EV', 'MUV']
 const FUEL_TYPES = ['Petrol', 'Diesel', 'Electric', 'CNG'];
 const TRANSMISSIONS = ['Manual', 'Automatic'];
 const CITIES_FALLBACK = ['Bengaluru', 'Mumbai', 'Delhi NCR', 'Hyderabad', 'Chennai', 'Pune', 'Kolkata', 'Jaipur', 'Ahmedabad', 'Kochi'];
-const PHOTO_SLOTS = ['Front View', 'Left View', 'Right View', 'Rear View', 'Interior / Dashboard'];
 
 export interface WizardValues {
   registrationNo: string; make: string; model: string; year: number; category: string;
   fuelType: string; transmission: string; seats: number; city: string;
   address: string; latitude: number | null; longitude: number | null;
   rcDocUrl: string; pollutionCertUrl: string; insuranceDocUrl: string;
-  images: string[]; description: string; features: string[];
+  images: string[]; originalImages: string[]; description: string; features: string[];
   dailyRate: number; securityDeposit: number; kmIncludedPerDay: number; extraKmCharge: number;
   instantBook: boolean; offersDelivery: boolean; deliveryFee: number; offersPickup: boolean; pickupFee: number;
 }
@@ -28,7 +29,7 @@ const DEFAULTS: WizardValues = {
   fuelType: 'Petrol', transmission: 'Manual', seats: 5, city: 'Bengaluru',
   address: '', latitude: null, longitude: null,
   rcDocUrl: '', pollutionCertUrl: '', insuranceDocUrl: '',
-  images: ['', '', '', '', ''], description: '', features: ['Air Conditioning', 'Power Steering', 'Bluetooth', 'Power Windows', 'Music System'],
+  images: [], originalImages: [], description: '', features: ['Air Conditioning', 'Power Steering', 'Bluetooth', 'Power Windows', 'Music System'],
   dailyRate: 1200, securityDeposit: 3000, kmIncludedPerDay: 300, extraKmCharge: 10,
   instantBook: true, offersDelivery: false, deliveryFee: 0, offersPickup: false, pickupFee: 0,
 };
@@ -40,7 +41,7 @@ export function wizardValuesToPayload(v: WizardValues) {
     securityDeposit: Number(v.securityDeposit), kmIncludedPerDay: Number(v.kmIncludedPerDay),
     extraKmCharge: Number(v.extraKmCharge), city: v.city, description: v.description,
     address: v.address || undefined, latitude: v.latitude ?? undefined, longitude: v.longitude ?? undefined,
-    images: v.images.map((s) => s.trim()).filter(Boolean),
+    images: v.images, originalImages: v.originalImages,
     features: v.features,
     instantBook: v.instantBook, offersDelivery: v.offersDelivery, deliveryFee: Number(v.deliveryFee),
     offersPickup: v.offersPickup, pickupFee: Number(v.pickupFee),
@@ -85,7 +86,7 @@ export default function CarOnboardingWizard({
     : true;
 
   const docsComplete = Boolean(values.rcDocUrl && values.pollutionCertUrl && values.insuranceDocUrl);
-  const photosCount = values.images.filter((s) => s.trim()).length;
+  const photosCount = values.images.length;
   const stepsCompleted = [
     Boolean(values.registrationNo && values.make && values.model),
     docsComplete,
@@ -210,22 +211,33 @@ export default function CarOnboardingWizard({
 
       {step === 2 && (
         <div className="space-y-5">
-          <p className="text-sm text-gray-500">Add clear, well-lit photos from each angle.</p>
-          {PHOTO_SLOTS.map((slot, i) => (
-            <FileUploadField
-              key={slot}
-              label={slot}
-              value={values.images[i]}
-              onChange={(url) => {
-                const next = [...values.images];
-                next[i] = url;
-                set('images', next);
-              }}
-              accept="image/jpeg,image/png,image/webp"
-              kind="image"
-            />
-          ))}
-          <p className="text-xs text-gray-400">{photosCount} of {PHOTO_SLOTS.length} photo slots filled · at least 2 recommended</p>
+          <p className="text-sm text-gray-500">Add clear, well-lit photos from each angle — front, sides, rear, and interior.</p>
+          <div className="flex flex-wrap gap-3">
+            {values.images.map((url, i) => (
+              <div key={url + i} className="relative w-20 h-20">
+                <Image src={url} alt={`Car photo ${i + 1}`} fill sizes="80px" className="rounded-lg object-cover border border-gray-200" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    set('images', values.images.filter((_, j) => j !== i));
+                    set('originalImages', values.originalImages.filter((_, j) => j !== i));
+                  }}
+                  className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center"
+                  aria-label="Remove photo"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400">License plates are blurred automatically before a photo is added — draw a box over the plate for each upload.</p>
+          <PlateBlurEditor
+            onComplete={(blurredUrl, originalUrl) => {
+              set('images', [...values.images, blurredUrl]);
+              set('originalImages', [...values.originalImages, originalUrl]);
+            }}
+          />
+          <p className="text-xs text-gray-400">{photosCount} photo{photosCount === 1 ? '' : 's'} added · at least 2 recommended</p>
         </div>
       )}
 
@@ -285,7 +297,7 @@ export default function CarOnboardingWizard({
           <div className="rounded-xl border border-gray-100 divide-y">
             <ReviewRow label="Vehicle" value={`${values.make} ${values.model} (${values.year}) · ${values.registrationNo}`} />
             <ReviewRow label="Documents" value={docsComplete ? 'All 3 uploaded — will show Verified' : 'Incomplete — add later to get verified'} ok={docsComplete} />
-            <ReviewRow label="Photos" value={`${photosCount} of ${PHOTO_SLOTS.length} slots filled`} ok={photosCount >= 2} />
+            <ReviewRow label="Photos" value={`${photosCount} photo${photosCount === 1 ? '' : 's'} added`} ok={photosCount >= 2} />
             <ReviewRow label="Features" value={`${values.features.length} selected`} ok={values.features.length >= 5} />
             <ReviewRow label="Pricing" value={`₹${values.dailyRate}/day · ${values.city}`} ok />
           </div>

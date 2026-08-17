@@ -1,4 +1,4 @@
-import { PrismaClient, PayoutStatus, BookingStatus, BookingDepositStatus, RefundRequestType } from '@prisma/client';
+import { PrismaClient, PayoutStatus, BookingStatus, BookingDepositStatus, RefundRequestType, CancelledBy } from '@prisma/client';
 import cron from 'node-cron';
 import axios from 'axios';
 import { config } from '../config';
@@ -219,18 +219,84 @@ export class PayoutEngine {
 
       for (const booking of releasable) {
         try {
+          // A late-return fee (see /booking/:id/complete) is recovered by
+          // reducing the release, same as a damage deduction would — not a
+          // separate live charge.
+          const releaseAmount = Math.max(0, booking.depositAmount - booking.lateFeeAmount);
+          const depositStatus = booking.lateFeeAmount > 0 ? BookingDepositStatus.PARTIALLY_DEDUCTED : BookingDepositStatus.RELEASED;
+
           await prisma.$transaction([
             prisma.booking.update({
               where: { id: booking.id },
-              data: { depositStatus: BookingDepositStatus.RELEASED, depositReleasedAt: new Date() },
+              data: { depositStatus, depositReleasedAt: new Date() },
             }),
-            prisma.refundRequest.create({
-              data: { bookingId: booking.id, type: RefundRequestType.DEPOSIT_RELEASE, amount: booking.depositAmount },
-            }),
+            ...(releaseAmount > 0
+              ? [
+                  prisma.refundRequest.create({
+                    data: {
+                      bookingId: booking.id,
+                      type: RefundRequestType.DEPOSIT_RELEASE,
+                      amount: releaseAmount,
+                      notes: booking.lateFeeAmount > 0 ? `₹${booking.lateFeeAmount} late-return fee deducted from the ₹${booking.depositAmount} deposit` : undefined,
+                    },
+                  }),
+                ]
+              : []),
           ]);
-          console.log(`[DEPOSIT RELEASE] Booking ${booking.id} — ₹${booking.depositAmount} queued for admin refund`);
+          console.log(
+            `[DEPOSIT RELEASE] Booking ${booking.id} — ₹${releaseAmount} queued for admin refund` +
+              (booking.lateFeeAmount > 0 ? ` (₹${booking.lateFeeAmount} late fee deducted)` : '')
+          );
         } catch (error: any) {
           console.error(`[DEPOSIT RELEASE ERROR] Booking ${booking.id}:`, error.message);
+        }
+      }
+    });
+  }
+
+  /**
+   * Runs hourly alongside the other crons — a paid booking that sat in
+   * PENDING_HOST_REVIEW past its deadline with no host response is treated
+   * the same as an explicit host reject (full refund of trip cost + deposit,
+   * per refund-policy §5), not auto-confirmed. Auto-confirming would defeat
+   * the whole point of host review: catching a car that turned out to
+   * actually be unavailable. See hostReview.routes.ts for the explicit-reject
+   * counterpart this mirrors.
+   */
+  static initializeHostReviewTimeoutCron() {
+    cron.schedule('0 * * * *', async () => {
+      const expired = await prisma.booking.findMany({
+        where: { status: BookingStatus.PENDING_HOST_REVIEW, hostReviewDeadline: { lt: new Date() } },
+        include: { car: true },
+      });
+
+      for (const booking of expired) {
+        try {
+          const refundAmount = booking.totalAmount - booking.platformFee + booking.depositAmount;
+          await prisma.$transaction([
+            prisma.booking.update({
+              where: { id: booking.id },
+              data: {
+                status: BookingStatus.REJECTED,
+                hostReviewDeadline: null,
+                rejectionReason: 'No host response within the review window',
+                cancelledBy: CancelledBy.SYSTEM,
+              },
+            }),
+            prisma.refundRequest.create({
+              data: { bookingId: booking.id, type: RefundRequestType.CANCELLATION, amount: refundAmount, notes: 'Host review window expired with no response' },
+            }),
+          ]);
+          await notify(
+            booking.customerId,
+            'GENERIC',
+            'Booking declined',
+            `The host didn't respond in time for your ${booking.car.make} ${booking.car.model} booking — you've been fully refunded.`,
+            `/account/trips/${booking.id}`
+          );
+          console.log(`[HOST REVIEW TIMEOUT] Booking ${booking.id} auto-rejected — ₹${refundAmount} queued for admin refund`);
+        } catch (error: any) {
+          console.error(`[HOST REVIEW TIMEOUT ERROR] Booking ${booking.id}:`, error.message);
         }
       }
     });

@@ -5,7 +5,7 @@ import AdminShell from '../../components/AdminShell';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/Toast';
 import { adminApi } from '../../lib/api';
-import type { AdminUser, CustomRoleRow, Role } from '../../lib/types';
+import type { AdminUser, CustomRoleRow, KycVerificationLogRow, Role } from '../../lib/types';
 
 const ROLES: Role[] = [
   'CUSTOMER', 'SELF_HOST', 'FLEET_OPERATOR', 'AGENT',
@@ -39,6 +39,13 @@ export default function UsersPage() {
   const [form, setForm] = useState({ fullName: '', email: '', phoneNumber: '', bio: '' });
   const [saving, setSaving] = useState(false);
   const [kycUser, setKycUser] = useState<AdminUser | null>(null);
+  const [kycLog, setKycLog] = useState<KycVerificationLogRow[]>([]);
+
+  useEffect(() => {
+    if (!kycUser) return;
+    setKycLog([]);
+    adminApi.kycLog(kycUser.id).then((res) => setKycLog(res.data)).catch(() => {});
+  }, [kycUser?.id]);
 
   function load() {
     setLoading(true);
@@ -284,6 +291,28 @@ export default function UsersPage() {
 
               {method.trust === 'none' && (
                 <p className="text-sm text-slate-500">This user hasn't completed any KYC path yet — nothing to review.</p>
+              )}
+
+              {kycLog.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-400 mb-2">Verification history</p>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {kycLog.map((entry) => (
+                      <div key={entry.id} className="flex items-center justify-between gap-3 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs">
+                        <div className="min-w-0">
+                          <p className="text-slate-200 font-semibold">{entry.method.replace(/_/g, ' ')}</p>
+                          {entry.detail && <p className="text-slate-500 truncate">{entry.detail}</p>}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className={`font-bold px-2 py-0.5 rounded-full ${entry.outcome === 'SUCCESS' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-red-500/10 text-red-300'}`}>
+                            {entry.outcome}
+                          </span>
+                          <p className="text-slate-600 mt-0.5">{new Date(entry.createdAt).toLocaleString()}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">

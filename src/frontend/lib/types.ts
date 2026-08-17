@@ -3,13 +3,18 @@ export type Role =
   | 'FLEET_ADMIN' | 'OPERATIONS_EXECUTIVE' | 'MECHANICAL_EXECUTIVE' | 'TECHNICIAN'
   | 'ADMIN';
 
-export type BookingStatus = 'PENDING' | 'PENDING_PAYMENT' | 'CONFIRMED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+export type BookingStatus =
+  | 'PENDING' | 'PENDING_PAYMENT' | 'PENDING_HOST_REVIEW' | 'CONFIRMED' | 'ACTIVE' | 'COMPLETED'
+  | 'CANCELLED' | 'REJECTED';
 
 export type PayoutStatus = 'HELD_IN_ESCROW' | 'QUEUED_FOR_N1' | 'SETTLED' | 'FAILED';
 
 export type ProtectionPlan = 'BASIC' | 'STANDARD' | 'PREMIUM';
 export type BookingDepositStatus = 'HELD' | 'RELEASED' | 'PARTIALLY_DEDUCTED' | 'FORFEITED';
 export type DamageClaimStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
+export type CancelledBy = 'CUSTOMER' | 'HOST' | 'SYSTEM' | 'ADMIN';
+export type TripStage = 'PRE_TRIP' | 'POST_TRIP';
+export type PhotoAngle = 'FRONT' | 'REAR' | 'LEFT' | 'RIGHT' | 'MIRROR_LEFT' | 'MIRROR_RIGHT' | 'ODOMETER' | 'OTHER';
 
 export type CarVerificationStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
 
@@ -126,6 +131,32 @@ export interface Booking {
   depositStatus: BookingDepositStatus;
   depositReleasedAt?: string | null;
   damageClaim?: DamageClaim | null;
+  hostReviewDeadline?: string | null;
+  rejectionReason?: string | null;
+  cancellationReason?: string | null;
+  cancelledBy?: CancelledBy | null;
+  deliveryLatitude?: number | null;
+  deliveryLongitude?: number | null;
+  deliveryLocationUpdatedAt?: string | null;
+  lateFeeAmount: number;
+  lateFeeHours: number;
+  createdAt: string;
+}
+
+export interface DeliveryLocation {
+  latitude: number;
+  longitude: number;
+  updatedAt: string;
+  source: 'TELEMATICS' | 'HOST_APP';
+}
+
+export interface BookingConditionPhoto {
+  id: string;
+  bookingId: string;
+  stage: TripStage;
+  angle: PhotoAngle;
+  url: string;
+  uploadedById: string;
   createdAt: string;
 }
 

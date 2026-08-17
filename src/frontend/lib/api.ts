@@ -1,6 +1,7 @@
 import type {
-  AdminStats, AppNotification, Blackout, Booking, Car, DamageClaim, EarningsOverview, IncentiveProgress, ProtectionPlan, PublicSettings, PublicUser,
-  Review, ServiceCatalogEntry, ServiceRequest, UtilizationEntry,
+  AdminStats, AppNotification, Blackout, Booking, BookingConditionPhoto, Car, DamageClaim, DeliveryLocation, EarningsOverview,
+  IncentiveProgress, PhotoAngle, ProtectionPlan, PublicSettings, PublicUser, Review, ServiceCatalogEntry, ServiceRequest, TripStage,
+  UtilizationEntry,
 } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api';
@@ -186,13 +187,27 @@ export const bookingsApi = {
   startEsign: (id: string) => post<{ success: true; data: { esignRequestId: string } }>(`/bookings/${id}/esign/start`),
   esignStatus: (id: string) => get<{ success: true; data: { status: string | null; downloadUrl?: string } }>(`/bookings/${id}/esign/status`),
   unlock: (id: string) => post<{ success: boolean; message: string }>(`/booking/${id}/unlock`),
-  cancel: (id: string) => post<{ success: true; data: Booking }>(`/bookings/${id}/cancel`),
+  cancel: (id: string, data?: { reason?: string }) =>
+    post<{ success: true; data: Booking; refundAmount: number; retentionPercent: number }>(`/bookings/${id}/cancel`, data),
   get: (id: string) => get<{ success: true; data: Booking }>(`/bookings/${id}`),
   myTrips: () => get<{ success: true; count: number; data: Booking[] }>('/users/me/bookings'),
   requestWash: (id: string, data?: { serviceLocation?: string; notes?: string }) =>
     post<{ success: true; message: string }>(`/booking/${id}/wash-service`, data),
   messages: (id: string) => get<{ success: true; count: number; data: TripMessage[] }>(`/bookings/${id}/messages`),
   sendMessage: (id: string, body: string) => post<{ success: true; data: TripMessage }>(`/bookings/${id}/messages`, { body }),
+  conditionPhotos: (id: string) => get<{ success: true; data: BookingConditionPhoto[] }>(`/bookings/${id}/condition-photos`),
+  uploadConditionPhotos: (id: string, stage: TripStage, photos: { angle: PhotoAngle; url: string }[]) =>
+    post<{ success: true; data: BookingConditionPhoto[] }>(`/bookings/${id}/condition-photos`, { stage, photos }),
+  shareDeliveryLocation: (id: string, latitude: number, longitude: number) =>
+    post<{ success: true }>(`/bookings/${id}/delivery-location`, { latitude, longitude }),
+  deliveryLocation: (id: string) => get<{ success: true; data: DeliveryLocation | null }>(`/bookings/${id}/delivery-location`),
+};
+
+/* ── Host booking review (accept/reject a paid, pending-review booking) ── */
+export const hostReviewApi = {
+  requests: () => get<{ success: true; count: number; data: Booking[] }>('/host/booking-requests'),
+  decide: (bookingId: string, data: { decision: 'ACCEPT' | 'REJECT'; reason?: string; note?: string }) =>
+    post<{ success: true; data: Booking; suggestPause?: boolean }>(`/bookings/${bookingId}/host-review`, data),
 };
 
 /* ── Damage claims (host reports damage against a completed trip's deposit) ── */

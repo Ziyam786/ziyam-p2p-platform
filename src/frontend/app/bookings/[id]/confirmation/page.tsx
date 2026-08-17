@@ -21,11 +21,24 @@ function ConfirmationInner() {
     <div className="min-h-screen bg-gray-50 font-sans">
       <Navbar />
       <div className="max-w-lg mx-auto px-4 pt-32 pb-24 text-center">
-        <span className="text-6xl block mb-4">🎉</span>
-        <h1 className="text-2xl font-extrabold text-gray-900 mb-2">Booking Confirmed!</h1>
-        <p className="text-gray-500 text-sm mb-8">
-          Your trip is booked. Pickup details and the host's contact info are in your trip page.
-        </p>
+        {booking?.status === 'PENDING_HOST_REVIEW' ? (
+          <>
+            <span className="text-6xl block mb-4">🕒</span>
+            <h1 className="text-2xl font-extrabold text-gray-900 mb-2">Request Sent!</h1>
+            <p className="text-gray-500 text-sm mb-8">
+              Payment received. The host is confirming the car is available for your dates — you'll be notified as soon as
+              they accept (or, if they can't, you're fully refunded automatically).
+            </p>
+          </>
+        ) : (
+          <>
+            <span className="text-6xl block mb-4">🎉</span>
+            <h1 className="text-2xl font-extrabold text-gray-900 mb-2">Booking Confirmed!</h1>
+            <p className="text-gray-500 text-sm mb-8">
+              Your trip is booked. Pickup details and the host's contact info are in your trip page.
+            </p>
+          </>
+        )}
 
         {booking && (
           <div className="bg-white rounded-2xl border border-gray-100 p-6 text-left mb-8">

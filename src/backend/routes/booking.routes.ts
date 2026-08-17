@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient, BookingStatus } from '@prisma/client';
+import { PrismaClient, BookingStatus, RefundRequestType, CancelledBy, TripStage, PhotoAngle } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import paymentGateway from '../services/paymentGateway';
 import { PayoutEngine } from '../services/payoutEngine';
@@ -21,6 +21,26 @@ const REFERRAL_REWARD = 500; // ₹ credited to the referrer once their referred
 // shown in the checkout UI's plan picker (src/frontend/app/cars/[id]/page.tsx),
 // which until now was description text only with no backing calculation.
 const DEPOSIT_HOLD_FRACTION: Record<string, number> = { BASIC: 1, STANDARD: 0.6, PREMIUM: 0.3 };
+
+// Late-return fee — see the /complete handler below.
+const LATE_FEE_GRACE_HOURS = 0.5;
+const MAX_LATE_FEE_HOURS = 24; // beyond this, admin/support handles it manually rather than auto-charging further
+const LATE_FEE_MULTIPLIER = 1.5;
+
+// The 4 angles a pickup/drop-off photo set must cover before /start or
+// /complete will succeed — mirrors and odometer are captured too (see
+// PhotoAngle) but stay optional, since only these four are load-bearing for
+// a damage dispute.
+const REQUIRED_PHOTO_ANGLES: PhotoAngle[] = [PhotoAngle.FRONT, PhotoAngle.REAR, PhotoAngle.LEFT, PhotoAngle.RIGHT];
+
+async function hasRequiredConditionPhotos(bookingId: string, stage: TripStage): Promise<boolean> {
+  const rows = await prisma.bookingConditionPhoto.findMany({
+    where: { bookingId, stage, angle: { in: REQUIRED_PHOTO_ANGLES } },
+    select: { angle: true },
+  });
+  const distinctAngles = new Set(rows.map((r) => r.angle));
+  return REQUIRED_PHOTO_ANGLES.every((a) => distinctAngles.has(a));
+}
 
 /**
  * Credits a referrer's Z-Credits-style wallet the first (and only the first)
@@ -196,6 +216,9 @@ router.post('/booking/:id/start', requireAuth, async (req: Request, res: Respons
   if (booking.status !== BookingStatus.CONFIRMED) {
     return res.status(400).json({ error: `Cannot start trip from status ${booking.status}` });
   }
+  if (!(await hasRequiredConditionPhotos(id, TripStage.PRE_TRIP))) {
+    return res.status(400).json({ error: 'Upload all 4 required pickup photos (front, rear, left, right) before starting the trip.' });
+  }
 
   // Generate the trip-end handover code now — shown only to the host, and
   // required from whoever calls /complete, so a trip can't be closed out
@@ -241,11 +264,41 @@ router.post('/booking/:id/complete', requireAuth, async (req: Request, res: Resp
     if (!existing.endOtp || otp !== existing.endOtp) {
       return res.status(400).json({ error: 'Incorrect trip-end code. Ask the host for the code shown in their app.' });
     }
+    if (!(await hasRequiredConditionPhotos(id, TripStage.POST_TRIP))) {
+      return res.status(400).json({ error: 'Upload all 4 required drop-off photos (front, rear, left, right) before completing the trip.' });
+    }
+
+    // Late-return fee — published in terms/page.tsx §5 ("late fees") but
+    // never actually charged until now. Grace period before anything's
+    // charged; capped at MAX_LATE_HOURS so an extreme overrun (days late)
+    // gets flagged for admin/support rather than auto-charging a runaway
+    // amount. Rate is derived from the car's own listed dailyRate — not an
+    // invented platform-wide number — at a 1.5x multiplier, the standard
+    // "costs more than the normal rate" late-return structure.
+    const hoursLate = (Date.now() - existing.endTime.getTime()) / (60 * 60 * 1000);
+    const chargeableHours = Math.max(0, Math.min(hoursLate - LATE_FEE_GRACE_HOURS, MAX_LATE_FEE_HOURS));
+    const lateFeeAmount = chargeableHours > 0 ? Math.round(chargeableHours * (existing.car.dailyRate / 24) * LATE_FEE_MULTIPLIER) : 0;
 
     const booking = await prisma.booking.update({
       where: { id },
-      data: { status: BookingStatus.COMPLETED },
+      data: { status: BookingStatus.COMPLETED, lateFeeAmount, lateFeeHours: Math.max(0, hoursLate) },
     });
+    if (lateFeeAmount > 0) {
+      await notify(
+        booking.customerId,
+        'GENERIC',
+        'Late return fee applied',
+        `Returning the ${existing.car.make} ${existing.car.model} ${Math.round(hoursLate)}h late added a ₹${lateFeeAmount.toLocaleString('en-IN')} fee, deducted from your security deposit.`,
+        `/account/trips/${booking.id}`
+      );
+      await notify(
+        existing.car.ownerId,
+        'GENERIC',
+        'Guest returned the car late',
+        `${Math.round(hoursLate)}h late — a ₹${lateFeeAmount.toLocaleString('en-IN')} late fee was applied and will come out of the released deposit.`,
+        '/host/dashboard'
+      );
+    }
     await creditReferralRewardIfFirstTrip(booking.customerId);
 
     // Fleet-managed cars don't schedule a payout here — that only happens once
@@ -310,6 +363,176 @@ router.post('/booking/:id/wash-service', requireAuth, async (req: Request, res: 
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// Guest-initiated cancellation, before a trip has actually started. Applies
+// the tiered refund from the published Refund & Cancellation Policy §3 —
+// platform fee is never refunded (§3's "minus... platform fees"); the
+// security deposit is always refunded in full since a cancelled trip never
+// happened, so there's nothing for it to cover (§8). No live PayU refund
+// call — creates a RefundRequest for the same manual admin queue the
+// deposit-release/damage-claim flows already use.
+router.post('/bookings/:id/cancel', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  if (booking.customerId !== req.user!.userId) return res.status(403).json({ error: 'Not your booking' });
+  const cancellableStatuses: BookingStatus[] = [BookingStatus.PENDING_HOST_REVIEW, BookingStatus.CONFIRMED];
+  if (!cancellableStatuses.includes(booking.status)) {
+    return res.status(400).json({ error: `Cannot cancel a booking with status ${booking.status}` });
+  }
+
+  const hoursUntilStart = (booking.startTime.getTime() - Date.now()) / (60 * 60 * 1000);
+  const tripCost = booking.totalAmount - booking.platformFee;
+  let retentionPercent: number;
+  let tierLabel: string;
+  if (hoursUntilStart > 24) {
+    retentionPercent = 0;
+    tierLabel = 'more than 24h before trip start — no cancellation charge';
+  } else if (hoursUntilStart >= 6) {
+    retentionPercent = 0.25;
+    tierLabel = '6-24h before trip start — 25% cancellation charge';
+  } else {
+    retentionPercent = 0.5;
+    tierLabel = 'within 6h of trip start — 50% cancellation charge';
+  }
+  const retained = Math.round(tripCost * retentionPercent);
+  const refundAmount = tripCost - retained + booking.depositAmount;
+
+  const [updated] = await prisma.$transaction([
+    prisma.booking.update({
+      where: { id },
+      data: {
+        status: BookingStatus.CANCELLED,
+        cancellationReason: reason ? String(reason).trim() : tierLabel,
+        cancelledBy: CancelledBy.CUSTOMER,
+      },
+    }),
+    prisma.refundRequest.create({
+      data: { bookingId: id, type: RefundRequestType.CANCELLATION, amount: refundAmount, notes: tierLabel },
+    }),
+  ]);
+  await notify(
+    booking.car.ownerId,
+    'GENERIC',
+    'Booking cancelled',
+    `A guest cancelled their ${booking.car.make} ${booking.car.model} trip (${tierLabel}).`,
+    '/host/dashboard'
+  );
+
+  res.json({ success: true, data: updated, refundAmount, retentionPercent });
+});
+
+// Pickup/drop-off vehicle-condition photos — either party may be the one
+// physically holding the phone at handover, so both host and guest can
+// upload. Submitted as a batch (one call per stage, after the client has
+// captured all angles) rather than one call per photo.
+router.post('/bookings/:id/condition-photos', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { stage, photos } = req.body as { stage?: string; photos?: { angle: string; url: string }[] };
+
+  if (!stage || !Object.values(TripStage).includes(stage as TripStage)) {
+    return res.status(400).json({ error: 'stage must be PRE_TRIP or POST_TRIP' });
+  }
+  if (!Array.isArray(photos) || photos.length === 0) {
+    return res.status(400).json({ error: 'photos must be a non-empty array of { angle, url }' });
+  }
+  for (const p of photos) {
+    if (!p.url || !p.angle || !Object.values(PhotoAngle).includes(p.angle as PhotoAngle)) {
+      return res.status(400).json({ error: 'Each photo needs a valid angle and url' });
+    }
+  }
+
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  const isCustomer = booking.customerId === req.user!.userId;
+  const isHost = booking.car.ownerId === req.user!.userId;
+  if (!isCustomer && !isHost) return res.status(403).json({ error: 'Not part of this booking' });
+
+  await prisma.bookingConditionPhoto.createMany({
+    data: photos.map((p) => ({
+      bookingId: id,
+      stage: stage as TripStage,
+      angle: p.angle as PhotoAngle,
+      url: p.url,
+      uploadedById: req.user!.userId,
+    })),
+  });
+
+  const saved = await prisma.bookingConditionPhoto.findMany({ where: { bookingId: id, stage: stage as TripStage }, orderBy: { createdAt: 'asc' } });
+  res.status(201).json({ success: true, data: saved });
+});
+
+router.get('/bookings/:id/condition-photos', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  const isCustomer = booking.customerId === req.user!.userId;
+  const isHost = booking.car.ownerId === req.user!.userId;
+  if (!isCustomer && !isHost) return res.status(403).json({ error: 'Not part of this booking' });
+
+  const photos = await prisma.bookingConditionPhoto.findMany({ where: { bookingId: id }, orderBy: { createdAt: 'asc' } });
+  res.json({ success: true, data: photos });
+});
+
+// Live doorstep-delivery tracking (Uber/Zepto-style) — the host's own device
+// reports its GPS position while driving the car over; the guest polls the
+// GET below to watch it move on a map. Only meaningful pre-pickup, so scoped
+// to CONFIRMED bookings with deliveryRequested set.
+router.post('/bookings/:id/delivery-location', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { latitude, longitude } = req.body;
+  if (typeof latitude !== 'number' || typeof longitude !== 'number' || Number.isNaN(latitude) || Number.isNaN(longitude)) {
+    return res.status(400).json({ error: 'latitude and longitude must be numbers' });
+  }
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return res.status(400).json({ error: 'latitude/longitude out of range' });
+  }
+
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  if (booking.car.ownerId !== req.user!.userId) return res.status(403).json({ error: 'Only the host can share this delivery\'s location' });
+  if (!booking.deliveryRequested) return res.status(400).json({ error: 'This booking was not requested for doorstep delivery' });
+  if (booking.status !== BookingStatus.CONFIRMED) {
+    return res.status(400).json({ error: `Cannot share delivery location for a booking with status ${booking.status}` });
+  }
+
+  const updated = await prisma.booking.update({
+    where: { id },
+    data: { deliveryLatitude: latitude, deliveryLongitude: longitude, deliveryLocationUpdatedAt: new Date() },
+    select: { deliveryLatitude: true, deliveryLongitude: true, deliveryLocationUpdatedAt: true },
+  });
+  res.json({ success: true, data: updated });
+});
+
+router.get('/bookings/:id/delivery-location', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  if (booking.customerId !== req.user!.userId) return res.status(403).json({ error: 'Not your booking' });
+
+  // Prefer live vehicle telemetry when the car actually has telematics
+  // hardware wired up (rare — most self-hosted listings don't); otherwise
+  // fall back to the host-app-reported position, which is what every
+  // delivery gets regardless of hardware.
+  if (booking.car.telematicsImei) {
+    try {
+      const state = await TelematicsService.getVehicleState(booking.car.telematicsImei);
+      return res.json({ success: true, data: { latitude: state.latitude, longitude: state.longitude, updatedAt: new Date(), source: 'TELEMATICS' } });
+    } catch {
+      // Fall through to the host-reported position below.
+    }
+  }
+
+  if (booking.deliveryLatitude == null || booking.deliveryLongitude == null) {
+    return res.json({ success: true, data: null });
+  }
+  res.json({
+    success: true,
+    data: { latitude: booking.deliveryLatitude, longitude: booking.deliveryLongitude, updatedAt: booking.deliveryLocationUpdatedAt, source: 'HOST_APP' },
+  });
 });
 
 // Guest<->host messaging, scoped to this booking. Either party can read/send;
