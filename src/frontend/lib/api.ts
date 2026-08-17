@@ -1,7 +1,7 @@
 import type {
   AdminStats, AppNotification, Blackout, Booking, BookingConditionPhoto, Car, DamageClaim, DeliveryLocation, EarningsOverview,
   IncentiveProgress, PhotoAngle, ProtectionPlan, PublicSettings, PublicUser, Review, ServiceCatalogEntry, ServiceRequest, TripStage,
-  UtilizationEntry,
+  UtilizationEntry, YieldSuggestion,
 } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api';
@@ -134,6 +134,8 @@ export const carsApi = {
   bookings: (carId: string) => get<{ success: true; count: number; data: Booking[] }>(`/cars/${carId}/bookings`),
   latestConditionPhotos: (carId: string) =>
     get<{ success: true; data: { asOf: string; photos: BookingConditionPhoto[] } | null }>(`/cars/${carId}/latest-condition-photos`),
+  yieldSuggestion: (carId: string) => get<{ success: true; data: YieldSuggestion }>(`/cars/${carId}/yield-suggestion`),
+  applyYieldSuggestion: (carId: string) => post<{ success: true; data: YieldSuggestion }>(`/cars/${carId}/apply-yield-suggestion`),
   marketPulse: (city?: string) =>
     get<{ success: true; data: { city: string | null; availableCount: number; averageDailyRate: number | null; popularCategory: string | null } }>(
       `/cars/market-pulse${city ? `?city=${encodeURIComponent(city)}` : ''}`

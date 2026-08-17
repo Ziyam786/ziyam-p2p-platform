@@ -236,6 +236,7 @@ model User {
   loggedOpsPayments       OpsPayment[]
   loggedOutstandings      Outstanding[]
   messagesSent            Message[]
+  pushTokens              PushToken[]
   createdAt               DateTime          @default(now())
   updatedAt               DateTime          @updatedAt
 }
@@ -309,6 +310,12 @@ model Car {
   offersPickup     Boolean  @default(false)
   pickupFee        Float    @default(0)
   telematicsImei   String?
+
+  // Ziyam Yield — when true, the weekly cron (yieldEngine.ts) applies the
+  // computed price suggestion to dailyRate automatically; when false (the
+  // default), the host sees the suggestion on their dashboard and applies
+  // it manually, or ignores it. Never silent unless the host opted in.
+  yieldAutoApply Boolean @default(false)
 
   // Fleet-operator management opt-in — when set, N+1 payouts route through the
   // fleet operator's receipt-confirmation step instead of the standard
@@ -434,6 +441,22 @@ model Notification {
   createdAt DateTime @default(now())
 
   @@index([userId, read])
+}
+
+// FCM device/browser tokens — a user can have several (multiple browsers/
+// devices). notify() (notificationService.ts) fans out to every real
+// notification here via pushNotificationService.ts, best-effort — a push
+// failure never blocks the in-app Notification row above from being created.
+model PushToken {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  token      String   @unique
+  platform   String? // web | ios | android
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Booking {

@@ -6,6 +6,8 @@ import { FleetService } from '../services/fleetService';
 import { pickFleetOperator } from '../services/fleetOperatorAssignment';
 import { esignApi, isSetuConfigured } from '../services/setuService';
 import { renderFleetPartnerAgreementPdf } from '../services/fleetPartnerAgreementPdf';
+import { computeYieldSuggestion, applyYieldSuggestion } from '../services/yieldEngine';
+import { safeErrorMessage } from '../utils/errorResponse';
 import { config } from '../config';
 
 const router = Router();
@@ -175,6 +177,7 @@ router.patch('/cars/:id', requireAuth, async (req: Request, res: Response) => {
     rcDocUrl, pollutionCertUrl, insuranceDocUrl, onboardingStep,
     noNightBookings, nightBookingStart, nightBookingEnd,
     minInterBookingHours, minBookingHours, maxBookingDays,
+    yieldAutoApply,
   } = req.body;
 
   // Documents are self-attested at this stage (no live DigiLocker/RTO integration yet —
@@ -219,6 +222,7 @@ router.patch('/cars/:id', requireAuth, async (req: Request, res: Response) => {
       ...(deliveryFee !== undefined && { deliveryFee }),
       ...(offersPickup !== undefined && { offersPickup }),
       ...(pickupFee !== undefined && { pickupFee }),
+      ...(yieldAutoApply !== undefined && { yieldAutoApply: Boolean(yieldAutoApply) }),
       ...(rcDocUrl !== undefined && { rcDocUrl }),
       ...(pollutionCertUrl !== undefined && { pollutionCertUrl }),
       ...(insuranceDocUrl !== undefined && { insuranceDocUrl }),
@@ -291,6 +295,42 @@ router.get('/cars/:id/incentives', requireAuth, async (req: Request, res: Respon
 
   const progress = await FleetService.getIncentiveProgress(id);
   res.json({ success: true, data: progress });
+});
+
+// Ziyam Yield — a price suggestion computed from this car's own real booking
+// history (utilization + near-term fill rate), not a black box. Read-only;
+// applying it is a separate, explicit action (see /apply-yield-suggestion).
+router.get('/cars/:id/yield-suggestion', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const car = await prisma.car.findUnique({ where: { id } });
+  if (!car) return res.status(404).json({ error: 'Car not found' });
+  if (car.ownerId !== req.user!.userId && req.user!.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Not your listing' });
+  }
+  try {
+    const suggestion = await computeYieldSuggestion(id);
+    res.json({ success: true, data: suggestion });
+  } catch (error: any) {
+    res.status(500).json({ error: safeErrorMessage(error) });
+  }
+});
+
+// Host-initiated — applies the suggested price to Car.dailyRate right now.
+// Never automatic unless the host separately opted into yieldAutoApply
+// (see /cars/:id PATCH and the weekly cron in yieldEngine.ts).
+router.post('/cars/:id/apply-yield-suggestion', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const car = await prisma.car.findUnique({ where: { id } });
+  if (!car) return res.status(404).json({ error: 'Car not found' });
+  if (car.ownerId !== req.user!.userId && req.user!.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Not your listing' });
+  }
+  try {
+    const result = await applyYieldSuggestion(id);
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    res.status(500).json({ error: safeErrorMessage(error) });
+  }
 });
 
 // Host-only trip history for this car — surfaces which completed bookings are

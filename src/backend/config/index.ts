@@ -122,9 +122,21 @@ export const config = {
   // just verifies the resulting access token against Supabase's own /auth/v1/user
   // endpoint. Everything else (sessions, all other routes) still runs on the
   // existing JWT-cookie system untouched.
+  // Firebase Admin — push notifications only (see firebaseAdmin.ts /
+  // pushNotificationService.ts). The full service account JSON, as a single
+  // env var string (paste the whole downloaded JSON file's contents).
+  firebase: {
+    serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON ?? '',
+  },
+
+  // Only used for the config.supabase.url/publishableKey guard in
+  // auth.routes.ts's /auth/oauth/supabase — actual verification goes through
+  // @supabase/server/core's verifyCredentials, which reads SUPABASE_URL/
+  // SUPABASE_PUBLISHABLE_KEY/SUPABASE_JWKS_URL from process.env directly
+  // (its own env resolution, independent of this config object).
   supabase: {
     url: process.env.SUPABASE_URL ?? '',
-    anonKey: process.env.SUPABASE_ANON_KEY ?? '',
+    publishableKey: process.env.SUPABASE_PUBLISHABLE_KEY ?? '',
   },
 };
 

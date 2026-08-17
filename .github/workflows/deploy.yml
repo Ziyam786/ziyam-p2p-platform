@@ -28,8 +28,18 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
+            # Prune first — every deploy rebuilds 4 full images (backend/
+            # frontend/admin/agent) with nothing ever cleaning up old layers,
+            # so disk fills silently over enough deploys. Pruning before
+            # git pull/docker build guarantees there's room for them to run
+            # at all if the disk is already tight; pruning again after
+            # catches what this build just orphaned. Never touches named
+            # volumes (postgres_data/uploads_data) — that requires the
+            # explicit --volumes flag, which is deliberately not passed here.
+            sudo docker system prune -af
             cd /var/www/ziyam
             git pull origin main
             cd devops
             sudo docker compose up -d --build
             sudo docker exec -i devops-backend-1 npx prisma migrate deploy
+            sudo docker system prune -af
