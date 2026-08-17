@@ -43,6 +43,28 @@ router.get('/users/me', requireAuth, async (req: Request, res: Response) => {
   res.json({ success: true, data: user });
 });
 
+// Registers/refreshes an FCM device token for push notifications (see
+// notificationService.ts / pushNotificationService.ts) — a user can have
+// several (multiple browsers/devices), so this upserts by token, not per-user.
+router.post('/users/me/push-token', requireAuth, async (req: Request, res: Response) => {
+  const { token, platform } = req.body;
+  if (!token || typeof token !== 'string') return res.status(400).json({ error: 'token is required' });
+
+  await prisma.pushToken.upsert({
+    where: { token },
+    create: { userId: req.user!.userId, token, platform: platform ?? 'web' },
+    update: { userId: req.user!.userId, lastUsedAt: new Date() },
+  });
+  res.status(201).json({ success: true });
+});
+
+router.delete('/users/me/push-token', requireAuth, async (req: Request, res: Response) => {
+  const { token } = req.body;
+  if (!token || typeof token !== 'string') return res.status(400).json({ error: 'token is required' });
+  await prisma.pushToken.deleteMany({ where: { token, userId: req.user!.userId } });
+  res.json({ success: true });
+});
+
 router.patch('/users/me', requireAuth, async (req: Request, res: Response) => {
   const { fullName, bio, avatarUrl, payoutAccountId, signatureUrl, selfieUrl, alternatePhoneNumber, payoutFrequency } = req.body;
   if (payoutFrequency !== undefined && !['STANDARD', 'WEEKLY'].includes(payoutFrequency)) {

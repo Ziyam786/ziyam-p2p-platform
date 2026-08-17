@@ -236,6 +236,7 @@ model User {
   loggedOpsPayments       OpsPayment[]
   loggedOutstandings      Outstanding[]
   messagesSent            Message[]
+  pushTokens              PushToken[]
   createdAt               DateTime          @default(now())
   updatedAt               DateTime          @updatedAt
 }
@@ -440,6 +441,22 @@ model Notification {
   createdAt DateTime @default(now())
 
   @@index([userId, read])
+}
+
+// FCM device/browser tokens — a user can have several (multiple browsers/
+// devices). notify() (notificationService.ts) fans out to every real
+// notification here via pushNotificationService.ts, best-effort — a push
+// failure never blocks the in-app Notification row above from being created.
+model PushToken {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  token      String   @unique
+  platform   String? // web | ios | android
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Booking {
