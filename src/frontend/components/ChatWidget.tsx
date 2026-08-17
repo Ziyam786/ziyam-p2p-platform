@@ -18,7 +18,7 @@ function getSessionId(): string {
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: "Hi! I'm the ZiyamSelfDrive assistant. Ask me about bookings, KYC, payouts, or anything else." },
+    { role: 'assistant', content: "Hi! I'm Avya, Ziyam's AI assistant. Ask me about bookings, KYC, payouts, or anything else — I can look up real car availability and your bookings, not just answer generically." },
   ]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -56,8 +56,8 @@ export default function ChatWidget() {
             <div className="flex items-center gap-2">
               <span className="text-lg">🤖</span>
               <div>
-                <p className="font-bold text-sm leading-tight">Ziyam Assistant</p>
-                <p className="text-[10px] text-gray-400">AI-powered support</p>
+                <p className="font-bold text-sm leading-tight">Avya AI</p>
+                <p className="text-[10px] text-gray-400">Ziyam's AI assistant</p>
               </div>
             </div>
             <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-white text-lg leading-none" aria-label="Close chat">
