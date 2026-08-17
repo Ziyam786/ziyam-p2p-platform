@@ -33,8 +33,29 @@ const CATEGORIES: { title: string; icon: string; faqs: { q: string; a: string }[
     faqs: [
       { q: 'Does ZiyamSelfDrive insure my car?', a: "No — we're a marketplace, not an insurer. Your own comprehensive insurance policy is the primary coverage, and it's mandatory to list a car. See our Insurance & Damage Policy page for the full breakdown." },
       { q: "What happens if a lessee damages my car?", a: 'The cost is deducted from the security deposit first. If it exceeds the deposit, you recover the remainder directly from the lessee — our support team helps coordinate this and will try to cover up to ₹20,000 of a claim.' },
+      { q: 'How do I actually report damage after a trip?', a: 'Contact support with your booking ID and photos within 24 hours of trip end — the sooner, the stronger your claim, especially if you photographed the car at both pickup and drop-off. Support will help you work out the deposit deduction and, if it qualifies, the platform assist.' },
+      { q: 'Do I have to take the car to a specific garage?', a: "No — unlike some fleet platforms, we don't run a network-garage program for self-hosted cars. Repair it wherever you normally would, and keep the invoice as documentation if you're recovering costs from the lessee beyond the deposit." },
+      { q: 'Can I keep my listing live while it\'s being repaired?', a: "Your call. Pause the listing from your availability calendar if the damage affects drivability, or keep it live and schedule the repair around your bookings if it's still safe to drive." },
       { q: "What if my car breaks down or is abandoned by a lessee?", a: "24/7 roadside assistance is included on every trip regardless of protection plan — we'll get the vehicle recovered to the nearest garage." },
       { q: 'Do I need to renew my insurance to keep my listing active?', a: 'Yes — an expired insurance policy will pause your listing until you upload a renewed one.' },
+    ],
+  },
+  {
+    title: 'Cleanliness & Pickup Readiness',
+    icon: '🧼',
+    faqs: [
+      { q: 'What should I have ready before a booking starts?', a: "A clean, fuelled, road-legal car at the pickup location, with the handover code ready to generate in your host app. There's no platform-enforced pre-trip checklist today — arriving prepared is what keeps your rating high." },
+      { q: 'What if a lessee returns the car dirty?', a: "Routine dirt isn't a deposit-eligible claim. If it's genuinely excessive — stains, odours needing professional detailing — photograph it at drop-off and raise it with support, who'll assess whether it qualifies as a deduction. Otherwise, rate the trip honestly so future hosts are informed." },
+      { q: 'Is there a standard cleaning checklist I should follow?', a: "Not a platform-enforced one yet. Between trips, most hosts cover the high-touch points — seats, steering wheel, door handles, air vents, gear shift, and the boot — for guest safety and a better rating." },
+    ],
+  },
+  {
+    title: 'Fuel & FASTag',
+    icon: '⛽',
+    faqs: [
+      { q: 'How much fuel should I hand the car over with?', a: "There's no platform-mandated level. Most hosts hand over at whatever level they expect back (e.g. \"return as delivered\") and say so clearly to the lessee over in-app messaging before the trip starts." },
+      { q: 'What if the lessee returns it with less fuel than expected?', a: "This is settled directly between you and the lessee — Ziyam doesn't adjudicate it or auto-deduct it from the deposit. Agreeing on the expected return level upfront avoids the dispute entirely." },
+      { q: 'Does Ziyam manage FASTag for my car?', a: "Not for self-hosted listings — FASTag stays yours to manage directly with your guest, same as fuel. Fleet-managed cars follow whatever toll process your fleet operator has set up." },
     ],
   },
   {
@@ -44,7 +65,7 @@ const CATEGORIES: { title: string; icon: string; faqs: { q: string; a: string }[
       { q: 'How do I block out dates when my car is unavailable?', a: "Use the availability calendar in your dashboard — tap a start and end date to pause bookings for that range. Lessees can't book over dates you've blocked." },
       { q: 'Can I change my price after listing?', a: "Yes, but pricing is set via a slider bounded to market rate for your car's category and city — you can't type an arbitrary price. This keeps pricing fair and competitive." },
       { q: 'How do I offer doorstep delivery?', a: 'Toggle it on from your car\'s edit page in the dashboard and set your delivery fee — you can enable this any time after listing, not just at onboarding.' },
-      { q: 'What if I need to take my car in for service?', a: "Block those dates on your availability calendar like any other pause. If you're fleet-managed, your fleet operator handles scheduling maintenance." },
+      { q: 'What if I need to take my car in for service?', a: "Block those dates on your availability calendar like any other pause. If you're fleet-managed, your fleet operator handles scheduling maintenance. You can also request a Washing or Basic/Standard Service add-on from your dashboard, billed at a set price estimate." },
     ],
   },
   {
