@@ -168,6 +168,23 @@ function AgentPortalInner() {
         </button>
       </header>
 
+      <div className="max-w-3xl mx-auto px-4 pt-6">
+        <div className="bg-brand-500/10 border border-brand-500/30 rounded-2xl px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-bold text-brand-300">Ground staff now have a dedicated app</p>
+            <p className="text-xs text-slate-400 mt-0.5">This embedded portal still works, but the standalone Agent app has the full toolkit — handover/return flows, ID verification, cash counter, and more.</p>
+          </div>
+          <a
+            href={process.env.NEXT_PUBLIC_AGENT_APP_URL ?? 'http://localhost:3002'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white px-4 py-2.5 rounded-lg transition shrink-0"
+          >
+            Open Agent App ↗
+          </a>
+        </div>
+      </div>
+
       <main className="max-w-3xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-bold text-slate-300">My Trips ({trips.length})</h2>
