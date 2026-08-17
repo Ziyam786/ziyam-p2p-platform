@@ -22,7 +22,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     const payload = verifyAuthToken(token);
     const user = await prisma.user.findUnique({ where: { id: payload.userId }, select: { isSuspended: true } });
     if (!user) return res.status(401).json({ error: 'Account no longer exists' });
-    if (user.isSuspended) return res.status(403).json({ error: 'This account has been suspended. Contact support@ziyam.in.' });
+    if (user.isSuspended) return res.status(403).json({ error: 'This account has been suspended. Contact eightlinesfleet@gmail.com.' });
 
     req.user = { userId: payload.userId, role: payload.role };
     next();

@@ -173,7 +173,7 @@ router.post('/auth/login', authRateLimiter, async (req: Request, res: Response) 
     return res.status(401).json({ error: 'Incorrect email or password' });
   }
   if (user.isSuspended) {
-    return res.status(403).json({ error: 'This account has been suspended. Contact support@ziyam.in.' });
+    return res.status(403).json({ error: 'This account has been suspended. Contact eightlinesfleet@gmail.com.' });
   }
 
   if (user.failedLoginAttempts > 0 || user.lockedUntil) {
@@ -225,7 +225,7 @@ router.post('/auth/otp/verify', authRateLimiter, async (req: Request, res: Respo
   const user = await prisma.user.findUnique({ where: { phoneNumber } });
   if (!user) return res.status(401).json({ error: 'Invalid or expired code' });
   if (user.isSuspended) {
-    return res.status(403).json({ error: 'This account has been suspended. Contact support@ziyam.in.' });
+    return res.status(403).json({ error: 'This account has been suspended. Contact eightlinesfleet@gmail.com.' });
   }
 
   const token = signAuthToken({ userId: user.id, role: user.role });
@@ -269,7 +269,7 @@ router.post('/auth/oauth/supabase', authRateLimiter, async (req: Request, res: R
     return res.status(404).json({ error: 'No Ziyam account found for that Google email yet. Please sign up first.', code: 'NO_ACCOUNT' });
   }
   if (user.isSuspended) {
-    return res.status(403).json({ error: 'This account has been suspended. Contact support@ziyam.in.' });
+    return res.status(403).json({ error: 'This account has been suspended. Contact eightlinesfleet@gmail.com.' });
   }
 
   const token = signAuthToken({ userId: user.id, role: user.role });

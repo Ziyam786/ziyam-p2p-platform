@@ -86,7 +86,7 @@ export default function SupportPage() {
                 )}
               </div>
               <p className="text-xs text-gray-400 mt-4 text-center">
-                Or email us directly at <a href="mailto:support@ziyam.in" className="text-amber-500 hover:underline">support@ziyam.in</a>
+                Or email us directly at <a href="mailto:eightlinesfleet@gmail.com" className="text-amber-500 hover:underline">eightlinesfleet@gmail.com</a>
               </p>
             </div>
           </div>

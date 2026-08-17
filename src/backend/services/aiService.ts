@@ -145,7 +145,7 @@ export async function generateChatReply(
   if (!anthropic) {
     return (
       "I'm not fully set up yet — the site owner needs to add an ANTHROPIC_API_KEY " +
-      'before I can answer questions. In the meantime, reach a human at support@ziyam.in.'
+      'before I can answer questions. In the meantime, reach a human at eightlinesfleet@gmail.com.'
     );
   }
 
@@ -165,7 +165,7 @@ export async function generateChatReply(
         const textBlock = response.content.find((block) => block.type === 'text');
         return textBlock && textBlock.type === 'text'
           ? textBlock.text
-          : "Sorry, I couldn't generate a response. Please try again or contact support@ziyam.in.";
+          : "Sorry, I couldn't generate a response. Please try again or contact eightlinesfleet@gmail.com.";
       }
 
       messages.push({ role: 'assistant', content: response.content });
@@ -180,9 +180,9 @@ export async function generateChatReply(
       messages.push({ role: 'user', content: toolResults });
     }
 
-    return "I looked into a few things but couldn't pin down a full answer — please contact support@ziyam.in for help.";
+    return "I looked into a few things but couldn't pin down a full answer — please contact eightlinesfleet@gmail.com for help.";
   } catch (error: any) {
     console.error('[AI SERVICE] Anthropic call failed:', error.message ?? error);
-    return "I'm having trouble reaching the AI service right now. Please try again shortly, or contact support@ziyam.in.";
+    return "I'm having trouble reaching the AI service right now. Please try again shortly, or contact eightlinesfleet@gmail.com.";
   }
 }

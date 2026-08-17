@@ -111,7 +111,7 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     'insurance, hosts recover damage costs directly from the lessee, and the platform helps by trying to cover up to ' +
     '₹20,000 of a claim and suggesting garages, with 24/7 roadside assistance for breakdowns or abandoned vehicles. ' +
     'Free cancellation up to 24 hours before pickup. Answer briefly and helpfully; if you do not know something ' +
-    'platform-specific, suggest contacting support@ziyam.in.',
+    'platform-specific, suggest contacting eightlinesfleet@gmail.com.',
 
   // Fleet Ops facilitation fee — admin-only (not in PUBLIC_KEYS). Ground-truthed
   // from the real production system: one configurable percentage (not the

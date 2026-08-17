@@ -41,7 +41,7 @@ router.post('/ai/chat', attachUserIfPresent, async (req: Request, res: Response)
 
   const chatEnabled = await getSetting<boolean>('ai_chat_enabled', true);
   if (!chatEnabled) {
-    return res.status(503).json({ error: 'The support assistant is temporarily disabled. Please contact support@ziyam.in.' });
+    return res.status(503).json({ error: 'The support assistant is temporarily disabled. Please contact eightlinesfleet@gmail.com.' });
   }
 
   const systemPrompt = await getSetting<string>('ai_chat_system_prompt');
