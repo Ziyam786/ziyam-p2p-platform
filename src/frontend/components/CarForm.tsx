@@ -6,7 +6,7 @@ import type { Car } from '../lib/types';
 import { settingsApi } from '../lib/api';
 import FeaturePicker from './FeaturePicker';
 import AddressAutocomplete from './AddressAutocomplete';
-import FileUploadField from './FileUploadField';
+import PlateBlurEditor from './PlateBlurEditor';
 import SmartPriceSlider from './SmartPriceSlider';
 
 const CATEGORIES_FALLBACK = ['Hatchback', 'Sedan', 'SUV', 'Luxury', 'EV', 'MUV'];
@@ -19,7 +19,7 @@ export interface CarFormValues {
   fuelType: string; transmission: string; seats: number; dailyRate: number; securityDeposit: number;
   kmIncludedPerDay: number; extraKmCharge: number; city: string; address: string;
   latitude: number | null; longitude: number | null; description: string;
-  images: string[]; features: string; instantBook: boolean; offersDelivery: boolean; deliveryFee: number;
+  images: string[]; originalImages: string[]; features: string; instantBook: boolean; offersDelivery: boolean; deliveryFee: number;
   offersPickup: boolean; pickupFee: number;
 }
 
@@ -27,7 +27,7 @@ const DEFAULTS: CarFormValues = {
   make: '', model: '', registrationNo: '', year: new Date().getFullYear(), category: 'Hatchback',
   fuelType: 'Petrol', transmission: 'Manual', seats: 5, dailyRate: 1200, securityDeposit: 3000,
   kmIncludedPerDay: 300, extraKmCharge: 10, city: 'Bengaluru', address: '', latitude: null, longitude: null, description: '',
-  images: [], features: 'Air Conditioning, Bluetooth / Aux, Power Steering', instantBook: true,
+  images: [], originalImages: [], features: 'Air Conditioning, Bluetooth / Aux, Power Steering', instantBook: true,
   offersDelivery: false, deliveryFee: 0, offersPickup: false, pickupFee: 0,
 };
 
@@ -37,7 +37,7 @@ export function carToFormValues(car: Car): CarFormValues {
     fuelType: car.fuelType, transmission: car.transmission, seats: car.seats, dailyRate: car.dailyRate,
     securityDeposit: car.securityDeposit, kmIncludedPerDay: car.kmIncludedPerDay, extraKmCharge: car.extraKmCharge,
     city: car.city, address: car.address ?? '', latitude: car.latitude ?? null, longitude: car.longitude ?? null,
-    description: car.description ?? '', images: car.images, features: car.features.join(', '),
+    description: car.description ?? '', images: car.images, originalImages: car.originalImages ?? [], features: car.features.join(', '),
     instantBook: car.instantBook, offersDelivery: car.offersDelivery, deliveryFee: car.deliveryFee,
     offersPickup: car.offersPickup, pickupFee: car.pickupFee,
   };
@@ -51,6 +51,7 @@ export function formValuesToPayload(v: CarFormValues) {
     extraKmCharge: Number(v.extraKmCharge), city: v.city, description: v.description,
     address: v.address || undefined, latitude: v.latitude ?? undefined, longitude: v.longitude ?? undefined,
     images: v.images,
+    originalImages: v.originalImages,
     features: v.features.split(',').map((s) => s.trim()).filter(Boolean),
     instantBook: v.instantBook, offersDelivery: v.offersDelivery, deliveryFee: Number(v.deliveryFee),
     offersPickup: v.offersPickup, pickupFee: Number(v.pickupFee),
@@ -184,7 +185,10 @@ export default function CarForm({
               <Image src={url} alt={`Car photo ${i + 1}`} fill sizes="80px" className="rounded-lg object-cover border border-gray-200" />
               <button
                 type="button"
-                onClick={() => set('images', values.images.filter((_, j) => j !== i))}
+                onClick={() => {
+                  set('images', values.images.filter((_, j) => j !== i));
+                  set('originalImages', values.originalImages.filter((_, j) => j !== i));
+                }}
                 className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center"
                 aria-label="Remove photo"
               >
@@ -193,12 +197,12 @@ export default function CarForm({
             </div>
           ))}
         </div>
-        <FileUploadField
-          label="Add a photo"
-          value=""
-          onChange={(url) => set('images', [...values.images, url])}
-          accept="image/jpeg,image/png,image/webp"
-          kind="image"
+        <p className="text-xs text-gray-400 mb-2">Photos have their license plate blurred automatically before they're added — draw a box over the plate for each upload.</p>
+        <PlateBlurEditor
+          onComplete={(blurredUrl, originalUrl) => {
+            set('images', [...values.images, blurredUrl]);
+            set('originalImages', [...values.originalImages, originalUrl]);
+          }}
         />
       </Field>
 

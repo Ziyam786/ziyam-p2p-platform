@@ -65,6 +65,11 @@ export interface AdminCar {
   extraKmCharge: number;
   description?: string | null;
   features: string[];
+  images?: string[];
+  // Admin-only unblurred originals, same array index as `images` — used to
+  // verify a listing's photo genuinely matches its registrationNo. Never
+  // exposed on any public-facing route/page.
+  originalImages?: string[];
   isAvailable: boolean;
   featured: boolean;
   instantBook: boolean;

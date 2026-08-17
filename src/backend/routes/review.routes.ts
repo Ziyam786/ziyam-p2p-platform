@@ -82,7 +82,8 @@ router.get('/hosts/:id/cars', async (req: Request, res: Response) => {
     orderBy: { createdAt: 'desc' },
   });
   const data = cars.map((c) => {
-    const { reviews, ...rest } = c;
+    // originalImages (unblurred plate) is admin-only — never sent to this public route.
+    const { reviews, originalImages, ...rest } = c;
     const reviewCount = reviews.length;
     const rating = reviewCount === 0 ? 0 : Number((reviews.reduce((s, r) => s + r.rating, 0) / reviewCount).toFixed(1));
     return { ...rest, rating, reviewCount };
