@@ -1,5 +1,5 @@
 import type {
-  AdminBooking, AdminCar, AdminPayout, AdminReview, AdminStats, AdminUser, AuditEntry,
+  AdminBooking, AdminCar, AdminDamageClaim, AdminPayout, AdminRefundRequest, AdminReview, AdminStats, AdminUser, AuditEntry,
   BalanceSheetData, BookingStatus, ChatConversationSummary, ChatMessageRow, CommandCenterData, CustomRoleRow, FleetExpenseRow,
   FleetSummary, JournalEntryRow, MonthlyBalanceRow, OpsInvoiceRow, OpsInvoiceStatus, OpsTripRow, OutstandingFrequency, OutstandingRow,
   OutstandingType, PlatformBookingEntry, PromoCode, SessionUser, SettingRow,
@@ -77,6 +77,13 @@ export const adminApi = {
 
   payouts: (status?: string) => get<{ success: true; data: AdminPayout[] }>(`/admin/payouts${status ? `?status=${status}` : ''}`),
   retryPayout: (id: string) => post<{ success: true; data: AdminPayout }>(`/admin/payouts/${id}/retry`),
+
+  damageClaims: (status?: string) => get<{ success: true; data: AdminDamageClaim[] }>(`/admin/damage-claims${status ? `?status=${status}` : ''}`),
+  resolveDamageClaim: (id: string, data: { status: 'APPROVED' | 'REJECTED'; approvedDeduction?: number; adminNotes?: string }) =>
+    patch<{ success: true; message: string }>(`/admin/damage-claims/${id}`, data),
+
+  refundRequests: (status?: string) => get<{ success: true; data: AdminRefundRequest[] }>(`/admin/refund-requests${status ? `?status=${status}` : ''}`),
+  completeRefundRequest: (id: string) => patch<{ success: true; data: AdminRefundRequest }>(`/admin/refund-requests/${id}/complete`),
 
   settings: () => get<{ success: true; data: SettingRow[] }>('/admin/settings'),
   updateSetting: (key: string, value: unknown) => put<{ success: true }>(`/admin/settings/${key}`, { value }),

@@ -1,5 +1,5 @@
 import type {
-  AdminStats, AppNotification, Blackout, Booking, Car, EarningsOverview, IncentiveProgress, ProtectionPlan, PublicSettings, PublicUser,
+  AdminStats, AppNotification, Blackout, Booking, Car, DamageClaim, EarningsOverview, IncentiveProgress, ProtectionPlan, PublicSettings, PublicUser,
   Review, ServiceCatalogEntry, ServiceRequest, UtilizationEntry,
 } from './types';
 
@@ -130,6 +130,7 @@ export const carsApi = {
     get<{ success: true; data: { summary: string | null; positiveTags: string[]; negativeTags: string[] } }>(`/cars/${carId}/review-summary`),
   incentives: (carId: string) => get<{ success: true; data: IncentiveProgress | null }>(`/cars/${carId}/incentives`),
   availability: (carId: string) => get<{ success: true; data: AvailabilityRange[] }>(`/cars/${carId}/availability`),
+  bookings: (carId: string) => get<{ success: true; count: number; data: Booking[] }>(`/cars/${carId}/bookings`),
   marketPulse: (city?: string) =>
     get<{ success: true; data: { city: string | null; availableCount: number; averageDailyRate: number | null; popularCategory: string | null } }>(
       `/cars/market-pulse${city ? `?city=${encodeURIComponent(city)}` : ''}`
@@ -192,6 +193,13 @@ export const bookingsApi = {
     post<{ success: true; message: string }>(`/booking/${id}/wash-service`, data),
   messages: (id: string) => get<{ success: true; count: number; data: TripMessage[] }>(`/bookings/${id}/messages`),
   sendMessage: (id: string, body: string) => post<{ success: true; data: TripMessage }>(`/bookings/${id}/messages`, { body }),
+};
+
+/* ── Damage claims (host reports damage against a completed trip's deposit) ── */
+export const damageClaimApi = {
+  report: (bookingId: string, data: { description: string; estimatedCost: number; images: string[] }) =>
+    post<{ success: true; data: DamageClaim }>(`/bookings/${bookingId}/damage-claim`, data),
+  get: (bookingId: string) => get<{ success: true; data: DamageClaim | null }>(`/bookings/${bookingId}/damage-claim`),
 };
 
 /* ── Itinerary unlocks ────────────────────────────────────────────── */

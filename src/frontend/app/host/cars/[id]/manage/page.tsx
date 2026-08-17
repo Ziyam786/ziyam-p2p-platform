@@ -13,6 +13,7 @@ import RatingsPanel from '../../../../../components/RatingsPanel';
 import IncentivesPanel from '../../../../../components/IncentivesPanel';
 import CarLocationMap, { directionsUrl } from '../../../../../components/CarLocationMap';
 import VehicleServices from '../../../../../components/VehicleServices';
+import DamageClaimPanel from '../../../../../components/DamageClaimPanel';
 import FleetOnboardingPanel from '../../../../../components/FleetOnboardingPanel';
 import { useAuth } from '../../../../../lib/auth-context';
 import { useToast } from '../../../../../components/Toast';
@@ -110,6 +111,7 @@ function ManageCarInner() {
           { key: 'preferences', label: 'Booking Preferences' },
           { key: 'incentives', label: 'Incentives' },
           { key: 'services', label: 'Vehicle Services' },
+          { key: 'damage', label: 'Damage & Deposits' },
           { key: 'ratings', label: 'Ratings & Reviews' },
           { key: 'fleet', label: car.fleetManaged ? 'Fleet Program ✓' : 'Fleet Program' },
         ]}
@@ -135,6 +137,8 @@ function ManageCarInner() {
         {tab === 'incentives' && <IncentivesPanel car={car} />}
 
         {tab === 'services' && <VehicleServices car={car} />}
+
+        {tab === 'damage' && <DamageClaimPanel car={car} />}
 
         {tab === 'ratings' && <RatingsPanel car={car} />}
 

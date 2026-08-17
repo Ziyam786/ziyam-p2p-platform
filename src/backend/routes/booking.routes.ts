@@ -16,6 +16,12 @@ const prisma = new PrismaClient();
 const VALID_PLANS = ['BASIC', 'STANDARD', 'PREMIUM'];
 const REFERRAL_REWARD = 500; // ₹ credited to the referrer once their referred user completes their first trip
 
+// What fraction of Car.securityDeposit is actually held per protection plan —
+// matches the "Reduced deposit hold" / "Lowest deposit hold" copy already
+// shown in the checkout UI's plan picker (src/frontend/app/cars/[id]/page.tsx),
+// which until now was description text only with no backing calculation.
+const DEPOSIT_HOLD_FRACTION: Record<string, number> = { BASIC: 1, STANDARD: 0.6, PREMIUM: 0.3 };
+
 /**
  * Credits a referrer's Z-Credits-style wallet the first (and only the first)
  * time a user they referred completes a trip — avoids reward-farming via
@@ -111,6 +117,14 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
 
     const { platformFee, hostPayout } = await PayoutEngine.splitAmount(totalAmount);
 
+    // Server-computed, not client-supplied — the deposit fraction can't be
+    // tampered with by sending a lower totalAmount. Charged alongside
+    // totalAmount at the PayU checkout-session step (not folded into
+    // totalAmount itself, since totalAmount also drives PayoutEngine.splitAmount
+    // at trip completion and the deposit isn't host revenue to split).
+    const resolvedPlan = VALID_PLANS.includes(protectionPlan) ? protectionPlan : 'BASIC';
+    const depositAmount = Math.round((car.securityDeposit ?? 0) * (DEPOSIT_HOLD_FRACTION[resolvedPlan] ?? 1));
+
     const booking = await prisma.booking.create({
       data: {
         id: uuidv4(),
@@ -121,7 +135,8 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
         totalAmount,
         platformFee,
         hostPayoutAmount: hostPayout,
-        protectionPlan: VALID_PLANS.includes(protectionPlan) ? protectionPlan : 'BASIC',
+        depositAmount,
+        protectionPlan: resolvedPlan,
         deliveryRequested: Boolean(deliveryRequested),
         coDriverRequested: Boolean(coDriverRequested),
         coDriverName: coDriverRequested ? String(coDriverName).trim() : null,
@@ -151,9 +166,13 @@ router.post('/booking/:id/checkout-session', requireAuth, async (req: Request, r
   }
 
   try {
+    // Deposit is charged in the same PayU transaction as the trip cost, not
+    // held separately — booking.totalAmount itself stays deposit-exclusive
+    // since PayoutEngine.splitAmount reads it at trip completion, and the
+    // deposit isn't host revenue to split.
     const checkout = await paymentGateway.initiateCheckout({
       bookingId: booking.id,
-      amount: booking.totalAmount,
+      amount: booking.totalAmount + booking.depositAmount,
       customerName: booking.customer.fullName,
       customerEmail: booking.customer.email,
       customerPhone: booking.customer.phoneNumber,

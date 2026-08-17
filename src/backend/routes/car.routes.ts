@@ -272,6 +272,25 @@ router.get('/cars/:id/incentives', requireAuth, async (req: Request, res: Respon
   res.json({ success: true, data: progress });
 });
 
+// Host-only trip history for this car — surfaces which completed bookings are
+// still within the damage-report window (see damageClaim.routes.ts).
+router.get('/cars/:id/bookings', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const car = await prisma.car.findUnique({ where: { id } });
+  if (!car) return res.status(404).json({ error: 'Car not found' });
+  if (car.ownerId !== req.user!.userId && req.user!.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Not your listing' });
+  }
+
+  const bookings = await prisma.booking.findMany({
+    where: { carId: id, status: { in: ['ACTIVE', 'COMPLETED'] } },
+    include: { customer: { select: { id: true, fullName: true } }, damageClaim: true },
+    orderBy: { startTime: 'desc' },
+    take: 50,
+  });
+  res.json({ success: true, count: bookings.length, data: bookings });
+});
+
 /* ── Fleet Partner Onboarding (Audit -> Security -> Agreement -> Go Live) ── */
 
 async function assertOwnsCarForOnboarding(req: Request, carId: string) {

@@ -1,4 +1,4 @@
-import { PrismaClient, PayoutStatus } from '@prisma/client';
+import { PrismaClient, PayoutStatus, BookingStatus, BookingDepositStatus, RefundRequestType } from '@prisma/client';
 import cron from 'node-cron';
 import axios from 'axios';
 import { config } from '../config';
@@ -12,6 +12,12 @@ const PAYU_COMMAND_URL =
   config.payu.mode === 'live'
     ? 'https://info.payu.in/merchant/postservice.php?form=2'
     : 'https://test.payu.in/merchant/postservice.php?form=2';
+
+// Must match REPORT_WINDOW_HOURS in routes/damageClaim.routes.ts — duplicated
+// rather than imported since a service importing a route module (and its
+// unused Router()/PrismaClient instantiation) inverts the normal dependency
+// direction for one constant.
+const DEPOSIT_REPORT_WINDOW_HOURS = 24;
 
 export class PayoutEngine {
   /**
@@ -184,6 +190,47 @@ export class PayoutEngine {
             where: { id: payout.id },
             data: { status: PayoutStatus.FAILED },
           });
+        }
+      }
+    });
+  }
+
+  /**
+   * Runs hourly alongside initializePayoutCron — releases a booking's security
+   * deposit (creates a RefundRequest for an admin to action manually, per the
+   * "manual admin queue over live PayU refunds" decision) once the damage-claim
+   * report window has passed with no claim filed. Bookings where a DamageClaim
+   * exists are skipped entirely — that claim's own resolution (see
+   * damageClaim.routes.ts) is what moves depositStatus forward instead.
+   */
+  static initializeDepositReleaseCron() {
+    cron.schedule('0 * * * *', async () => {
+      const cutoff = new Date(Date.now() - DEPOSIT_REPORT_WINDOW_HOURS * 60 * 60 * 1000);
+
+      const releasable = await prisma.booking.findMany({
+        where: {
+          status: BookingStatus.COMPLETED,
+          depositStatus: BookingDepositStatus.HELD,
+          depositAmount: { gt: 0 },
+          endTime: { lte: cutoff },
+          damageClaim: null,
+        },
+      });
+
+      for (const booking of releasable) {
+        try {
+          await prisma.$transaction([
+            prisma.booking.update({
+              where: { id: booking.id },
+              data: { depositStatus: BookingDepositStatus.RELEASED, depositReleasedAt: new Date() },
+            }),
+            prisma.refundRequest.create({
+              data: { bookingId: booking.id, type: RefundRequestType.DEPOSIT_RELEASE, amount: booking.depositAmount },
+            }),
+          ]);
+          console.log(`[DEPOSIT RELEASE] Booking ${booking.id} — ₹${booking.depositAmount} queued for admin refund`);
+        } catch (error: any) {
+          console.error(`[DEPOSIT RELEASE ERROR] Booking ${booking.id}:`, error.message);
         }
       }
     });

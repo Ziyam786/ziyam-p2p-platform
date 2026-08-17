@@ -38,7 +38,10 @@ export async function startLeaseAgreementEsign(bookingId: string): Promise<{ esi
     endTime: booking.endTime,
     protectionPlan: booking.protectionPlan,
     totalAmount: booking.totalAmount,
-    securityDeposit: booking.car.securityDeposit,
+    // The actual amount held, not car.securityDeposit's raw figure — reduced
+    // per protectionPlan (see DEPOSIT_HOLD_FRACTION in booking.routes.ts) and
+    // genuinely charged via PayU, unlike the un-adjusted car-level number.
+    securityDeposit: booking.depositAmount,
   });
   const { documentId } = await esignApi.uploadDocument(pdf, `lease-agreement-${booking.id.slice(0, 8)}`);
   const signature = await esignApi.createSignatureRequest(

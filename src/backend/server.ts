@@ -25,6 +25,8 @@ import agentRoutes from './routes/agent.routes';
 import opsTripRoutes from './routes/opsTrip.routes';
 import financeErpRoutes from './routes/financeErp.routes';
 import itineraryRoutes from './routes/itinerary.routes';
+import damageClaimRoutes from './routes/damageClaim.routes';
+import refundRequestRoutes from './routes/refundRequest.routes';
 
 const app = express();
 
@@ -110,6 +112,8 @@ app.use('/api', agentRoutes);
 app.use('/api', opsTripRoutes);
 app.use('/api', financeErpRoutes);
 app.use('/api', itineraryRoutes);
+app.use('/api', damageClaimRoutes);
+app.use('/api', refundRequestRoutes);
 
 // 404 handler for unmatched API routes
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
@@ -123,6 +127,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 
 // Background N+1 settlement cron
 PayoutEngine.initializePayoutCron();
+PayoutEngine.initializeDepositReleaseCron();
 
 app.listen(config.port, () => {
   console.log(`🚀 ZiyamSelfDrive API running on port ${config.port} (${config.nodeEnv})`);
