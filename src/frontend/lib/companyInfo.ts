@@ -13,6 +13,12 @@ export const COMPANY = {
   operatingCity: 'Bengaluru',
   scopeNote: 'Currently operating in Bengaluru only — expanding pan-India as the fleet grows.',
   jurisdiction: 'Courts at Bengaluru, Karnataka',
+  startupIndiaRecognized: true,
+  certifications: [
+    { standard: 'ISO 9001', name: 'Quality Management System' },
+    { standard: 'ISO 27001', name: 'Information Security Management System' },
+    { standard: 'ISO 14001', name: 'Environmental Management System' },
+  ],
   team: [
     { name: 'Syed Fardeen', role: 'Founder & Director' },
     { name: 'Junaid Khan', role: 'Co-founder & Director' },
