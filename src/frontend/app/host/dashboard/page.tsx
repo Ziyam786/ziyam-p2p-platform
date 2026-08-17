@@ -9,9 +9,10 @@ import StatCard from '../../../components/StatCard';
 import Rating from '../../../components/Rating';
 import { LogoBadge } from '../../../components/Logo';
 import BlackoutManager from '../../../components/BlackoutManager';
+import BookingRequestsPanel from '../../../components/BookingRequestsPanel';
 import { useAuth } from '../../../lib/auth-context';
 import { useToast } from '../../../components/Toast';
-import { hostApi, carsApi } from '../../../lib/api';
+import { hostApi, carsApi, hostReviewApi } from '../../../lib/api';
 import type { Car, EarningsOverview, UtilizationEntry } from '../../../lib/types';
 
 const EMPTY: EarningsOverview = {
@@ -28,6 +29,11 @@ function DashboardInner() {
   const [utilization, setUtilization] = useState<UtilizationEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [blackoutCar, setBlackoutCar] = useState<Car | null>(null);
+  const [requestCount, setRequestCount] = useState(0);
+
+  function loadRequestCount() {
+    hostReviewApi.requests().then((res) => setRequestCount(res.count)).catch(() => {});
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -41,6 +47,7 @@ function DashboardInner() {
       })
       .catch((err) => show(err.message ?? 'Failed to load dashboard data', 'error'))
       .finally(() => active && setLoading(false));
+    loadRequestCount();
     return () => {
       active = false;
     };
@@ -104,6 +111,7 @@ function DashboardInner() {
           onChange={setTab}
           tabs={[
             { key: 'overview', label: 'Overview' },
+            { key: 'requests', label: `Booking Requests${requestCount > 0 ? ` (${requestCount})` : ''}` },
             { key: 'cars', label: `My Cars (${cars.length})` },
             { key: 'utilization', label: 'Utilization' },
             { key: 'policy', label: 'Payout Policy' },
@@ -121,8 +129,16 @@ function DashboardInner() {
             <StatCard label="Your Net Profit (70%)" value={metrics.netEarnings} sub="Host direct share" tone="positive" />
             <StatCard label="Escrow Queue (N+1)" value={metrics.pendingEscrow} sub="Releasing per settlement policy" tone="warning" />
           </div>
+        ) : tab === 'requests' ? (
+          <BookingRequestsPanel onChanged={loadRequestCount} />
         ) : tab === 'cars' ? (
           <div className="space-y-4">
+            {cars.length > 0 && (
+              <div className="bg-gray-900 border border-gray-800 rounded-xl px-5 py-3 text-xs text-gray-400">
+                💡 Got a car that's temporarily unavailable? Pause it below (or from Manage → Controls) to
+                avoid booking requests you'll just have to decline.
+              </div>
+            )}
             {cars.length === 0 ? (
               <div className="text-center py-16 border border-dashed border-gray-800 rounded-xl">
                 <p className="text-gray-400 mb-4">You haven't listed any cars yet.</p>

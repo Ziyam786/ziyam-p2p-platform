@@ -3,8 +3,7 @@ import { PrismaClient, BookingStatus } from '@prisma/client';
 import { config } from '../config';
 import { verifyPayuResponseHash } from '../utils/payuHash';
 import { notify } from '../services/notificationService';
-import { startLeaseAgreementEsign } from '../services/leaseAgreementEsign';
-import { isSetuConfigured } from '../services/setuService';
+import { getSetting } from '../services/settingsService';
 import { generateChatReply } from '../services/aiService';
 import { ITINERARY_DESTINATIONS } from './itinerary.routes';
 
@@ -58,14 +57,23 @@ router.post('/payments/payu/callback', async (req: Request, res: Response) => {
 
   // Idempotent: PayU may retry the postback, and the browser redirect can also land here twice.
   if (booking.status !== BookingStatus.PENDING_PAYMENT) {
-    const alreadyConfirmed = booking.status === BookingStatus.CONFIRMED || booking.status === BookingStatus.ACTIVE || booking.status === BookingStatus.COMPLETED;
-    return res.redirect(303, alreadyConfirmed ? `${redirectBase}/bookings/${bookingId}/confirmation` : `${redirectBase}/checkout/${bookingId}`);
+    const alreadyProcessed = booking.status !== BookingStatus.CANCELLED;
+    return res.redirect(303, alreadyProcessed ? `${redirectBase}/bookings/${bookingId}/confirmation` : `${redirectBase}/checkout/${bookingId}`);
   }
 
   if (String(status).toLowerCase() === 'success') {
+    // Payment success doesn't confirm the trip outright — the host still has
+    // to verify the car is actually available. See hostReview.routes.ts,
+    // which moves PENDING_HOST_REVIEW -> CONFIRMED (or REJECTED with a full
+    // refund) and is where the lease-agreement eSign now fires from, not here
+    // — signing a lease for a booking that might still be rejected made no sense.
+    const reviewWindowHours = await getSetting<number>('host_review_window_hours', 2);
     const updated = await prisma.booking.update({
       where: { id: bookingId },
-      data: { status: BookingStatus.CONFIRMED },
+      data: {
+        status: BookingStatus.PENDING_HOST_REVIEW,
+        hostReviewDeadline: new Date(Date.now() + reviewWindowHours * 60 * 60 * 1000),
+      },
       include: { car: true },
     });
     if (booking.promoCode) {
@@ -73,23 +81,18 @@ router.post('/payments/payu/callback', async (req: Request, res: Response) => {
     }
     await notify(
       updated.customerId,
-      'BOOKING_CONFIRMED',
-      'Booking confirmed!',
-      `Your trip in the ${updated.car.make} ${updated.car.model} is booked.`,
+      'GENERIC',
+      'Booking request sent',
+      `Your request for the ${updated.car.make} ${updated.car.model} is awaiting host confirmation.`,
       `/account/trips/${updated.id}`
     );
-
-    // Best-effort: kick off Setu eSign for the lease agreement right away so
-    // both host and guest get their signing link immediately, instead of
-    // waiting for either of them to open the agreement page and click "Start
-    // eSign". Never blocks the payment redirect — if Setu is unreachable or
-    // unconfigured, the manual button on /bookings/:id/agreement is still
-    // there as a fallback.
-    if (isSetuConfigured()) {
-      startLeaseAgreementEsign(bookingId).catch((err) => {
-        console.error(`[PAYU CALLBACK] Auto eSign trigger failed for booking ${bookingId}:`, err.response?.data ?? err.message);
-      });
-    }
+    await notify(
+      updated.car.ownerId,
+      'GENERIC',
+      'New booking request',
+      `A guest wants to book your ${updated.car.make} ${updated.car.model} — accept or decline within ${reviewWindowHours}h.`,
+      '/host/dashboard?tab=requests'
+    );
 
     return res.redirect(303, `${redirectBase}/bookings/${bookingId}/confirmation`);
   }

@@ -1,8 +1,8 @@
 import type {
   AdminBooking, AdminCar, AdminDamageClaim, AdminPayout, AdminRefundRequest, AdminReview, AdminStats, AdminUser, AuditEntry,
-  BalanceSheetData, BookingStatus, ChatConversationSummary, ChatMessageRow, CommandCenterData, CustomRoleRow, FleetExpenseRow,
-  FleetSummary, JournalEntryRow, MonthlyBalanceRow, OpsInvoiceRow, OpsInvoiceStatus, OpsTripRow, OutstandingFrequency, OutstandingRow,
-  OutstandingType, PlatformBookingEntry, PromoCode, SessionUser, SettingRow,
+  BalanceSheetData, BookingConditionPhoto, BookingStatus, ChatConversationSummary, ChatMessageRow, CommandCenterData, CustomRoleRow,
+  FleetExpenseRow, FleetSummary, JournalEntryRow, KycVerificationLogRow, MonthlyBalanceRow, OpsInvoiceRow, OpsInvoiceStatus, OpsTripRow,
+  OutstandingFrequency, OutstandingRow, OutstandingType, PlatformBookingEntry, PromoCode, SessionUser, SettingRow,
 } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api';
@@ -66,6 +66,8 @@ export const adminApi = {
 
   bookings: (status?: string) => get<{ success: true; data: AdminBooking[] }>(`/admin/bookings${status ? `?status=${status}` : ''}`),
   updateBooking: (id: string, status: string) => patch<{ success: true; data: AdminBooking }>(`/admin/bookings/${id}`, { status }),
+  bookingConditionPhotos: (id: string) => get<{ success: true; data: BookingConditionPhoto[] }>(`/admin/bookings/${id}/condition-photos`),
+  kycLog: (userId: string) => get<{ success: true; data: KycVerificationLogRow[] }>(`/admin/users/${userId}/kyc-log`),
   createBooking: (data: {
     customerId?: string; customerName?: string; customerPhone?: string; customerEmail?: string;
     carId: string; startTime: string; endTime: string; totalAmount: number; protectionPlan?: string; status?: BookingStatus;

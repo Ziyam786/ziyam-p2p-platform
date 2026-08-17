@@ -52,6 +52,9 @@ router.post('/kyc/aadhaar/verify', requireAuth, async (req: Request, res: Respon
       verifiedName = result.name;
     } catch (err: any) {
       console.error('[KYC] Aadhaar OTP verify failed:', err.response?.data ?? err.message);
+      await prisma.kycVerificationLog.create({
+        data: { userId: req.user!.userId, method: 'AADHAAR_OTP', outcome: 'FAILED', detail: err.response?.data?.message ?? err.message },
+      });
       return res.status(422).json({ error: 'Aadhaar verification failed — check the OTP and try again.' });
     }
   }
@@ -60,6 +63,9 @@ router.post('/kyc/aadhaar/verify', requireAuth, async (req: Request, res: Respon
     where: { id: req.user!.userId },
     data: { isKycVerified: true, ...(verifiedName && { aadhaarVerifiedName: verifiedName }) },
     select: { id: true, isKycVerified: true, aadhaarVerifiedName: true },
+  });
+  await prisma.kycVerificationLog.create({
+    data: { userId: user.id, method: 'AADHAAR_OTP', outcome: 'SUCCESS', detail: verifiedName },
   });
 
   await notify(user.id, 'KYC_VERIFIED', "You're verified!", 'Your identity has been confirmed. You can now book or list cars.', '/account');
@@ -108,12 +114,18 @@ router.get('/kyc/digilocker/status', requireAuth, async (req: Request, res: Resp
         },
         select: { id: true, isKycVerified: true, aadhaarVerifiedName: true },
       });
+      await prisma.kycVerificationLog.create({
+        data: { userId: updated.id, method: 'DIGILOCKER', outcome: 'SUCCESS', detail: updated.aadhaarVerifiedName },
+      });
       await notify(updated.id, 'KYC_VERIFIED', "You're verified!", 'Your identity has been confirmed via DigiLocker. You can now book or list cars.', '/account');
       return res.json({ success: true, data: { status: 'authenticated', isKycVerified: true } });
     }
     res.json({ success: true, data: { status: status.status, isKycVerified: false } });
   } catch (err: any) {
     console.error('[KYC] DigiLocker status check failed:', err.response?.data ?? err.message);
+    await prisma.kycVerificationLog.create({
+      data: { userId: req.user!.userId, method: 'DIGILOCKER', outcome: 'FAILED', detail: err.response?.data?.message ?? err.message },
+    });
     res.status(502).json({ error: 'Could not check DigiLocker status right now.' });
   }
 });
@@ -131,6 +143,9 @@ router.post('/kyc/submit', requireAuth, async (req: Request, res: Response) => {
     where: { id: req.user!.userId },
     data: { isKycVerified: true, kycDocUrl: docUrl },
     select: { id: true, isKycVerified: true, kycDocUrl: true },
+  });
+  await prisma.kycVerificationLog.create({
+    data: { userId: user.id, method: 'DOC_UPLOAD', outcome: 'SUCCESS', detail: docUrl },
   });
 
   await notify(user.id, 'KYC_VERIFIED', "You're verified!", 'Your identity has been confirmed. You can now book or list cars.', '/account');

@@ -2,8 +2,13 @@ export type Role =
   | 'CUSTOMER' | 'SELF_HOST' | 'FLEET_OPERATOR' | 'AGENT'
   | 'FLEET_ADMIN' | 'OPERATIONS_EXECUTIVE' | 'MECHANICAL_EXECUTIVE' | 'TECHNICIAN'
   | 'ADMIN';
-export type BookingStatus = 'PENDING' | 'PENDING_PAYMENT' | 'CONFIRMED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+export type BookingStatus = 'PENDING' | 'PENDING_PAYMENT' | 'PENDING_HOST_REVIEW' | 'CONFIRMED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'REJECTED';
 export type PayoutStatus = 'HELD_IN_ESCROW' | 'QUEUED_FOR_N1' | 'SETTLED' | 'FAILED';
+export type CancelledBy = 'CUSTOMER' | 'HOST' | 'SYSTEM' | 'ADMIN';
+export type TripStage = 'PRE_TRIP' | 'POST_TRIP';
+export type PhotoAngle = 'FRONT' | 'REAR' | 'LEFT' | 'RIGHT' | 'MIRROR_LEFT' | 'MIRROR_RIGHT' | 'ODOMETER' | 'OTHER';
+export type KycMethod = 'AADHAAR_OTP' | 'DIGILOCKER' | 'DOC_UPLOAD';
+export type KycOutcome = 'SUCCESS' | 'FAILED';
 
 export interface AdminUser {
   id: string;
@@ -106,6 +111,32 @@ export interface AdminBooking {
   hostPayoutAmount: number;
   protectionPlan: string;
   status: BookingStatus;
+  depositAmount: number;
+  depositStatus: string;
+  hostReviewDeadline?: string | null;
+  rejectionReason?: string | null;
+  cancellationReason?: string | null;
+  cancelledBy?: CancelledBy | null;
+  refundRequests?: { type: RefundRequestType; amount: number; status: RefundRequestStatus; createdAt: string }[];
+  createdAt: string;
+}
+
+export interface BookingConditionPhoto {
+  id: string;
+  bookingId: string;
+  stage: TripStage;
+  angle: PhotoAngle;
+  url: string;
+  uploadedById: string;
+  createdAt: string;
+}
+
+export interface KycVerificationLogRow {
+  id: string;
+  userId: string;
+  method: KycMethod;
+  outcome: KycOutcome;
+  detail?: string | null;
   createdAt: string;
 }
 
