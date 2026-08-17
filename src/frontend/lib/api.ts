@@ -219,6 +219,8 @@ export const usersApi = {
     post<{ success: true; data: { esignRequestId: string } }>('/users/me/partner-agreement/esign/start'),
   partnerAgreementEsignStatus: () =>
     get<{ success: true; data: { status: string | null; downloadUrl?: string } }>('/users/me/partner-agreement/esign/status'),
+  verifyBankAccount: (ifsc: string, accountNumber: string) =>
+    post<{ success: true; data: PublicUser }>('/users/me/bank/verify', { ifsc, accountNumber }),
 };
 
 /* ── KYC ──────────────────────────────────────────────────────────── */

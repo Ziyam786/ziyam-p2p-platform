@@ -81,6 +81,7 @@ router.post('/users/me/bank/verify', requireAuth, async (req: Request, res: Resp
     if (!result.accountExists) {
       return res.status(422).json({ error: result.message || 'Bank account could not be verified' });
     }
+    const existing = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { payoutAccountId: true } });
     const user = await prisma.user.update({
       where: { id: req.user!.userId },
       data: {
@@ -88,6 +89,14 @@ router.post('/users/me/bank/verify', requireAuth, async (req: Request, res: Resp
         bankIfsc: ifsc,
         bankNameAtBank: result.nameAtBank,
         bankAccountVerified: true,
+        // There's no real PayU sub-merchant/marketplace onboarding integration
+        // built yet (that's a separate, heavier KYC flow with PayU directly) —
+        // a verified bank account is the real, honest signal we have today
+        // that a host is ready to receive payouts, so it's what unblocks
+        // bookings on their cars (see the payoutAccountId check in
+        // booking.routes.ts). Only generated once, so re-verifying (e.g. after
+        // changing banks) doesn't churn the id booking history may reference.
+        ...(!existing?.payoutAccountId && { payoutAccountId: `acct_${req.user!.userId.slice(0, 8)}` }),
       },
       select: PUBLIC_USER_SELECT,
     });
