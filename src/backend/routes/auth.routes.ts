@@ -8,6 +8,7 @@ import { requireAuth } from '../middleware/auth';
 import { requestOtp, verifyOtp } from '../services/otpService';
 import { authRateLimiter } from '../middleware/rateLimit';
 import { normalizeEmail, isValidEmail, normalizePhone, isValidPhone, normalizeFullName } from '../utils/validation';
+import { verifyCredentials } from '@supabase/server/core';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -242,7 +243,7 @@ router.post('/auth/otp/verify', authRateLimiter, async (req: Request, res: Respo
 // signup form once. Existing accounts (whether they originally signed up
 // with a password or via OTP) can use this from then on.
 router.post('/auth/oauth/supabase', authRateLimiter, async (req: Request, res: Response) => {
-  if (!config.supabase.url || !config.supabase.anonKey) {
+  if (!config.supabase.url || !config.supabase.publishableKey) {
     return res.status(503).json({ error: 'Google sign-in is not configured yet' });
   }
   const { accessToken } = req.body;
@@ -250,15 +251,17 @@ router.post('/auth/oauth/supabase', authRateLimiter, async (req: Request, res: R
     return res.status(400).json({ error: 'accessToken is required' });
   }
 
+  // Cryptographic JWT verification via @supabase/server/core, against the
+  // JWKS at SUPABASE_JWKS_URL — no network round-trip to Supabase's /auth/v1/user
+  // on every login like the old fetch()-based check this replaced. See
+  // types/supabase-server-core.d.ts for why this needs an ambient type decl.
   let supabaseEmail: string;
   try {
-    const verifyRes = await fetch(`${config.supabase.url}/auth/v1/user`, {
-      headers: { Authorization: `Bearer ${accessToken}`, apikey: config.supabase.anonKey },
-    });
-    if (!verifyRes.ok) return res.status(401).json({ error: 'Google sign-in session is invalid or expired' });
-    const supabaseUser: any = await verifyRes.json();
-    if (!supabaseUser.email) return res.status(401).json({ error: 'Google sign-in session is invalid or expired' });
-    supabaseEmail = normalizeEmail(supabaseUser.email);
+    const { data: auth, error: verifyError } = await verifyCredentials({ token: accessToken, apikey: null }, { auth: 'user' });
+    if (verifyError || !auth?.userClaims?.email) {
+      return res.status(401).json({ error: 'Google sign-in session is invalid or expired' });
+    }
+    supabaseEmail = normalizeEmail(auth.userClaims.email);
   } catch (err) {
     console.error('[AUTH] Supabase token verification failed:', err);
     return res.status(502).json({ error: 'Could not verify Google sign-in right now. Please try again.' });
