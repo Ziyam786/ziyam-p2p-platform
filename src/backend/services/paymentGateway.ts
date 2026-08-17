@@ -8,6 +8,10 @@ interface InitiateCheckoutParams {
   customerEmail: string;
   customerPhone: string;
   productInfo: string;
+  /** Defaults to the booking callback — pass a different path for other PayU
+   * flows (e.g. itinerary unlocks) so they land on their own callback route
+   * instead of being mistaken for a booking payment. */
+  callbackPath?: string;
 }
 
 export interface PayuCheckoutSession {
@@ -48,6 +52,7 @@ class PaymentGateway {
       udf1: params.bookingId,
     });
 
+    const callbackPath = params.callbackPath ?? '/api/payments/payu/callback';
     const fields: Record<string, string> = {
       key: config.payu.key,
       txnid,
@@ -58,8 +63,8 @@ class PaymentGateway {
       email: params.customerEmail,
       phone: params.customerPhone,
       udf1: params.bookingId,
-      surl: `${config.serverUrl}/api/payments/payu/callback`,
-      furl: `${config.serverUrl}/api/payments/payu/callback`,
+      surl: `${config.serverUrl}${callbackPath}`,
+      furl: `${config.serverUrl}${callbackPath}`,
       hash,
     };
 

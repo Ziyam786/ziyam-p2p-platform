@@ -177,6 +177,27 @@ export const bookingsApi = {
   sendMessage: (id: string, body: string) => post<{ success: true; data: TripMessage }>(`/bookings/${id}/messages`, { body }),
 };
 
+/* ── Itinerary unlocks ────────────────────────────────────────────── */
+export type ItineraryDestination = 'Ooty' | 'Coorg' | 'Chikmagalur' | 'Gokarna';
+
+export interface ItineraryUnlock {
+  id: string;
+  destination: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  amount: number;
+  status: 'PENDING_PAYMENT' | 'PAID' | 'FAILED';
+  generatedContent: string | null;
+  createdAt: string;
+}
+
+export const itinerariesApi = {
+  unlock: (data: { destination: ItineraryDestination; customerName: string; customerEmail: string; customerPhone: string }) =>
+    post<{ success: true; data: PayuCheckoutSession & { id: string } }>('/itineraries/unlock', data),
+  get: (id: string) => get<{ success: true; data: ItineraryUnlock }>(`/itineraries/${id}`),
+};
+
 export interface TripMessage {
   id: string;
   bookingId: string;
