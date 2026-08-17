@@ -32,8 +32,8 @@ const CATEGORIES: { title: string; icon: string; faqs: { q: string; a: string }[
     icon: '🛡️',
     faqs: [
       { q: 'Does ZiyamSelfDrive insure my car?', a: "No — we're a marketplace, not an insurer. Your own comprehensive insurance policy is the primary coverage, and it's mandatory to list a car. See our Insurance & Damage Policy page for the full breakdown." },
-      { q: "What happens if a renter damages my car?", a: 'The cost is deducted from the security deposit first. If it exceeds the deposit, you recover the remainder directly from the renter — our support team helps coordinate this and will try to cover up to ₹20,000 of a claim.' },
-      { q: "What if my car breaks down or is abandoned by a renter?", a: "24/7 roadside assistance is included on every trip regardless of protection plan — we'll get the vehicle recovered to the nearest garage." },
+      { q: "What happens if a lessee damages my car?", a: 'The cost is deducted from the security deposit first. If it exceeds the deposit, you recover the remainder directly from the lessee — our support team helps coordinate this and will try to cover up to ₹20,000 of a claim.' },
+      { q: "What if my car breaks down or is abandoned by a lessee?", a: "24/7 roadside assistance is included on every trip regardless of protection plan — we'll get the vehicle recovered to the nearest garage." },
       { q: 'Do I need to renew my insurance to keep my listing active?', a: 'Yes — an expired insurance policy will pause your listing until you upload a renewed one.' },
     ],
   },
@@ -41,7 +41,7 @@ const CATEGORIES: { title: string; icon: string; faqs: { q: string; a: string }[
     title: 'Managing Your Vehicle',
     icon: '🔧',
     faqs: [
-      { q: 'How do I block out dates when my car is unavailable?', a: "Use the availability calendar in your dashboard — tap a start and end date to pause bookings for that range. Renters can't book over dates you've blocked." },
+      { q: 'How do I block out dates when my car is unavailable?', a: "Use the availability calendar in your dashboard — tap a start and end date to pause bookings for that range. Lessees can't book over dates you've blocked." },
       { q: 'Can I change my price after listing?', a: "Yes, but pricing is set via a slider bounded to market rate for your car's category and city — you can't type an arbitrary price. This keeps pricing fair and competitive." },
       { q: 'How do I offer doorstep delivery?', a: 'Toggle it on from your car\'s edit page in the dashboard and set your delivery fee — you can enable this any time after listing, not just at onboarding.' },
       { q: 'What if I need to take my car in for service?', a: "Block those dates on your availability calendar like any other pause. If you're fleet-managed, your fleet operator handles scheduling maintenance." },
@@ -51,7 +51,7 @@ const CATEGORIES: { title: string; icon: string; faqs: { q: string; a: string }[
     title: 'Trust & Safety',
     icon: '🪪',
     faqs: [
-      { q: 'How are renters verified?', a: 'Every renter completes mandatory KYC via DigiLocker/Aadhaar before their first booking — the same verification standard hosts go through.' },
+      { q: 'How are lessees verified?', a: 'Every lessee completes mandatory KYC via DigiLocker/Aadhaar before their first booking — the same verification standard hosts go through.' },
       { q: 'How does the trip handover code work?', a: "When a trip starts, a 4-digit code is shown only in your host app. The guest must enter this code to mark the trip complete when returning the car — this proves an actual in-person handover happened, protecting both sides from disputes." },
       { q: 'What if a guest tries to arrange a rental outside the platform?', a: "Don't. Off-platform arrangements void KYC verification, payout protection, and support coverage for that trip — if something goes wrong, you're on your own." },
       { q: 'Can I refer other hosts?', a: 'Yes — you earn ₹500 in platform credit once someone you refer completes their first trip.' },

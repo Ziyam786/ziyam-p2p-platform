@@ -742,13 +742,13 @@ export default function HomePage() {
           </ScrollReveal>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Renter */}
+            {/* Lessee */}
             <ScrollReveal direction="left">
               <div className="h-full flex flex-col rounded-3xl border border-amber-500/20 bg-gradient-to-b from-amber-500/[0.07] to-slate-900/60 backdrop-blur-xl p-8">
                 <div className="w-11 h-11 rounded-xl bg-amber-500/15 flex items-center justify-center mb-5">
                   <CarFront className="w-5 h-5 text-amber-400" />
                 </div>
-                <h3 className="text-xl font-extrabold text-white mb-1">For Renters</h3>
+                <h3 className="text-xl font-extrabold text-white mb-1">For Lessees</h3>
                 <p className="text-slate-400 text-sm mb-6">Everything shown upfront — no surprises at pickup.</p>
 
                 <ul className="space-y-4 flex-1">
@@ -1004,7 +1004,7 @@ export default function HomePage() {
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
             <ScrollReveal>
               <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">What Our Community Says</h2>
-              <p className="text-gray-500 text-sm mb-10 text-center">Real feedback from renters and hosts</p>
+              <p className="text-gray-500 text-sm mb-10 text-center">Real feedback from lessees and hosts</p>
             </ScrollReveal>
             <StaggerGroup className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {testimonials.map((t, i) => (

@@ -8,7 +8,7 @@ import MotionButton from '../../components/MotionButton';
 import { COMPANY } from '../../lib/companyInfo';
 
 const VALUES = [
-  { icon: '🤝', title: 'Trust First', desc: 'Every host and renter is KYC-verified. Every car is inspected before it goes live.' },
+  { icon: '🤝', title: 'Trust First', desc: 'Every host and lessee is KYC-verified. Every car is inspected before it goes live.' },
   { icon: '⚖️', title: 'Fair Splits', desc: 'Hosts keep 70% of every booking — one of the highest host shares of any platform in India.' },
   { icon: '🌱', title: 'Idle Assets, Active Income', desc: 'The average private car sits parked most of the day. We help owners put that time to work.' },
   { icon: '🔐', title: 'Safety by Design', desc: 'Escrowed deposits, N+1 payouts, mandatory KYC, and dedicated support protect both sides of every trip.' },
@@ -27,7 +27,7 @@ export default function AboutPage() {
       <PageHero
         eyebrow="Our Story"
         title="Making every car a shared asset"
-        subtitle="ZiyamSelfDrive is a peer-to-peer self-drive marketplace — connecting car owners with renters who just want the keys, not the driver."
+        subtitle="ZiyamSelfDrive is a peer-to-peer self-drive marketplace — connecting car owners with lessees who just want the keys, not the driver."
       />
 
       <section className="py-14 bg-white">

@@ -234,7 +234,7 @@ export default function CarForm({
         )}
         {values.securityDeposit === 0 && (
           <p className="text-xs text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2">
-            ✓ Security deposit is ₹0 — this listing will show a "Zero Deposit" badge to renters.
+            ✓ Security deposit is ₹0 — this listing will show a "Zero Deposit" badge to lessees.
           </p>
         )}
       </div>

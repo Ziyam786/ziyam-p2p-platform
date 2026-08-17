@@ -113,7 +113,7 @@ export default function PromoCodesPage() {
   }
 
   return (
-    <AdminShell title="Promo Codes" subtitle={`${codes.length} codes · renters apply these at checkout`}>
+    <AdminShell title="Promo Codes" subtitle={`${codes.length} codes · lessees apply these at checkout`}>
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-6">
         <h2 className="font-bold text-slate-100 mb-4">Create a Promo Code</h2>
         <form onSubmit={handleCreate} className="grid grid-cols-2 sm:grid-cols-5 gap-3 items-end">

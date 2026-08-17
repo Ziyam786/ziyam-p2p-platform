@@ -79,7 +79,7 @@ const FAQS = [
   },
   {
     q: 'Are there toll or parking charges?',
-    a: 'Yes. All tolls, parking fees, and traffic challans during the rental period are the renter\'s responsibility.',
+    a: 'Yes. All tolls, parking fees, and traffic challans during the rental period are the lessee\'s responsibility.',
   },
   {
     q: 'What is the security deposit for?',
@@ -112,10 +112,10 @@ export default function HowItWorksPage() {
         </div>
       </section>
 
-      {/* For Renters */}
+      {/* For Lessees */}
       <section className="py-20 bg-white">
         <div className="max-w-5xl mx-auto px-4">
-          <h2 className="text-2xl font-extrabold text-gray-900 mb-2 text-center">For Renters</h2>
+          <h2 className="text-2xl font-extrabold text-gray-900 mb-2 text-center">For Lessees</h2>
           <p className="text-gray-500 text-sm text-center mb-12">Your complete guide to renting a self-drive car</p>
 
           <div className="space-y-10">

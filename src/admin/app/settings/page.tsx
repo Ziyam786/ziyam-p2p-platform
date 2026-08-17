@@ -289,7 +289,7 @@ export default function SettingsPage() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
             <h2 className="font-bold text-slate-100 mb-1">Demand Pricing</h2>
             <p className="text-xs text-slate-500 mb-5">
-              Renter-facing surge on top of a car's listed rate — bumps stack additively and are capped at the max
+              Lessee-facing surge on top of a car's listed rate — bumps stack additively and are capped at the max
               multiplier below. Keyed off the trip's pickup time.
             </p>
 
@@ -373,10 +373,10 @@ export default function SettingsPage() {
             <h2 className="font-bold text-slate-100">AI Support Assistant</h2>
             <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
               <input type="checkbox" checked={aiEnabled} onChange={(e) => setAiEnabled(e.target.checked)} className="w-4 h-4 accent-brand-500" />
-              Enabled on the renter site
+              Enabled on the lessee site
             </label>
           </div>
-          <p className="text-xs text-slate-500 mb-4">System prompt the chatbot uses to answer renter/host questions</p>
+          <p className="text-xs text-slate-500 mb-4">System prompt the chatbot uses to answer lessee/host questions</p>
           <textarea
             value={aiPrompt}
             onChange={(e) => setAiPrompt(e.target.value)}

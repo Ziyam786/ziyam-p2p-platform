@@ -208,7 +208,7 @@ function DashboardInner() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-300">
               <Policy title="70/30 Revenue Split" body="You keep 70% of the base fare. Ziyam takes 30% for marketing, platform tech, dynamic pricing, and support." />
               <Policy title="N+1 Settlement Policy" body="Self-hosted payouts settle 24-48 hours after trip end (or weekly if you opt in); fleet-managed cars settle within 1 day of receipt confirmation." />
-              <Policy title="Security Deposit" body="Renter security deposits are held in escrow and applied to damage or toll costs first — see the full Insurance & Damage Policy for how recovery beyond the deposit works." />
+              <Policy title="Security Deposit" body="Lessee security deposits are held in escrow and applied to damage or toll costs first — see the full Insurance & Damage Policy for how recovery beyond the deposit works." />
             </div>
           </div>
         )}

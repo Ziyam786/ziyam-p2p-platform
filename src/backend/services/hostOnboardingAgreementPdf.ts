@@ -57,7 +57,7 @@ export function renderHostOnboardingAgreementPdf(data: HostOnboardingAgreementDa
 
     h1().text('WHEREAS');
     body();
-    doc.text('a. The Company operates ZiyamSelfDrive, a peer-to-peer self-drive vehicle rental marketplace currently operating in Bengaluru, connecting vehicle owners ("Hosts") with renters ("Guests").');
+    doc.text('a. The Company operates ZiyamSelfDrive, a peer-to-peer self-drive vehicle rental marketplace currently operating in Bengaluru, connecting vehicle owners ("Hosts") with lessees ("Guests").');
     doc.text('b. The Host wishes to list one or more vehicles on the Platform and receive booking requests from Guests.');
     doc.text('c. The Company acts as a limited payment collection and facilitation agent — collecting fares from Guests via its payment partner and remitting the Host\'s share as set out in this Agreement.');
     doc.text('d. This Agreement is a one-time, account-level agreement between the Host and the Company, and applies regardless of whether a given vehicle is Self-Hosted or Fleet-Managed (each as defined below).');

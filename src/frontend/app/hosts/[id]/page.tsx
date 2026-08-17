@@ -90,7 +90,7 @@ export default function HostProfilePage() {
             {reviews.map((r) => (
               <div key={r.id} className="border-b border-gray-50 last:border-0 pb-4 last:pb-0">
                 <div className="flex justify-between items-center mb-1 flex-wrap gap-1">
-                  <span className="font-semibold text-gray-800 text-sm">{r.author?.fullName ?? 'Renter'}</span>
+                  <span className="font-semibold text-gray-800 text-sm">{r.author?.fullName ?? 'Lessee'}</span>
                   <Rating value={r.rating} />
                 </div>
                 {r.car && <p className="text-xs text-gray-400">{r.car.make} {r.car.model}</p>}

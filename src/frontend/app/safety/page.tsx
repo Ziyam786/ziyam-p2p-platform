@@ -4,9 +4,9 @@ import Footer from '../../components/Footer';
 import PageHero from '../../components/PageHero';
 
 const PILLARS = [
-  { icon: '🪪', title: 'Verified Identities', desc: 'Every renter and host completes DigiLocker-based KYC before their first trip.' },
+  { icon: '🪪', title: 'Verified Identities', desc: 'Every lessee and host completes DigiLocker-based KYC before their first trip.' },
   { icon: '🛡️', title: 'Insurance-Verified Vehicles', desc: 'Every host must carry active comprehensive insurance, checked before their listing goes live — see our Insurance & Damage Policy.' },
-  { icon: '📸', title: 'Digital Handover Logs', desc: 'Photo-documented pickup and drop-off protects both renters and hosts from disputes.' },
+  { icon: '📸', title: 'Digital Handover Logs', desc: 'Photo-documented pickup and drop-off protects both lessees and hosts from disputes.' },
   { icon: '💰', title: 'Escrowed Deposits', desc: 'Security deposits are held separately and only released after a clean vehicle return.' },
   { icon: '📍', title: 'Live Vehicle Telemetry', desc: 'Keyless-enabled vehicles report live location and status for faster roadside response.' },
   { icon: '📞', title: '24/7 Roadside Support', desc: 'A dedicated emergency line is included with every single booking, no exceptions.' },
@@ -16,7 +16,7 @@ export default function SafetyPage() {
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       <Navbar />
-      <PageHero eyebrow="Trust & Safety" title="Safety is the foundation" subtitle="Every layer of ZiyamSelfDrive — from sign-up to drop-off — is designed to protect renters and hosts alike." />
+      <PageHero eyebrow="Trust & Safety" title="Safety is the foundation" subtitle="Every layer of ZiyamSelfDrive — from sign-up to drop-off — is designed to protect lessees and hosts alike." />
 
       <section className="py-16 bg-white">
         <div className="max-w-5xl mx-auto px-4">
