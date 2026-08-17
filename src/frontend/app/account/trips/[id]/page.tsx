@@ -380,7 +380,9 @@ function TripDetailInner() {
           </div>
         </div>
 
-        {trip.status === 'CONFIRMED' && trip.deliveryRequested && !isHost && <GuestDeliveryTracker bookingId={trip.id} />}
+        {trip.status === 'CONFIRMED' && trip.deliveryRequested && !isHost && (
+          <GuestDeliveryTracker bookingId={trip.id} hostName={trip.car?.owner?.fullName} hostAvatarUrl={trip.car?.owner?.avatarUrl} />
+        )}
 
         {['ACTIVE', 'COMPLETED'].includes(trip.status) && conditionPhotos.length > 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-6">
@@ -404,7 +406,7 @@ function TripDetailInner() {
         )}
 
         {['CONFIRMED', 'ACTIVE', 'COMPLETED'].includes(trip.status) && (
-          <div className="mb-6">
+          <div id="trip-chat" className="mb-6 scroll-mt-24">
             <TripChat bookingId={trip.id} otherPartyName={isHost ? trip.customer?.fullName : trip.car?.owner?.fullName} />
           </div>
         )}
