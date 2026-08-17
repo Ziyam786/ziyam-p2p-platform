@@ -12,7 +12,7 @@ import BlackoutManager from '../../../components/BlackoutManager';
 import BookingRequestsPanel from '../../../components/BookingRequestsPanel';
 import { useAuth } from '../../../lib/auth-context';
 import { useToast } from '../../../components/Toast';
-import { hostApi, carsApi, hostReviewApi } from '../../../lib/api';
+import { hostApi, carsApi, hostReviewApi, usersApi, ApiError } from '../../../lib/api';
 import type { Car, EarningsOverview, UtilizationEntry } from '../../../lib/types';
 
 const EMPTY: EarningsOverview = {
@@ -20,7 +20,7 @@ const EMPTY: EarningsOverview = {
 };
 
 function DashboardInner() {
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const { show } = useToast();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState(searchParams.get('tab') ?? 'overview');
@@ -33,6 +33,26 @@ function DashboardInner() {
 
   function loadRequestCount() {
     hostReviewApi.requests().then((res) => setRequestCount(res.count)).catch(() => {});
+  }
+
+  const [bankIfsc, setBankIfsc] = useState('');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
+  const [verifyingBank, setVerifyingBank] = useState(false);
+
+  async function handleVerifyBank(e: React.FormEvent) {
+    e.preventDefault();
+    setVerifyingBank(true);
+    try {
+      await usersApi.verifyBankAccount(bankIfsc.trim().toUpperCase(), bankAccountNumber.trim());
+      show('Bank account verified — payouts are now enabled on your cars', 'success');
+      setBankIfsc('');
+      setBankAccountNumber('');
+      await refresh();
+    } catch (err) {
+      show(err instanceof ApiError ? err.message : 'Could not verify bank account', 'error');
+    } finally {
+      setVerifyingBank(false);
+    }
   }
 
   useEffect(() => {
@@ -104,6 +124,17 @@ function DashboardInner() {
         </div>
       )}
 
+      {user && !user.payoutAccountId && (
+        <div className="mx-8 mb-6 bg-red-500/10 border border-red-500/30 rounded-xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-red-300">
+            ⚠ No payout account on file yet — your cars can&apos;t be booked until you verify a bank account.
+          </p>
+          <button onClick={() => setTab('payout')} className="text-xs font-bold bg-red-500 hover:bg-red-400 text-gray-950 px-4 py-2 rounded-lg transition whitespace-nowrap">
+            Set Up Payouts
+          </button>
+        </div>
+      )}
+
       <div className="px-8">
         <Tabs
           variant="dark"
@@ -114,7 +145,7 @@ function DashboardInner() {
             { key: 'requests', label: `Booking Requests${requestCount > 0 ? ` (${requestCount})` : ''}` },
             { key: 'cars', label: `My Cars (${cars.length})` },
             { key: 'utilization', label: 'Utilization' },
-            { key: 'policy', label: 'Payout Policy' },
+            { key: 'payout', label: 'Payout Setup' },
           ]}
         />
       </div>
@@ -219,12 +250,54 @@ function DashboardInner() {
             )}
           </div>
         ) : (
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-            <h3 className="text-xl font-bold mb-4">Payout Schedule & Settlement Terms</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-300">
-              <Policy title="70/30 Revenue Split" body="You keep 70% of the base fare. Ziyam takes 30% for marketing, platform tech, dynamic pricing, and support." />
-              <Policy title="N+1 Settlement Policy" body="Self-hosted payouts settle 24-48 hours after trip end (or weekly if you opt in); fleet-managed cars settle within 1 day of receipt confirmation." />
-              <Policy title="Security Deposit" body="Lessee security deposits are held in escrow and applied to damage or toll costs first — see the full Insurance & Damage Policy for how recovery beyond the deposit works." />
+          <div className="space-y-6">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+              <h3 className="text-xl font-bold mb-1">Payout Bank Account</h3>
+              {user?.payoutAccountId ? (
+                <div className="mt-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-3 flex items-center gap-3">
+                  <span className="text-emerald-400 text-lg">✓</span>
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-300">Verified — payouts are enabled</p>
+                    {user.bankNameAtBank && <p className="text-xs text-gray-400 mt-0.5">{user.bankNameAtBank} · account ending {user.bankAccountNumber?.slice(-4)}</p>}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-400 mb-4">Verify a bank account to start receiving payouts — this unlocks bookings on all your listed cars.</p>
+                  <form onSubmit={handleVerifyBank} className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
+                    <label className="block">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block">IFSC Code</span>
+                      <input
+                        required value={bankIfsc} onChange={(e) => setBankIfsc(e.target.value)}
+                        placeholder="HDFC0001234" maxLength={11}
+                        className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block">Account Number</span>
+                      <input
+                        required value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)}
+                        className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </label>
+                    <button
+                      type="submit" disabled={verifyingBank}
+                      className="sm:col-span-2 btn-gradient text-black font-semibold py-2.5 rounded-lg transition disabled:opacity-60"
+                    >
+                      {verifyingBank ? 'Verifying…' : 'Verify Bank Account'}
+                    </button>
+                  </form>
+                </>
+              )}
+            </div>
+
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+              <h3 className="text-xl font-bold mb-4">Payout Schedule & Settlement Terms</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-300">
+                <Policy title="70/30 Revenue Split" body="You keep 70% of the base fare. Ziyam takes 30% for marketing, platform tech, dynamic pricing, and support." />
+                <Policy title="N+1 Settlement Policy" body="Self-hosted payouts settle 24-48 hours after trip end (or weekly if you opt in); fleet-managed cars settle within 1 day of receipt confirmation." />
+                <Policy title="Security Deposit" body="Lessee security deposits are held in escrow and applied to damage or toll costs first — see the full Insurance & Damage Policy for how recovery beyond the deposit works." />
+              </div>
             </div>
           </div>
         )}
