@@ -38,7 +38,7 @@ export default function VerificationChecklist() {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-6">
       <h2 className="font-bold text-gray-900 mb-1">Verification Checklist</h2>
-      <p className="text-xs text-gray-500 mb-4">Completing these builds trust with renters/hosts and is required for lease agreements.</p>
+      <p className="text-xs text-gray-500 mb-4">Completing these builds trust with lessees/hosts and is required for lease agreements.</p>
 
       <div className="space-y-2">
         <ChecklistRow icon="🪪" label="Aadhaar Verification" done={user.isKycVerified} href="/account/kyc" />

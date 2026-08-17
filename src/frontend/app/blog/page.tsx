@@ -4,11 +4,11 @@ import Footer from '../../components/Footer';
 import PageHero from '../../components/PageHero';
 
 const POSTS = [
-  { title: '5 things to check before renting a self-drive car', tag: 'Renter Guide', read: '4 min read', emoji: '✅' },
+  { title: '5 things to check before renting a self-drive car', tag: 'Lessee Guide', read: '4 min read', emoji: '✅' },
   { title: 'How the N+1 payout cycle works for hosts', tag: 'Hosting', read: '3 min read', emoji: '💸' },
   { title: 'EV road trips: charging stations across South India', tag: 'Travel', read: '6 min read', emoji: '⚡' },
   { title: "From idle asset to ₹35,000/month: a host's story", tag: 'Hosting', read: '5 min read', emoji: '🚗' },
-  { title: 'Monsoon driving checklist for self-drive renters', tag: 'Safety', read: '3 min read', emoji: '🌧️' },
+  { title: 'Monsoon driving checklist for self-drive lessees', tag: 'Safety', read: '3 min read', emoji: '🌧️' },
   { title: 'Instant Book vs. Approval Required — which is right for your fleet?', tag: 'Hosting', read: '4 min read', emoji: '⚙️' },
 ];
 
@@ -16,7 +16,7 @@ export default function BlogPage() {
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       <Navbar />
-      <PageHero eyebrow="Ziyam Blog" title="Stories, guides & road trip ideas" subtitle="From renter tips to host earnings breakdowns — everything self-drive." />
+      <PageHero eyebrow="Ziyam Blog" title="Stories, guides & road trip ideas" subtitle="From lessee tips to host earnings breakdowns — everything self-drive." />
 
       <section className="py-16 bg-white">
         <div className="max-w-6xl mx-auto px-4">

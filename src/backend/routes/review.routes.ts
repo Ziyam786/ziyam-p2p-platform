@@ -37,7 +37,7 @@ router.post('/reviews', requireAuth, async (req: Request, res: Response) => {
     booking.car.ownerId,
     'REVIEW_RECEIVED',
     `New ${rating}-star review`,
-    `A renter reviewed your ${booking.car.make} ${booking.car.model}.`,
+    `A lessee reviewed your ${booking.car.make} ${booking.car.model}.`,
     `/host/dashboard`
   );
 

@@ -91,7 +91,7 @@ function AccountInner() {
                 onChange={(e) => setBio(e.target.value)}
                 rows={3}
                 className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-                placeholder="Tell other renters/hosts a bit about yourself"
+                placeholder="Tell other lessees/hosts a bit about yourself"
               />
             </div>
             <button

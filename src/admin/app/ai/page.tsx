@@ -24,11 +24,11 @@ export default function AiConversationsPage() {
   }
 
   return (
-    <AdminShell title="AI Assistant" subtitle={`${conversations.length} conversations with renters/hosts`}>
+    <AdminShell title="AI Assistant" subtitle={`${conversations.length} conversations with lessees/hosts`}>
       {loading ? (
         <p className="text-slate-500">Loading…</p>
       ) : conversations.length === 0 ? (
-        <p className="text-slate-500">No conversations yet — they'll show up here once renters use the chat widget.</p>
+        <p className="text-slate-500">No conversations yet — they'll show up here once lessees use the chat widget.</p>
       ) : (
         <div className="space-y-2">
           {conversations.map((c) => (

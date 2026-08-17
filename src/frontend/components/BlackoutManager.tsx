@@ -79,7 +79,7 @@ export default function BlackoutManager({ car, onClose }: { car: Car; onClose: (
   return (
     <Modal open onClose={onClose} title={`Availability — ${car.make} ${car.model}`}>
       <p className="text-sm text-gray-500 mb-4">
-        Tap a start date, then an end date, to pause bookings for that range (maintenance, personal use, etc.). Renters won't be able to book overlapping dates.
+        Tap a start date, then an end date, to pause bookings for that range (maintenance, personal use, etc.). Lessees won't be able to book overlapping dates.
       </p>
 
       <form onSubmit={handleAdd} className="mb-6">

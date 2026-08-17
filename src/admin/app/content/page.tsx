@@ -58,7 +58,7 @@ export default function ContentPage() {
     setSavingKey(key);
     try {
       await adminApi.updateSetting(key, value);
-      show(`${label} updated — live on the renter site now`, 'success');
+      show(`${label} updated — live on the lessee site now`, 'success');
     } catch (err: any) {
       show(err.message ?? 'Failed to save', 'error');
     } finally {
@@ -68,14 +68,14 @@ export default function ContentPage() {
 
   if (loading) {
     return (
-      <AdminShell title="Site Content" subtitle="Edit what renters see on the live site">
+      <AdminShell title="Site Content" subtitle="Edit what lessees see on the live site">
         <p className="text-slate-500">Loading…</p>
       </AdminShell>
     );
   }
 
   return (
-    <AdminShell title="Site Content" subtitle="Edit what renters see on the live site — changes go live immediately, no deploy needed">
+    <AdminShell title="Site Content" subtitle="Edit what lessees see on the live site — changes go live immediately, no deploy needed">
       <div className="space-y-6">
         <SectionCard
           title="Homepage Hero"
@@ -97,7 +97,7 @@ export default function ContentPage() {
 
         <SectionCard
           title="Trust Badges"
-          desc="The four stat callouts on the hero (e.g. '1 Lakh+ Happy Renters')"
+          desc="The four stat callouts on the hero (e.g. '1 Lakh+ Happy Lessees')"
           onSave={() => save('trust_badges', badges, 'Trust badges')}
           saving={savingKey === 'trust_badges'}
         >
@@ -105,7 +105,7 @@ export default function ContentPage() {
             {badges.map((b, i) => (
               <div key={i} className="flex gap-2">
                 <input value={b.label} onChange={(e) => setBadges((arr) => arr.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} placeholder="1 Lakh+" className={`${rowInput} flex-1`} />
-                <input value={b.sub} onChange={(e) => setBadges((arr) => arr.map((x, j) => j === i ? { ...x, sub: e.target.value } : x))} placeholder="Happy Renters" className={`${rowInput} flex-1`} />
+                <input value={b.sub} onChange={(e) => setBadges((arr) => arr.map((x, j) => j === i ? { ...x, sub: e.target.value } : x))} placeholder="Happy Lessees" className={`${rowInput} flex-1`} />
                 <button onClick={() => setBadges((arr) => arr.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-300 px-2 text-sm">✕</button>
               </div>
             ))}
@@ -158,7 +158,7 @@ export default function ContentPage() {
 
         <SectionCard
           title="Testimonials"
-          desc="Renter/host quotes shown on the homepage"
+          desc="Lessee/host quotes shown on the homepage"
           onSave={() => save('testimonials', testimonials, 'Testimonials')}
           saving={savingKey === 'testimonials'}
         >

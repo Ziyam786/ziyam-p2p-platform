@@ -66,7 +66,7 @@ export default function GuestPolicyPage() {
 
           <Section title="3. Security Deposit & Protection Plans">
             <Card title="Deposit">
-              <p>Refundable, released within 24-48 hours after a clean vehicle return. Renter-caused damage is deducted from it first — see Section 6 for the full damage process.</p>
+              <p>Refundable, released within 24-48 hours after a clean vehicle return. Lessee-caused damage is deducted from it first — see Section 6 for the full damage process.</p>
             </Card>
             <Card title="Protection Plans">
               <p>Basic (free), Standard (+₹149/day), and Premium (+₹349/day) only change your deposit-hold amount and support priority — they don't transfer any damage liability away from you. See our full <a href="/insurance" className="text-amber-600 underline">Insurance &amp; Damage Policy</a>.</p>
@@ -96,7 +96,7 @@ export default function GuestPolicyPage() {
             <Card title="Strict Usage Policy">
               <ul className="space-y-1.5 list-disc list-inside">
                 <li>Personal use only — commercial use, racing, rallying, and off-roading are prohibited</li>
-                <li>The vehicle must be driven ONLY by the verified renter named on the booking</li>
+                <li>The vehicle must be driven ONLY by the verified lessee named on the booking</li>
                 <li>Handing the vehicle to any third party — friends, family, or unregistered drivers — is strictly prohibited and voids insurance-relevant driver verification</li>
               </ul>
             </Card>

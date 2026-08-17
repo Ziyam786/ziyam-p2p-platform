@@ -130,7 +130,7 @@ export default function HostOnboardingPage() {
         ) : currentStep === 1 ? (
           <div className="bg-white rounded-2xl border border-gray-100 p-8">
             <p className="font-bold text-gray-900 mb-2">Verify your identity</p>
-            <p className="text-gray-500 text-sm mb-6">Required before you can list a vehicle, for renter safety and trust.</p>
+            <p className="text-gray-500 text-sm mb-6">Required before you can list a vehicle, for lessee safety and trust.</p>
             <form onSubmit={submitKyc} className="space-y-4">
               <input
                 required

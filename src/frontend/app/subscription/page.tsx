@@ -32,7 +32,7 @@ export default function SubscriptionPage() {
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       <Navbar />
-      <PageHero eyebrow="Skip the per-trip pricing" title="Subscription Plans" subtitle="Predictable monthly pricing for renters who drive often." />
+      <PageHero eyebrow="Skip the per-trip pricing" title="Subscription Plans" subtitle="Predictable monthly pricing for lessees who drive often." />
 
       <section className="py-16 bg-white">
         <div className="max-w-5xl mx-auto px-4">

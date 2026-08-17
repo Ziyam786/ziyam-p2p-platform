@@ -58,7 +58,7 @@ export default function ReviewsPage() {
             <div key={r.id} className={`bg-slate-900 border rounded-2xl p-5 flex justify-between gap-4 ${r.hidden ? 'border-amber-500/40' : 'border-slate-800'}`}>
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="font-semibold text-slate-200 text-sm">{r.author?.fullName ?? 'Renter'}</span>
+                  <span className="font-semibold text-slate-200 text-sm">{r.author?.fullName ?? 'Lessee'}</span>
                   <span className="text-amber-400 text-xs">{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</span>
                   {r.hidden && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400">HIDDEN</span>}
                 </div>

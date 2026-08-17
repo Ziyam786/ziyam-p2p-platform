@@ -385,7 +385,7 @@ export default function CarDetailPage() {
                   {car.reviews.map((r) => (
                     <div key={r.id} className="border-b border-gray-50 last:border-0 pb-4 last:pb-0">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-semibold text-gray-800 text-sm">{r.author?.fullName ?? 'Renter'}</span>
+                        <span className="font-semibold text-gray-800 text-sm">{r.author?.fullName ?? 'Lessee'}</span>
                         <Rating value={r.rating} />
                       </div>
                       {r.comment && <p className="text-sm text-gray-600">{r.comment}</p>}

@@ -84,8 +84,8 @@ export default function HostPolicyPage() {
             </div>
             <Card title="In short">
               <ul className="space-y-1.5 list-disc list-inside">
-                <li>Renter-caused damage is deducted from the security deposit first</li>
-                <li>Costs beyond the deposit are the host's responsibility to recover from the renter directly</li>
+                <li>Lessee-caused damage is deducted from the security deposit first</li>
+                <li>Costs beyond the deposit are the host's responsibility to recover from the lessee directly</li>
                 <li>ZiyamSelfDrive assists with claim coordination and will try to cover up to ₹20,000 of a claim</li>
                 <li>24/7 roadside assistance is included for breakdowns and abandoned-vehicle recovery, regardless of protection plan</li>
               </ul>
@@ -105,7 +105,7 @@ export default function HostPolicyPage() {
 
           <Section title="6. Pausing & Availability">
             <Card title="Pause anytime for maintenance or personal use">
-              <p>Block off dates from your dashboard's availability calendar — renters won't be able to book overlapping dates. There's no penalty for reasonable, occasional pausing.</p>
+              <p>Block off dates from your dashboard's availability calendar — lessees won't be able to book overlapping dates. There's no penalty for reasonable, occasional pausing.</p>
               <p>Repeated last-minute cancellations of confirmed bookings may result in a review of your listing, since it directly affects guest trust in the platform.</p>
             </Card>
           </Section>

@@ -26,7 +26,7 @@ export default function InsurancePage() {
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       <Navbar />
-      <PageHero eyebrow="For Hosts & Renters" title="Insurance & Damage Policy" subtitle="An honest explanation of who's covered, by whom, and what happens if something goes wrong." />
+      <PageHero eyebrow="For Hosts & Lessees" title="Insurance & Damage Policy" subtitle="An honest explanation of who's covered, by whom, and what happens if something goes wrong." />
 
       <section className="py-16 bg-white">
         <div className="max-w-5xl mx-auto px-4">
@@ -41,7 +41,7 @@ export default function InsurancePage() {
           </div>
 
           <h2 className="text-xl font-extrabold text-gray-900 mb-2">Protection Plans</h2>
-          <p className="text-sm text-gray-500 mb-6">Renter-facing add-ons that affect your deposit hold, not who pays for damage.</p>
+          <p className="text-sm text-gray-500 mb-6">Lessee-facing add-ons that affect your deposit hold, not who pays for damage.</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-14">
             {PLANS.map((p) => (
               <div key={p.name} className={`rounded-2xl p-6 border-2 ${p.highlight ? 'border-amber-500 bg-amber-50' : 'border-gray-100 bg-gray-50'}`}>
@@ -68,10 +68,10 @@ export default function InsurancePage() {
               </p>
             </div>
             <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
-              <h3 className="font-bold text-gray-900 mb-2">2. Hosts recover costs from the renter directly, from the security deposit first</h3>
+              <h3 className="font-bold text-gray-900 mb-2">2. Hosts recover costs from the lessee directly, from the security deposit first</h3>
               <p className="text-sm text-gray-600 leading-relaxed">
-                Renter-caused damage is deducted from the held security deposit first. If costs exceed the deposit,
-                the host is responsible for recovering the difference from the renter — the same as any other P2P
+                Lessee-caused damage is deducted from the held security deposit first. If costs exceed the deposit,
+                the host is responsible for recovering the difference from the lessee — the same as any other P2P
                 rental marketplace.
               </p>
             </div>

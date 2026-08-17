@@ -187,7 +187,7 @@ router.post('/booking/:id/start', requireAuth, async (req: Request, res: Respons
     booking.car.ownerId,
     'TRIP_STARTED',
     'Trip started',
-    `A renter has picked up your ${booking.car.make} ${booking.car.model}.`,
+    `A lessee has picked up your ${booking.car.make} ${booking.car.model}.`,
     '/host/dashboard'
   );
   res.json({ success: true, data: updated });
