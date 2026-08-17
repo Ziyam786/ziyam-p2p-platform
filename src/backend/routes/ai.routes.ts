@@ -57,7 +57,7 @@ router.post('/ai/chat', attachUserIfPresent, async (req: Request, res: Response)
 
   await prisma.chatLog.create({ data: { id: uuidv4(), sessionId, userId, role: 'user', content: message } });
 
-  const reply = await generateChatReply(systemPrompt, history);
+  const reply = await generateChatReply(systemPrompt, history, { userId, enableTools: true });
 
   await prisma.chatLog.create({ data: { id: uuidv4(), sessionId, userId, role: 'assistant', content: reply } });
 
