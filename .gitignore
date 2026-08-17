@@ -21,6 +21,9 @@ build/
 *.swo
 *~
 
+# Claude Code local session state (scheduled task locks, skill symlinks) — not project config
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db

@@ -19,6 +19,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
     "@prisma/client": "^5.18.0",
+    "@supabase/server": "^1.4.1",
     "@types/pdfkit": "^0.17.6",
     "axios": "^1.7.4",
     "bcryptjs": "^2.4.3",
