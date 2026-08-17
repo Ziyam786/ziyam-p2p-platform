@@ -22,7 +22,7 @@ const NAV = [
   { href: '/promo-codes', label: 'Promo Codes', icon: '🎟️' },
   { href: '/content', label: 'Site Content', icon: '📝' },
   { href: '/settings', label: 'Platform Settings', icon: '⚙️' },
-  { href: '/ai', label: 'AI Assistant', icon: '🤖' },
+  { href: '/ai', label: 'Avya AI', icon: '🤖' },
   { href: '/audit-log', label: 'Audit Log', icon: '🧾' },
 ];
 
@@ -36,7 +36,7 @@ const NAV = [
 // velosta.com-style split the platform is modeled on). Same auth cookie
 // domain, its own deployment.
 const EXTERNAL_NAV = [
-  { href: process.env.NEXT_PUBLIC_AGENT_APP_URL ?? 'http://localhost:3002', label: 'Agent App', icon: '🧑‍✈️' },
+  { href: process.env.NEXT_PUBLIC_AGENT_APP_URL ?? 'http://localhost:3002', label: 'Kyro (Agent App)', icon: '🧑‍✈️' },
   { href: 'https://ziyam.in/marc8-dashboard', label: 'Fleet Ops (Marc8)', icon: '🛠️' },
 ];
 
@@ -57,10 +57,10 @@ export default function Sidebar() {
           <LogoBadge className="w-8 h-8 shrink-0 rounded-lg" />
           <div className="flex items-baseline gap-1.5">
             <span className="text-xl font-extrabold text-brand-400 tracking-tight">Ziyam</span>
-            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Control</span>
+            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Arcs Command</span>
           </div>
         </div>
-        <p className="text-[10px] text-slate-600 mt-1">Internal admin panel</p>
+        <p className="text-[10px] text-slate-600 mt-1">Admin & financial command center</p>
       </div>
 
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">

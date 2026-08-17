@@ -178,6 +178,48 @@ export default function HowItWorksPage() {
         </div>
       </section>
 
+      {/* Technology */}
+      <section className="py-20 bg-gray-50">
+        <div className="max-w-5xl mx-auto px-4">
+          <h2 className="text-2xl font-extrabold text-gray-900 mb-2 text-center">Built on Ziyam's Technology Stack</h2>
+          <p className="text-gray-500 text-sm text-center mb-12">Four systems working together — not marketing labels, the real infrastructure behind every trip</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="bg-white rounded-2xl p-6 border border-gray-100">
+              <h3 className="font-bold text-gray-900 mb-1">Ziyam Axon Network</h3>
+              <p className="text-xs text-amber-600 font-semibold mb-2">Supply Gateway</p>
+              <p className="text-sm text-gray-500 leading-relaxed">
+                Routes every search to the right car — availability, blackout dates, city/category matching, and real-time
+                pricing across the whole listed fleet.
+              </p>
+            </div>
+            <div className="bg-white rounded-2xl p-6 border border-gray-100">
+              <h3 className="font-bold text-gray-900 mb-1">Ziyam Avya AI</h3>
+              <p className="text-xs text-amber-600 font-semibold mb-2">Deeptech Trust Layer</p>
+              <p className="text-sm text-gray-500 leading-relaxed">
+                Our AI assistant — grounded in live booking and inventory data, not generic answers, so what it tells you
+                about a car or a trip is actually true right now.
+              </p>
+            </div>
+            <div className="bg-white rounded-2xl p-6 border border-gray-100">
+              <h3 className="font-bold text-gray-900 mb-1">Ziyam Kyro</h3>
+              <p className="text-xs text-amber-600 font-semibold mb-2">Execution — Fleet Operator Console</p>
+              <p className="text-sm text-gray-500 leading-relaxed">
+                The ground-staff app fleet operators run trips on — check-in/handover, ID verification, and cash
+                reconciliation, in the field, in real time.
+              </p>
+            </div>
+            <div className="bg-white rounded-2xl p-6 border border-gray-100">
+              <h3 className="font-bold text-gray-900 mb-1">Ziyam Arcs Command</h3>
+              <p className="text-xs text-amber-600 font-semibold mb-2">Central Nervous System</p>
+              <p className="text-sm text-gray-500 leading-relaxed">
+                The command center tying it together — bookings, payouts, KYC review, and the full financial ledger in one
+                place for our operations team.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* FAQs */}
       <section className="py-20 bg-white">
         <div className="max-w-3xl mx-auto px-4">
