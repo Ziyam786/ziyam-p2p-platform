@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { bookingsApi } from '../lib/api';
 import { useGoogleMaps } from '../lib/useGoogleMaps';
 import { useToast } from './Toast';
+import { subscribeToDeliveryLocation } from '../lib/firebase';
 import type { DeliveryLocation } from '../lib/types';
 
 const HOST_UPDATE_INTERVAL_MS = 15000;
@@ -100,23 +101,47 @@ export function GuestDeliveryTracker({ bookingId, hostName, hostAvatarUrl }: { b
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
 
+  // One initial REST fetch either way — real-time listener takes over from
+  // there if it can attach; a fresh page load shouldn't wait on Firestore
+  // just to show whatever the last known position was.
   useEffect(() => {
     let active = true;
-    function poll() {
-      bookingsApi
-        .deliveryLocation(bookingId)
-        .then((res) => {
-          if (!active) return;
-          setLocation(res.data);
-          setChecked(true);
-        })
-        .catch(() => active && setChecked(true));
-    }
-    poll();
-    const interval = setInterval(poll, GUEST_POLL_INTERVAL_MS);
+    bookingsApi
+      .deliveryLocation(bookingId)
+      .then((res) => active && setLocation(res.data))
+      .finally(() => active && setChecked(true));
     return () => {
       active = false;
-      clearInterval(interval);
+    };
+  }, [bookingId]);
+
+  // Real-time first (subscribeToDeliveryLocation resolves to null if
+  // Firebase isn't configured for this deployment); polling is the
+  // fallback, not the default, so a configured deployment never double-fetches.
+  useEffect(() => {
+    let active = true;
+    let unsubscribe: (() => void) | null = null;
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    subscribeToDeliveryLocation(bookingId, (update) => {
+      if (active) setLocation(update);
+    }).then((unsub) => {
+      if (!active) {
+        unsub?.();
+        return;
+      }
+      if (unsub) {
+        unsubscribe = unsub;
+      } else {
+        const poll = () => bookingsApi.deliveryLocation(bookingId).then((res) => active && setLocation(res.data)).catch(() => {});
+        interval = setInterval(poll, GUEST_POLL_INTERVAL_MS);
+      }
+    });
+
+    return () => {
+      active = false;
+      unsubscribe?.();
+      if (interval) clearInterval(interval);
     };
   }, [bookingId]);
 
