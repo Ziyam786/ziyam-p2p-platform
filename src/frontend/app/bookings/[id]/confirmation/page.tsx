@@ -7,14 +7,38 @@ import Navbar from '../../../../components/Navbar';
 import Footer from '../../../../components/Footer';
 import ProtectedRoute from '../../../../components/ProtectedRoute';
 import { bookingsApi } from '../../../../lib/api';
+import { trackEvent } from '../../../../lib/mixpanel';
 import type { Booking } from '../../../../lib/types';
+
+const PAID_BOOKING_STATUSES = new Set(['RESERVED', 'PENDING_HOST_REVIEW', 'CONFIRMED']);
 
 function ConfirmationInner() {
   const params = useParams<{ id: string }>();
   const [booking, setBooking] = useState<Booking | null>(null);
 
   useEffect(() => {
-    bookingsApi.get(params.id).then((res) => setBooking(res.data));
+    bookingsApi.get(params.id).then((res) => {
+      const next = res.data;
+      setBooking(next);
+      if (!PAID_BOOKING_STATUSES.has(next.status)) return;
+      const dedupeKey = `mp_booking_completed_${next.id}`;
+      try {
+        if (sessionStorage.getItem(dedupeKey)) return;
+        sessionStorage.setItem(dedupeKey, '1');
+      } catch {
+        // sessionStorage can be unavailable; still track once this mount.
+      }
+      const properties: Record<string, string | number | boolean> = {
+        booking_id: next.id,
+        booking_status: next.status,
+        car_id: next.carId,
+        total_amount: next.totalAmount,
+        protection_plan: next.protectionPlan,
+        is_delivery_requested: next.deliveryRequested,
+      };
+      if (next.car?.city) properties.city = next.car.city;
+      trackEvent('booking_completed', properties);
+    });
   }, [params.id]);
 
   return (
