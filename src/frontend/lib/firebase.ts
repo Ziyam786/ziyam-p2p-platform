@@ -212,3 +212,31 @@ export async function onForegroundPush(callback: (title: string, body: string, l
     return () => {};
   }
 }
+
+const ITINERARY_BRIEFS: Record<string, string> = {
+  Ooty: 'a hill station ~270 km from Bengaluru, known for tea gardens, the Nilgiri toy train, and cool weather',
+  Coorg: 'a coffee-growing hill district ~250 km from Bengaluru, known for coffee plantations, waterfalls, and Kodava cuisine',
+  Chikmagalur: 'a misty hill town ~245 km from Bengaluru, known for coffee estates, trekking (Mullayanagiri), and quiet homestays',
+  Gokarna: 'a beach town ~480 km from Bengaluru, known for its temple town heritage and quieter alternative to Goa',
+};
+
+/** Gemini via Firebase AI Logic — used to write paid road-trip itineraries in the renter app. */
+export async function generateRoadTripItinerary(destination: string): Promise<string> {
+  const app = await getFirebaseApp();
+  const { getAI, getGenerativeModel, GoogleAIBackend } = await import('firebase/ai');
+  const ai = getAI(app, { backend: new GoogleAIBackend() });
+  const model = getGenerativeModel(ai, { model: 'gemini-flash-latest' });
+  const brief = ITINERARY_BRIEFS[destination] ?? destination;
+  const result = await model.generateContent(
+    `You are a travel expert writing a road-trip itinerary for a self-drive car rental customer of ZiyamSelfDrive, ` +
+      `a P2P car rental platform in Bengaluru. Write a well-organized, specific day-by-day itinerary in plain text ` +
+      `(use line breaks and simple dashes for structure, no markdown headers). Include: route overview and driving ` +
+      `distance/time from Bengaluru, recommended trip duration, suggested stops along the way, key attractions at the ` +
+      `destination, best time to visit, and practical self-drive tips (fuel stops, road conditions, parking). Keep it ` +
+      `genuinely useful and specific to the destination, not generic filler.\n\n` +
+      `Write the itinerary for a Bengaluru to ${destination} road trip. ${brief}.`
+  );
+  const text = result.response.text().trim();
+  if (text.length < 80) throw new Error('Itinerary generation returned too little text');
+  return text;
+}
