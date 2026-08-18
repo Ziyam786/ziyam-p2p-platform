@@ -11,7 +11,8 @@ export type PayoutStatus = 'HELD_IN_ESCROW' | 'QUEUED_FOR_N1' | 'SETTLED' | 'FAI
 
 export type ProtectionPlan = 'BASIC' | 'STANDARD' | 'PREMIUM';
 export type BookingDepositStatus = 'HELD' | 'RELEASED' | 'PARTIALLY_DEDUCTED' | 'FORFEITED';
-export type DamageClaimStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
+export type DamageClaimStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'BILL_SUBMITTED' | 'APPROVED' | 'REJECTED';
+export type TripIssueType = 'DAMAGE' | 'FUEL' | 'FASTAG';
 export type CancelledBy = 'CUSTOMER' | 'HOST' | 'SYSTEM' | 'ADMIN';
 export type TripStage = 'PRE_TRIP' | 'POST_TRIP';
 export type PhotoAngle = 'FRONT' | 'REAR' | 'LEFT' | 'RIGHT' | 'MIRROR_LEFT' | 'MIRROR_RIGHT' | 'ODOMETER' | 'OTHER';
@@ -159,7 +160,7 @@ export interface Booking {
   depositAmount: number;
   depositStatus: BookingDepositStatus;
   depositReleasedAt?: string | null;
-  damageClaim?: DamageClaim | null;
+  damageClaims?: DamageClaim[];
   hostReviewDeadline?: string | null;
   rejectionReason?: string | null;
   cancellationReason?: string | null;
@@ -196,6 +197,7 @@ export interface DamageClaim {
   id: string;
   bookingId: string;
   reportedById: string;
+  type: TripIssueType;
   description: string;
   images: string[];
   estimatedCost: number;
@@ -205,6 +207,13 @@ export interface DamageClaim {
   reviewedByAdminId?: string | null;
   createdAt: string;
   resolvedAt?: string | null;
+  resolutionBillUrl?: string | null;
+  resolutionBillAmount?: number | null;
+  resolutionPhotos: string[];
+  resolutionSubmittedAt?: string | null;
+  excessChargeAmount?: number | null;
+  excessChargePaymentIntentId?: string | null;
+  excessChargePaidAt?: string | null;
 }
 
 export interface Review {

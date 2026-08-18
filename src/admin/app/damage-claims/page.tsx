@@ -5,16 +5,20 @@ import AdminShell from '../../components/AdminShell';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/Toast';
 import { adminApi } from '../../lib/api';
-import type { AdminDamageClaim, DamageClaimStatus } from '../../lib/types';
+import type { AdminDamageClaim, DamageClaimStatus, TripIssueType } from '../../lib/types';
 
-const STATUSES: DamageClaimStatus[] = ['SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED'];
+const STATUSES: DamageClaimStatus[] = ['SUBMITTED', 'UNDER_REVIEW', 'BILL_SUBMITTED', 'APPROVED', 'REJECTED'];
 
 const STATUS_STYLES: Record<DamageClaimStatus, string> = {
   SUBMITTED: 'bg-amber-500/10 text-amber-400',
   UNDER_REVIEW: 'bg-blue-500/10 text-blue-400',
+  BILL_SUBMITTED: 'bg-purple-500/10 text-purple-400',
   APPROVED: 'bg-red-500/10 text-red-400',
   REJECTED: 'bg-emerald-500/10 text-emerald-400',
 };
+
+const TYPE_LABELS: Record<TripIssueType, string> = { DAMAGE: 'Damage', FUEL: 'Fuel', FASTAG: 'FASTag' };
+const REVIEWABLE_STATUSES: DamageClaimStatus[] = ['SUBMITTED', 'UNDER_REVIEW', 'BILL_SUBMITTED'];
 
 export default function DamageClaimsPage() {
   const { show } = useToast();
@@ -60,8 +64,8 @@ export default function DamageClaimsPage() {
 
   return (
     <AdminShell
-      title="Damage Claims"
-      subtitle={`${claims.length} claims`}
+      title="Trip Issue Reports"
+      subtitle={`${claims.length} reports`}
       action={
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200">
           <option value="">All statuses</option>
@@ -79,15 +83,16 @@ export default function DamageClaimsPage() {
             <div key={c.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
               <div className="flex items-start justify-between gap-3 mb-2">
                 <div>
-                  <p className="font-semibold text-slate-200">{c.booking?.car.make} {c.booking?.car.model}</p>
+                  <p className="font-semibold text-slate-200">{c.booking?.car.make} {c.booking?.car.model} <span className="text-slate-500 font-normal">· {TYPE_LABELS[c.type]}</span></p>
                   <p className="text-xs text-slate-500">{c.reportedBy?.fullName} reported vs. lessee {c.booking?.customer.fullName}</p>
                 </div>
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${STATUS_STYLES[c.status]}`}>{c.status.replace('_', ' ')}</span>
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${STATUS_STYLES[c.status]}`}>{c.status.replace(/_/g, ' ')}</span>
               </div>
               <p className="text-sm text-slate-300 mb-2">{c.description}</p>
               <p className="text-xs text-slate-500 mb-3">
                 Estimated ₹{c.estimatedCost.toLocaleString()} · Deposit held ₹{c.booking?.depositAmount.toLocaleString()}
                 {c.approvedDeduction != null && ` · Approved ₹${c.approvedDeduction.toLocaleString()}`}
+                {c.excessChargeAmount != null && ` · Excess ₹${c.excessChargeAmount.toLocaleString()} ${c.excessChargePaidAt ? '(paid)' : '(unpaid)'}`}
               </p>
               {c.images.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3">
@@ -97,7 +102,21 @@ export default function DamageClaimsPage() {
                   ))}
                 </div>
               )}
-              {(c.status === 'SUBMITTED' || c.status === 'UNDER_REVIEW') && (
+              {c.resolutionBillUrl && (
+                <div className="mb-3 bg-purple-500/5 border border-purple-500/20 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-purple-300 mb-1">Repair bill submitted — ₹{c.resolutionBillAmount?.toLocaleString()}</p>
+                  <a href={c.resolutionBillUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-400 hover:underline">View bill →</a>
+                  {c.resolutionPhotos.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {c.resolutionPhotos.map((url) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={url} src={url} alt="" className="w-14 h-14 object-cover rounded-lg border border-slate-700" />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {REVIEWABLE_STATUSES.includes(c.status) && (
                 <button onClick={() => openReview(c)} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white transition">
                   Review
                 </button>
@@ -115,17 +134,26 @@ export default function DamageClaimsPage() {
             <p className="text-xs text-slate-500">
               Estimated ₹{reviewing.estimatedCost.toLocaleString()} · Deposit held ₹{reviewing.booking?.depositAmount.toLocaleString()}
             </p>
+            {reviewing.resolutionBillUrl && (
+              <div className="bg-purple-500/5 border border-purple-500/20 rounded-lg p-3">
+                <p className="text-xs font-semibold text-purple-300 mb-1">Host-submitted repair bill — ₹{reviewing.resolutionBillAmount?.toLocaleString()}</p>
+                <a href={reviewing.resolutionBillUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-400 hover:underline">View bill →</a>
+              </div>
+            )}
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Approved deduction (₹)</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Approved amount (₹)</label>
               <input
                 type="number"
                 min={1}
-                max={reviewing.booking?.depositAmount}
                 value={deduction}
                 onChange={(e) => setDeduction(e.target.value)}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
               />
-              <p className="text-[11px] text-slate-500 mt-1">Capped at the held deposit — anything beyond is the host's to recover directly from the lessee.</p>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Not capped at the deposit — if this exceeds ₹{reviewing.booking?.depositAmount.toLocaleString()}, the guest is
+                charged the difference directly through the app before the host is paid out. Approving fires a fast payout
+                (well under 15 min) for whatever's already covered by the deposit.
+              </p>
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Notes (optional)</label>

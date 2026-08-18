@@ -6,6 +6,7 @@ import { notify } from '../services/notificationService';
 import { getSetting } from '../services/settingsService';
 import { generateChatReply } from '../services/aiService';
 import { ITINERARY_DESTINATIONS } from './itinerary.routes';
+import { PayoutEngine } from '../services/payoutEngine';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -177,6 +178,67 @@ router.post('/payments/payu/balance-callback', async (req: Request, res: Respons
   );
 
   return res.redirect(303, `${redirectBase}/bookings/${bookingId}/confirmation`);
+});
+
+/**
+ * Callback for the "guest pays the excess" leg of an approved trip issue
+ * report (see damageClaim.routes.ts's POST /issue-reports/:id/pay-excess) —
+ * same hash-verification/idempotency discipline as the callbacks above, but
+ * keyed to DamageClaim.excessChargePaymentIntentId instead of
+ * Booking.paymentIntentId (a damage/fuel/FASTag reimbursement is a separate
+ * transaction from the original trip payment). On success, immediately
+ * triggers the fast host payout — this is the point that was blocking it.
+ */
+router.post('/payments/payu/issue-report-callback', async (req: Request, res: Response) => {
+  const body = req.body ?? {};
+  const { status, txnid, amount, productinfo, firstname, email, udf1, hash } = body;
+  const bookingId = udf1;
+
+  const redirectBase = config.clientUrl.replace(/\/$/, '');
+
+  if (!bookingId || !hash || !txnid) {
+    console.error('[PAYU ISSUE REPORT CALLBACK] Missing required fields', body);
+    return res.redirect(303, `${redirectBase}/checkout/error?reason=malformed_callback`);
+  }
+
+  const hashValid = verifyPayuResponseHash({
+    status: String(status ?? ''),
+    txnid: String(txnid),
+    amount: String(amount ?? ''),
+    productinfo: String(productinfo ?? ''),
+    firstname: String(firstname ?? ''),
+    email: String(email ?? ''),
+    udf1: String(udf1 ?? ''),
+    hash: String(hash),
+  });
+
+  if (!hashValid) {
+    console.error(`[PAYU ISSUE REPORT CALLBACK] Hash verification FAILED for txnid ${txnid} — possible tampering, refusing to confirm.`);
+    return res.redirect(303, `${redirectBase}/account/trips/${bookingId}?payment=unverified`);
+  }
+
+  const claim = await prisma.damageClaim.findFirst({ where: { bookingId, excessChargePaymentIntentId: txnid } });
+  if (!claim) {
+    console.error(`[PAYU ISSUE REPORT CALLBACK] No issue report found for booking ${bookingId} with txnid ${txnid}`);
+    return res.redirect(303, `${redirectBase}/checkout/error?reason=claim_not_found`);
+  }
+
+  // Idempotent — PayU may retry the postback, and the browser redirect can also land here twice.
+  if (claim.excessChargePaidAt) {
+    return res.redirect(303, `${redirectBase}/account/trips/${bookingId}`);
+  }
+
+  if (String(status).toLowerCase() !== 'success') {
+    return res.redirect(303, `${redirectBase}/account/trips/${bookingId}?payment=failed`);
+  }
+
+  await prisma.damageClaim.update({ where: { id: claim.id }, data: { excessChargePaidAt: new Date() } });
+
+  PayoutEngine.fastPayoutForIssueReport(claim.id).catch((err) => {
+    console.error(`[ISSUE REPORT] Fast payout failed after excess payment for claim ${claim.id}:`, err.message);
+  });
+
+  return res.redirect(303, `${redirectBase}/account/trips/${bookingId}`);
 });
 
 /**

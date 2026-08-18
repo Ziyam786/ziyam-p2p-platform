@@ -225,11 +225,14 @@ export const hostReviewApi = {
     post<{ success: true; data: Booking; suggestPause?: boolean }>(`/bookings/${bookingId}/host-review`, data),
 };
 
-/* ── Damage claims (host reports damage against a completed trip's deposit) ── */
+/* ── Trip issue reports (damage/fuel/FASTag — either party, against a completed trip's deposit) ── */
 export const damageClaimApi = {
-  report: (bookingId: string, data: { description: string; estimatedCost: number; images: string[] }) =>
-    post<{ success: true; data: DamageClaim }>(`/bookings/${bookingId}/damage-claim`, data),
-  get: (bookingId: string) => get<{ success: true; data: DamageClaim | null }>(`/bookings/${bookingId}/damage-claim`),
+  report: (bookingId: string, data: { type: string; description: string; estimatedCost: number; images: string[] }) =>
+    post<{ success: true; data: DamageClaim }>(`/bookings/${bookingId}/issue-reports`, data),
+  list: (bookingId: string) => get<{ success: true; count: number; data: DamageClaim[] }>(`/bookings/${bookingId}/issue-reports`),
+  submitBill: (id: string, data: { billUrl: string; billAmount: number; photos: string[] }) =>
+    patch<{ success: true; data: DamageClaim }>(`/issue-reports/${id}/submit-bill`, data),
+  payExcess: (id: string) => post<{ success: true; data: { url: string; fields: Record<string, string> } }>(`/issue-reports/${id}/pay-excess`),
 };
 
 /* ── Itinerary unlocks ────────────────────────────────────────────── */

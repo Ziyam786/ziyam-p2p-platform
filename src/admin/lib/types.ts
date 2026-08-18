@@ -177,7 +177,8 @@ export interface AdminPayout {
   createdAt: string;
 }
 
-export type DamageClaimStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
+export type DamageClaimStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'BILL_SUBMITTED' | 'APPROVED' | 'REJECTED';
+export type TripIssueType = 'DAMAGE' | 'FUEL' | 'FASTAG';
 export type RefundRequestStatus = 'PENDING' | 'COMPLETED';
 export type RefundRequestType = 'DEPOSIT_RELEASE' | 'DEPOSIT_PARTIAL' | 'CANCELLATION';
 
@@ -187,6 +188,7 @@ export interface AdminDamageClaim {
   booking?: { car: { make: string; model: string }; customer: { fullName: string; email: string }; depositAmount: number };
   reportedById: string;
   reportedBy?: { fullName: string; email: string };
+  type: TripIssueType;
   description: string;
   images: string[];
   estimatedCost: number;
@@ -195,6 +197,11 @@ export interface AdminDamageClaim {
   adminNotes?: string | null;
   createdAt: string;
   resolvedAt?: string | null;
+  resolutionBillUrl?: string | null;
+  resolutionBillAmount?: number | null;
+  resolutionPhotos: string[];
+  excessChargeAmount?: number | null;
+  excessChargePaidAt?: string | null;
 }
 
 export interface AdminRefundRequest {
