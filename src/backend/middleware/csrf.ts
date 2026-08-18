@@ -45,9 +45,8 @@ export function requireCsrfToken(req: Request, res: Response, next: NextFunction
   if (SAFE_METHODS.has(req.method)) return next();
   if (!req.cookies?.[config.auth.cookieName]) return next();
 
-  // Literal `ziyam_csrf` / `x-csrf-token` names so CodeQL's
-  // js/missing-token-validation sees this as CSRF middleware (it does not
-  // treat a locally named csrf() factory as csurf/lusca).
+  // Literal `ziyam_csrf` / `x-csrf-token` so CodeQL treats this handler as CSRF
+  // middleware (a local csrf() factory is not csurf/lusca).
   const csrfToken = req.cookies?.ziyam_csrf;
   const headerToken = req.headers['x-csrf-token'];
   if (
