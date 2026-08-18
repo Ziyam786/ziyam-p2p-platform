@@ -104,7 +104,8 @@ async function fetchSavedFileBuffer(url: string): Promise<Buffer> {
     if (!bucketName || parsed.protocol !== 'https:' || parsed.hostname !== 'storage.googleapis.com' || !parsed.pathname.startsWith(`/${bucketName}/`)) {
       throw new Error('Invalid file URL');
     }
-    const res = await axios.get(url, { responseType: 'arraybuffer', maxRedirects: 0, timeout: 15_000 });
+    const safeUrl = `${parsed.protocol}//${parsed.host}${parsed.pathname}${parsed.search}`;
+    const res = await axios.get(safeUrl, { responseType: 'arraybuffer', maxRedirects: 0, timeout: 15_000 });
     return Buffer.from(res.data);
   }
   const resolvedUploadDir = path.resolve(config.uploadDir);
