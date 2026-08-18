@@ -1,6 +1,6 @@
 import { PrismaClient, Role, BookingStatus, PayoutStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -29,14 +29,14 @@ async function main() {
 
   const admin = await prisma.user.create({
     data: {
-      id: uuidv4(), fullName: 'Ziyam Admin', email: 'admin@ziyam.in', phoneNumber: '+919000000001',
+      id: randomUUID(), fullName: 'Ziyam Admin', email: 'admin@ziyam.in', phoneNumber: '+919000000001',
       passwordHash, role: Role.ADMIN, isKycVerified: true,
     },
   });
 
   const hostRavi = await prisma.user.create({
     data: {
-      id: uuidv4(), fullName: 'Ravi Kumar', email: 'ravi.host@ziyam.in', phoneNumber: '+919000000002',
+      id: randomUUID(), fullName: 'Ravi Kumar', email: 'ravi.host@ziyam.in', phoneNumber: '+919000000002',
       passwordHash, role: Role.SELF_HOST, isKycVerified: true, payoutAccountId: 'acct_mock_ravi',
       bio: 'Weekend car enthusiast renting out my well-maintained Swift and Creta in Bengaluru.',
     },
@@ -44,7 +44,7 @@ async function main() {
 
   const hostFleet = await prisma.user.create({
     data: {
-      id: uuidv4(), fullName: 'Metro Fleet Rentals', email: 'fleet@ziyam.in', phoneNumber: '+919000000003',
+      id: randomUUID(), fullName: 'Metro Fleet Rentals', email: 'fleet@ziyam.in', phoneNumber: '+919000000003',
       passwordHash, role: Role.FLEET_OPERATOR, isKycVerified: true, payoutAccountId: 'acct_mock_metrofleet',
       bio: 'Multi-city fleet operator with 40+ verified vehicles across Mumbai, Delhi NCR, and Hyderabad.',
     },
@@ -52,7 +52,7 @@ async function main() {
 
   const customer = await prisma.user.create({
     data: {
-      id: uuidv4(), fullName: 'Aisha Sharma', email: 'aisha@example.com', phoneNumber: '+919000000004',
+      id: randomUUID(), fullName: 'Aisha Sharma', email: 'aisha@example.com', phoneNumber: '+919000000004',
       passwordHash, role: Role.CUSTOMER, isKycVerified: true,
     },
   });
@@ -60,7 +60,7 @@ async function main() {
   // A disposable suspended account, purely so the admin panel's suspend/reactivate UI has an example to show.
   await prisma.user.create({
     data: {
-      id: uuidv4(), fullName: 'Suspended Test User', email: 'suspended@example.com', phoneNumber: '+919000000005',
+      id: randomUUID(), fullName: 'Suspended Test User', email: 'suspended@example.com', phoneNumber: '+919000000005',
       passwordHash, role: Role.CUSTOMER, isKycVerified: false, isSuspended: true,
     },
   });
@@ -83,7 +83,7 @@ async function main() {
     const { owner, ...rest } = def;
     const car = await prisma.car.create({
       data: {
-        id: uuidv4(),
+        id: randomUUID(),
         ownerId: owner.id,
         ...rest,
         securityDeposit: rest.category === 'Luxury' ? 10000 : 3000,
@@ -98,7 +98,7 @@ async function main() {
   // A completed trip with a review, so the UI has real rating data to show
   const completedBooking = await prisma.booking.create({
     data: {
-      id: uuidv4(),
+      id: randomUUID(),
       carId: cars[0].id,
       customerId: customer.id,
       startTime: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
@@ -126,7 +126,7 @@ async function main() {
 
   await prisma.review.create({
     data: {
-      id: uuidv4(),
+      id: randomUUID(),
       bookingId: completedBooking.id,
       carId: cars[0].id,
       authorId: customer.id,
@@ -140,7 +140,7 @@ async function main() {
   // so the admin panel's "Retry" action has something real to demonstrate.
   const failedPayoutBooking = await prisma.booking.create({
     data: {
-      id: uuidv4(),
+      id: randomUUID(),
       carId: cars[5].id,
       customerId: customer.id,
       startTime: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
@@ -167,7 +167,7 @@ async function main() {
   // An upcoming confirmed trip
   await prisma.booking.create({
     data: {
-      id: uuidv4(),
+      id: randomUUID(),
       carId: cars[1].id,
       customerId: customer.id,
       startTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),

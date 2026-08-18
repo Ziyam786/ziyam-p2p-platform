@@ -1,7 +1,7 @@
 import axios from 'axios';
 import path from 'path';
 import fs from 'fs/promises';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { config } from '../config';
 
 /**
@@ -51,7 +51,7 @@ export async function extractKycDocument(docBase64: string, docType: 'image' | '
   const res = await client(config.arya.kycToken).post('/v2/kyc', {
     doc_type: docType,
     doc_base64: docBase64,
-    req_id: uuidv4(),
+    req_id: randomUUID(),
   });
   return res.data;
 }
@@ -72,7 +72,7 @@ export async function extractRcDocument(docBase64: string): Promise<AryaRcResult
   if (!isRcVerificationConfigured()) throw new Error('Arya RC verification is not configured (ARYA_RC_TOKEN)');
   const res = await client(config.arya.rcToken).post('/v1/rc', {
     doc_base64: docBase64,
-    req_id: uuidv4(),
+    req_id: randomUUID(),
   });
   return res.data;
 }
@@ -88,7 +88,7 @@ export interface AryaImageQualityResult {
 export async function checkImageQuality(docBase64: string): Promise<AryaImageQualityResult> {
   if (!isImageQualityConfigured()) throw new Error('Arya image quality check is not configured (ARYA_IMAGE_QUALITY_TOKEN)');
   const res = await client(config.arya.imageQualityToken).post('/v1/image-quality-checker', {
-    req_id: uuidv4(),
+    req_id: randomUUID(),
     doc_base64: docBase64,
     brightness: true,
     blur: true,
@@ -137,7 +137,7 @@ export async function maskAadhaarDocument(docBase64: string, docType: 'image' | 
   const res = await client(config.arya.aadhaarMaskToken).post('/v1/aadhaar-mask', {
     doc_type: docType,
     doc_base64: docBase64,
-    req_id: uuidv4(),
+    req_id: randomUUID(),
   });
   return res.data;
 }
@@ -159,7 +159,7 @@ export async function checkCyberThreat(url: string): Promise<AryaCyberThreatResu
   if (!isCyberThreatConfigured()) throw new Error('Arya cyber threat detection is not configured (ARYA_CYBER_THREAT_TOKEN)');
   const res = await client(config.arya.cyberThreatToken).post('/v1/cyber-threat-detection', {
     url,
-    req_id: uuidv4(),
+    req_id: randomUUID(),
   });
   return res.data;
 }
@@ -205,7 +205,7 @@ export interface AryaLivenessResult {
 export async function checkLiveness(docBase64: string): Promise<AryaLivenessResult> {
   if (!isLivenessConfigured()) throw new Error('Arya liveness check is not configured (ARYA_LIVENESS_TOKEN)');
   const res = await client(config.arya.livenessToken).post('/v1/liveness', {
-    req_id: uuidv4(),
+    req_id: randomUUID(),
     doc_base64: docBase64,
   });
   return res.data;
@@ -223,7 +223,7 @@ export interface AryaDeepfakeResult {
 export async function checkDeepfake(docBase64: string, docType: 'image' | 'video' = 'image'): Promise<AryaDeepfakeResult> {
   if (!isDeepfakeConfigured()) throw new Error('Arya deepfake detection is not configured (ARYA_DEEPFAKE_TOKEN)');
   const res = await client(config.arya.deepfakeToken).post('/v1/deepfake-detection/image', {
-    req_id: uuidv4(),
+    req_id: randomUUID(),
     doc_base64: docBase64,
     doc_type: docType,
     isIOS: false,
@@ -244,7 +244,7 @@ export interface AryaFaceMatchResult {
 export async function verifyFaceMatch(img1Base64: string, img2Base64: string): Promise<AryaFaceMatchResult> {
   if (!isFaceMatchConfigured()) throw new Error('Arya face match is not configured (ARYA_FACE_MATCH_TOKEN)');
   const res = await client(config.arya.faceMatchToken).post('/v1/verifyFace', {
-    req_id: uuidv4(),
+    req_id: randomUUID(),
     doc1_type: 'image',
     doc2_type: 'image',
     img1_base64: img1Base64,

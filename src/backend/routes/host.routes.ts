@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { FleetService } from '../services/fleetService';
 import { requireAuth } from '../middleware/auth';
 
@@ -36,7 +36,7 @@ router.post('/host/:hostId/cars', requireAuth, async (req: Request, res: Respons
 
   const car = await prisma.car.create({
     data: {
-      id: uuidv4(),
+      id: randomUUID(),
       ownerId: hostId,
       make,
       model,
@@ -142,7 +142,7 @@ router.post('/cars/:carId/blackouts', requireAuth, async (req: Request, res: Res
   if (end <= start) return res.status(400).json({ error: 'endDate must be after startDate' });
 
   const blackout = await prisma.blackout.create({
-    data: { id: uuidv4(), carId: req.params.carId, startDate: start, endDate: end, reason },
+    data: { id: randomUUID(), carId: req.params.carId, startDate: start, endDate: end, reason },
   });
   res.status(201).json({ success: true, data: blackout });
 });

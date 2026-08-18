@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, Role } from '@prisma/client';
-import { randomInt } from 'crypto';
-import { v4 as uuidv4 } from 'uuid';
+import { randomInt, randomUUID } from 'crypto';
 import { config } from '../config';
 import { hashPassword, comparePassword } from '../utils/password';
 import { signAuthToken } from '../utils/jwt';
@@ -137,7 +136,7 @@ router.post('/auth/signup', authRateLimiter, async (req: Request, res: Response)
   const passwordHash = await hashPassword(password);
   const newReferralCode = await generateUniqueReferralCode(fullName);
   const user = await prisma.user.create({
-    data: { id: uuidv4(), fullName, email, phoneNumber, passwordHash, role: requestedRole, referralCode: newReferralCode, referredById },
+    data: { id: randomUUID(), fullName, email, phoneNumber, passwordHash, role: requestedRole, referralCode: newReferralCode, referredById },
     select: PUBLIC_USER_SELECT,
   });
 
