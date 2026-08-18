@@ -283,8 +283,12 @@ export const kycApi = {
     post<{ success: true; message: string; data: { isKycVerified: boolean; aadhaarVerifiedName?: string } }>('/kyc/aadhaar/verify', { referenceId, otp }),
   startDigilocker: () => post<{ success: true; data: { url: string } }>('/kyc/digilocker/start'),
   digilockerStatus: () => get<{ success: true; data: { status: string; isKycVerified: boolean } }>('/kyc/digilocker/status'),
-  verifyDrivingLicense: (docBase64: string) =>
-    post<{ success: true; data: { id: string; isDrivingLicenseVerified: boolean } }>('/kyc/driving-license', { docBase64 }),
+  verifyDrivingLicense: (docBase64?: string, selfieBase64?: string) =>
+    post<{
+      success: true;
+      data: { id: string; isDrivingLicenseVerified: boolean; isSelfieVerified: boolean };
+      selfieCheck: { attempted: boolean; passed?: boolean };
+    }>('/kyc/driving-license', { docBase64, selfieBase64 }),
 };
 
 /* ── Bank account verification ───────────────────────────────────── */

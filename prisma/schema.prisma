@@ -193,6 +193,13 @@ model User {
   isDrivingLicenseVerified    Boolean @default(false)
   drivingLicenseExtractedData Json?
 
+  // Selfie hardening (liveness + deepfake + face-match against the driving
+  // license photo), run together in the same /kyc/driving-license request
+  // as an optional selfieBase64 — neither raw image is ever persisted, only
+  // these results, same minimal-retention pattern as the license itself.
+  isSelfieVerified       Boolean @default(false)
+  selfieVerificationData Json?
+
   // Refer & Earn
   referralCode   String? @unique // backfilled lazily on first login post-migration; new signups always get one
   referredById   String?

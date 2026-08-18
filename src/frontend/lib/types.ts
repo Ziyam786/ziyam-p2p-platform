@@ -26,6 +26,7 @@ export interface PublicUser {
   role: Role;
   isKycVerified: boolean;
   isDrivingLicenseVerified?: boolean;
+  isSelfieVerified?: boolean;
   isSuspended?: boolean;
   avatarUrl?: string | null;
   bio?: string | null;
