@@ -59,7 +59,11 @@ export const uploadsApi = {
     if (!res.ok) {
       throw new ApiError(body?.error ?? `Upload failed with status ${res.status}`, res.status);
     }
-    return { url: `${API_ORIGIN}${body.data.url}` };
+    // Firebase Storage returns an already-absolute URL; the local-disk
+    // fallback (Storage unconfigured) still returns a relative /uploads/...
+    // path that needs the API origin prepended, same as before this migration.
+    const url: string = body.data.url;
+    return { url: /^https?:\/\//i.test(url) ? url : `${API_ORIGIN}${url}` };
   },
   // Manually blurs a host-drawn rectangle (license plate) on an
   // already-uploaded photo. `originalUrl` is whatever upload() returned
