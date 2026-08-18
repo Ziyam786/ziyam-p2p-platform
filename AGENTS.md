@@ -28,7 +28,7 @@ Wrong assumptions about platform, identity, or consent will produce broken Mixpa
 | **SDK version** | see `src/frontend/package.json` |
 | **Tracking method** | client-side |
 | **CDP (if any)** | none |
-| **Consent required** | no (India-first product; privacy policy discloses analytics). Revisit if EU/CA traffic is added. |
+| **Consent required** | yes — Mixpanel must not initialize until the user accepts analytics on the renter/host web app (`ziyam_analytics_consent` in localStorage). Decline means no SDK init. |
 | **Mixpanel project token location** | `src/frontend/.env.local` → `NEXT_PUBLIC_MIXPANEL_TOKEN` (also Docker build-arg / GitHub secret of the same name) |
 
 Admin (`src/admin`) and agent (`src/agent`) apps are internal tools and are not Mixpanel-instrumented.
@@ -42,10 +42,10 @@ Mixpanel is initialized in:
 **File:** `src/frontend/lib/mixpanel.ts` (called from `src/frontend/components/MixpanelProvider.tsx` in `src/frontend/app/layout.tsx`)
 
 ```
-// Mixpanel is initialized once at app startup via MixpanelProvider
-// Autocapture is enabled (clicks, forms, page views). Do not also set
-// track_pageview or fire a manual page_viewed event.
-// Session Replay records 100% of sessions (record_sessions_percent: 100).
+// Mixpanel is initialized only after the user accepts analytics
+// (MixpanelConsentBanner). Autocapture is enabled (clicks, forms, page views).
+// Do not also set track_pageview or fire a manual page_viewed event.
+// Session Replay records 100% of consented sessions (record_sessions_percent: 100).
 // Do not create additional Mixpanel instances
 ```
 
@@ -127,5 +127,6 @@ trackEvent('event_name', {
 - **Do not track PII as Mixpanel properties** -- no emails, full names, phone numbers, IP addresses, or payment details in Mixpanel event properties. `$name` / `$email` belong only on the Mixpanel user profile via `people.set` after `identify`.
 - **Do not fire Mixpanel events inside loops** -- each Mixpanel event call is a network request.
 - **Do not hardcode the Mixpanel project token** -- read it from `NEXT_PUBLIC_MIXPANEL_TOKEN`.
+- **Do not initialize Mixpanel before analytics consent.** `initMixpanel` / `trackEvent` / `identifyMixpanelUser` no-op until `ziyam_analytics_consent` is `granted`.
 - **Do not skip `mixpanel.reset()` on logout** -- failing to reset causes Mixpanel to merge the next user's events with the previous user's profile.
 - **Do not call `mixpanel.identify()` before the user is authenticated** -- premature identification creates orphaned Mixpanel profiles.
