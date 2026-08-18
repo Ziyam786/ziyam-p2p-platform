@@ -8,7 +8,7 @@ import { PayoutEngine } from './services/payoutEngine';
 import { initializeYieldAutoApplyCron } from './services/yieldEngine';
 import { initializeDocExpiryCron } from './services/carVerificationService';
 import { apiRateLimiter } from './middleware/rateLimit';
-import { csrf } from './middleware/csrf';
+import { requireCsrfToken } from './middleware/csrf';
 import { safeErrorMessage } from './utils/errorResponse';
 import authRoutes from './routes/auth.routes';
 import carRoutes from './routes/car.routes';
@@ -93,7 +93,7 @@ app.use(express.json());
 // it never hits cookieParser. /health and /uploads stay off this router.
 const api = express.Router();
 api.use(cookieParser());
-api.use(csrf());
+api.use(requireCsrfToken);
 api.use(apiRateLimiter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'ZiyamSelfDrive API' }));
