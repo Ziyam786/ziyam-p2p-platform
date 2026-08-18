@@ -93,14 +93,29 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
   try {
     // KYC is mandatory for both sides of a trip — hosts are already gated at
     // listing time (see host.routes.ts), this closes the matching gap for guests.
-    const customer = await prisma.user.findUnique({ where: { id: customerId }, select: { isKycVerified: true } });
+    const customer = await prisma.user.findUnique({ where: { id: customerId }, select: { isKycVerified: true, isDrivingLicenseVerified: true } });
     if (!customer?.isKycVerified) {
       return res.status(403).json({ error: 'Please complete KYC verification before booking a car.', code: 'KYC_REQUIRED' });
+    }
+    // Identity KYC alone doesn't confirm someone can legally drive — this is
+    // a brand-new check (see /kyc/driving-license) so most existing guests
+    // won't have done it yet; the error code lets the frontend route them
+    // straight to that step instead of a generic failure.
+    if (!customer.isDrivingLicenseVerified) {
+      return res.status(403).json({ error: 'Please verify your driving license before booking a car.', code: 'DRIVING_LICENSE_REQUIRED' });
     }
 
     const car = await prisma.car.findUnique({ where: { id: carId }, include: { owner: true } });
     if (!car) return res.status(404).json({ error: 'Car not found' });
     if (!car.isAvailable) return res.status(409).json({ error: 'Car is no longer available' });
+    // Verification existing (PENDING_REVIEW badge, admin review queue) means
+    // nothing if an unreviewed car can still be booked — this is the actual
+    // enforcement point. Cars auto-VERIFIED before this gate existed stay
+    // bookable; anything PENDING/PENDING_REVIEW/REJECTED needs a real
+    // admin pass first (see PATCH /admin/cars/:id/verification).
+    if (car.verificationStatus !== 'VERIFIED') {
+      return res.status(422).json({ error: 'This car is still pending document verification and cannot be booked yet.', code: 'CAR_NOT_VERIFIED' });
+    }
     if (!car.owner.payoutAccountId || !car.owner.bankAccountVerified) {
       return res.status(422).json({ error: 'Host payout account not configured' });
     }

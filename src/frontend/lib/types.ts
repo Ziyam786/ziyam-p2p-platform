@@ -129,7 +129,15 @@ export interface Booking {
   carId: string;
   car?: Car;
   customerId: string;
-  customer?: { id?: string; fullName: string; email: string; signatureUrl?: string | null };
+  customer?: {
+    id?: string;
+    fullName: string;
+    email: string;
+    signatureUrl?: string | null;
+    isKycVerified?: boolean;
+    isDrivingLicenseVerified?: boolean;
+    isSelfieVerified?: boolean;
+  };
   startTime: string;
   endTime: string;
   totalAmount: number;

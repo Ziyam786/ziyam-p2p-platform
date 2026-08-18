@@ -161,6 +161,7 @@ export default function UsersPage() {
                 <th className="py-3 px-4">Role</th>
                 <th className="py-3 px-4">Custom Role</th>
                 <th className="py-3 px-4">KYC</th>
+                <th className="py-3 px-4">License</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4">Actions</th>
               </tr>
@@ -202,6 +203,11 @@ export default function UsersPage() {
                     >
                       {u.isKycVerified ? 'Verified' : 'Unverified'}
                     </button>
+                  </td>
+                  <td className="py-3 px-4">
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${u.isDrivingLicenseVerified ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-400'}`}>
+                      {u.isDrivingLicenseVerified ? (u.isSelfieVerified ? 'Verified + ID Match' : 'Verified') : 'Unverified'}
+                    </span>
                   </td>
                   <td className="py-3 px-4">
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${u.isSuspended ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
