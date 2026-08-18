@@ -7,6 +7,7 @@ import { useAuth } from '../lib/auth-context';
 const TABS = [
   { href: '/host/dashboard', icon: '🏠', label: 'Home' },
   { href: '/host/dashboard?tab=cars', icon: '🚗', label: 'My Cars' },
+  { href: '/host/dashboard?tab=trips', icon: '📅', label: 'Trips' },
   { href: '/host/earnings-calculator', icon: '💰', label: 'Earnings' },
   { href: '/account', icon: '👤', label: 'Profile' },
 ];

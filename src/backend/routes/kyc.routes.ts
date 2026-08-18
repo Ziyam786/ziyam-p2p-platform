@@ -12,7 +12,6 @@ import {
   isFaceMatchConfigured, verifyFaceMatch,
   fetchDocAsBase64,
   isAadhaarMaskConfigured, maskAadhaarDocument, maskedAadhaarBuffer, isLikelyAadhaarKyc,
-  assertSafeDocumentUrl,
   type AryaKycResult,
 } from '../services/aryaVerificationService';
 import { saveFile } from './upload.routes';
@@ -336,7 +335,6 @@ router.post('/kyc/submit', requireAuth, async (req: Request, res: Response) => {
   }
 
   try {
-    await assertSafeDocumentUrl(docUrl);
     const docBase64 = await fetchDocAsBase64(docUrl);
     await assertReadableDocument(docBase64);
     const result = await extractKycDocument(docBase64, 'image');
@@ -363,7 +361,7 @@ router.post('/kyc/submit', requireAuth, async (req: Request, res: Response) => {
     await notify(user.id, 'KYC_VERIFIED', "You're verified!", 'Your identity has been confirmed via Arya.ai. You can now book or list cars.', '/account');
     res.json({ success: true, message: 'KYC verified', data: user });
   } catch (err: any) {
-    if (err.status === 422 || err.status === 400) return res.status(err.status).json({ error: err.message });
+      if (err.status === 422 || err.status === 400) return res.status(err.status).json({ error: err.message });
     console.error('[KYC] Arya submit failed:', err.response?.data ?? err.message);
     res.status(502).json({ error: 'Could not verify that document right now. Please try again shortly.' });
   }

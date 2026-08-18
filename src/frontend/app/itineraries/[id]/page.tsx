@@ -1,11 +1,18 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
 import { itinerariesApi } from '../../../lib/api';
 import type { ItineraryUnlock } from '../../../lib/api';
+import { generateRoadTripItinerary } from '../../../lib/firebase';
+
+function needsFirebaseFill(unlock: ItineraryUnlock): boolean {
+  if (unlock.status !== 'PAID') return false;
+  const text = unlock.generatedContent?.trim() ?? '';
+  return text.length < 80 || /couldn't generate your itinerary/i.test(text);
+}
 
 export default function ItineraryPage() {
   const params = useParams<{ id: string }>();
@@ -13,6 +20,9 @@ export default function ItineraryPage() {
   const [unlock, setUnlock] = useState<ItineraryUnlock | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const generateStarted = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -25,9 +35,6 @@ export default function ItineraryPage() {
         .then((res) => {
           if (!active) return;
           setUnlock(res.data);
-          // The PayU callback generates the itinerary before redirecting here,
-          // so this normally resolves on the first fetch — poll briefly only
-          // as a safety net for the rare case the redirect beats the callback.
           if (res.data.status === 'PENDING_PAYMENT' && attempts < 8) {
             setTimeout(poll, 1500);
           } else {
@@ -42,6 +49,30 @@ export default function ItineraryPage() {
     };
   }, [params.id]);
 
+  useEffect(() => {
+    if (!unlock || loading || !needsFirebaseFill(unlock) || generateStarted.current) return;
+    generateStarted.current = true;
+    let cancelled = false;
+    setGenerating(true);
+    setGenerateError(null);
+    generateRoadTripItinerary(unlock.destination)
+      .then((text) => itinerariesApi.saveContent(unlock.id, text))
+      .then((res) => {
+        if (!cancelled) setUnlock(res.data);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setGenerateError(err instanceof Error ? err.message : 'Could not generate the itinerary');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setGenerating(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [unlock, loading]);
+
   const paymentIssue = searchParams.get('payment');
 
   return (
@@ -50,7 +81,7 @@ export default function ItineraryPage() {
       <div className="max-w-2xl mx-auto px-4 pt-28 pb-24">
         {loading ? (
           <p className="text-center text-gray-400 py-20">
-            {unlock?.status === 'PENDING_PAYMENT' ? 'Generating your itinerary…' : 'Loading…'}
+            {unlock?.status === 'PENDING_PAYMENT' ? 'Confirming your payment…' : 'Loading…'}
           </p>
         ) : notFound ? (
           <div className="text-center py-20">
@@ -70,8 +101,14 @@ export default function ItineraryPage() {
           </div>
         ) : unlock.status === 'PENDING_PAYMENT' ? (
           <div className="text-center py-20">
-            <p className="text-gray-700 font-semibold mb-2">Still generating your itinerary…</p>
+            <p className="text-gray-700 font-semibold mb-2">Still confirming your payment…</p>
             <p className="text-gray-500 text-sm">This page will update automatically — hang tight.</p>
+          </div>
+        ) : generating || needsFirebaseFill(unlock) ? (
+          <div className="text-center py-20">
+            <p className="text-gray-700 font-semibold mb-2">Writing your itinerary…</p>
+            <p className="text-gray-500 text-sm">Payment is confirmed. Gemini is drafting the day-by-day plan now.</p>
+            {generateError && <p className="text-red-500 text-sm mt-4">{generateError}</p>}
           </div>
         ) : (
           <>

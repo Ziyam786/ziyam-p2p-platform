@@ -313,7 +313,7 @@ router.post('/payments/payu/itinerary-callback', async (req: Request, res: Respo
     "cars for this trip' section. If the tool returns no cars, skip that section entirely — never invent a car or " +
     'price that search_available_cars did not actually return.';
 
-  let generatedContent: string;
+  let generatedContent: string | null = null;
   try {
     generatedContent = await generateChatReply(
       systemPrompt,
@@ -322,9 +322,6 @@ router.post('/payments/payu/itinerary-callback', async (req: Request, res: Respo
     );
   } catch (err: any) {
     console.error('[PAYU ITINERARY CALLBACK] AI generation failed for unlock %s:', unlockId, err.message ?? err);
-    generatedContent =
-      "We've confirmed your payment, but couldn't generate your itinerary just yet — please contact support and we'll " +
-      'get it to you directly, or check back here shortly as we retry automatically.';
   }
 
   await prisma.itineraryUnlock.update({

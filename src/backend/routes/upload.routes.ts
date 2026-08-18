@@ -189,6 +189,7 @@ router.post('/uploads/blur-region', requireAuth, async (req: Request, res: Respo
     const newUrl = await saveFile(composited, mimetype);
     res.json({ success: true, data: { url: newUrl } });
   } catch (err: any) {
+    if (err.status === 400) return res.status(400).json({ error: err.message });
     console.error('[UPLOADS] blur-region failed:', err.message);
     res.status(500).json({ error: 'Failed to process image' });
   }

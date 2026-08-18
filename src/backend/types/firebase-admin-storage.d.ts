@@ -16,6 +16,7 @@ declare module 'firebase-admin/storage' {
 
   export interface StorageFile {
     save(data: Buffer, options?: SaveOptions): Promise<void>;
+    download(): Promise<[Buffer]>;
     makePublic(): Promise<unknown>;
     publicUrl(): string;
     exists(): Promise<[boolean]>;
