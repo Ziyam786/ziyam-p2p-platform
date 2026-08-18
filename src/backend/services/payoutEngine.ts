@@ -202,7 +202,7 @@ export class PayoutEngine {
           );
           console.log(`[PAYOUT SUCCESS] ₹${payout.netPayout} -> host ${payout.hostId}`);
         } catch (error: any) {
-          console.error(`[PAYOUT ERROR] Ledger ${payout.id}:`, error.message);
+          console.error('[PAYOUT ERROR] Ledger %s:', payout.id, error.message);
           await prisma.payoutLedger.update({
             where: { id: payout.id },
             data: { status: PayoutStatus.FAILED },
@@ -265,7 +265,7 @@ export class PayoutEngine {
               (booking.lateFeeAmount > 0 ? ` (₹${booking.lateFeeAmount} late fee deducted)` : '')
           );
         } catch (error: any) {
-          console.error(`[DEPOSIT RELEASE ERROR] Booking ${booking.id}:`, error.message);
+          console.error('[DEPOSIT RELEASE ERROR] Booking %s:', booking.id, error.message);
         }
       }
     });
@@ -313,7 +313,7 @@ export class PayoutEngine {
           );
           console.log(`[HOST REVIEW TIMEOUT] Booking ${booking.id} auto-rejected — ₹${refundAmount} queued for admin refund`);
         } catch (error: any) {
-          console.error(`[HOST REVIEW TIMEOUT ERROR] Booking ${booking.id}:`, error.message);
+          console.error('[HOST REVIEW TIMEOUT ERROR] Booking %s:', booking.id, error.message);
         }
       }
     });
@@ -353,7 +353,7 @@ export class PayoutEngine {
           );
           console.log(`[RESERVATION TIMEOUT] Booking ${booking.id} auto-cancelled — ₹${booking.reservationFeeAmount} reservation fee forfeited`);
         } catch (error: any) {
-          console.error(`[RESERVATION TIMEOUT ERROR] Booking ${booking.id}:`, error.message);
+          console.error('[RESERVATION TIMEOUT ERROR] Booking %s:', booking.id, error.message);
         }
       }
     });

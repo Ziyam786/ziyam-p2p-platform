@@ -24,7 +24,7 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
   hero_subtitle:
     'Rent verified self-drive cars from trusted hosts across India. No driver. No restrictions. Just open roads.',
   trust_badges: [
-    { label: 'DigiLocker', sub: 'KYC Verified' },
+    { label: 'Arya.ai', sub: 'KYC Verified' },
     { label: 'Escrow-Held', sub: 'Security Deposits' },
     { label: 'N+1', sub: 'Guaranteed Payouts' },
     { label: 'Zero', sub: 'Hidden Fees' },
@@ -104,7 +104,7 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     'in Bengaluru only. Hosts keep 70% of every booking (Ziyam keeps 30%). Self-hosted hosts are paid 24-48 hours ' +
     'after trip completion (or weekly, if they opt in); hosts managed by a fleet operator are paid within 1 day of ' +
     'the fleet operator confirming receipt from the platform. Lessees must be 21+ with a valid driving licence 1+ ' +
-    'year old. KYC is via DigiLocker and is mandatory for both lessees and hosts. Security deposits are refundable ' +
+    'year old. Identity KYC is Aadhaar OTP eKYC or Arya.ai document check (plus DigiLocker where offered). Driving licence, liveness selfie, and host RC checks are via Arya.ai and are mandatory for both lessees and hosts. Security deposits are refundable ' +
     'and released after a clean return. Protection plans only affect deposit-hold amount and support priority — ' +
     'Basic (free), Standard (+₹149/day, reduced deposit hold), Premium (+₹349/day, lowest deposit hold). ZiyamSelfDrive ' +
     'does not insure vehicles against lessee-caused damage: every listed car carries the host\'s own comprehensive ' +

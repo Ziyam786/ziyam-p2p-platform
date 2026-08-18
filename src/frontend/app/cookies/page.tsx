@@ -13,7 +13,7 @@ export default function CookiesPage() {
         },
         {
           heading: 'Analytics Cookies',
-          body: ['We use lightweight, privacy-respecting analytics to understand how people use ZiyamSelfDrive and improve the product. No personal data is sold or shared with advertisers.'],
+          body: ['We use Mixpanel for product analytics and session replay on the renter/host site (page views, clicks, and selected events such as sign-up and booking completed). Mixpanel may set cookies or local storage to distinguish sessions. We do not sell this data to advertisers.'],
         },
         {
           heading: 'Managing Cookies',

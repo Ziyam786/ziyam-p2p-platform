@@ -173,7 +173,7 @@ function AgreementInner() {
           <p className="mb-4">5.3. 24/7 roadside assistance is included for every Host, regardless of protection plan or hosting mode.</p>
 
           <h3 className="font-bold text-gray-900 mt-6 mb-2">6. Host Conduct & KYC</h3>
-          <p className="mb-4">6.1. KYC via DigiLocker/Aadhaar is required before any vehicle goes live. Circumventing the Platform to arrange a rental directly with a Guest voids KYC protection, driver verification, and Platform support for that trip.</p>
+          <p className="mb-4">6.1. KYC (Aadhaar OTP eKYC or Arya.ai identity document, plus driving licence) is required before any vehicle goes live. Circumventing the Platform to arrange a rental directly with a Guest voids KYC protection, driver verification, and Platform support for that trip.</p>
 
           <h3 className="font-bold text-gray-900 mt-6 mb-2">7. Term, Confidentiality & Liability</h3>
           <p className="mb-1">7.1. This Agreement remains in effect while the Host maintains an active account; either Party may terminate with written notice, without affecting amounts already earned.</p>

@@ -38,6 +38,6 @@ export async function sendPushNotification(userId: string, title: string, body: 
       await prisma.pushToken.deleteMany({ where: { id: { in: deadTokenIds } } });
     }
   } catch (err: any) {
-    console.error(`[PUSH] Send failed for user ${userId}:`, err.message);
+    console.error('[PUSH] Send failed for user %s:', userId, err.message);
   }
 }

@@ -6,7 +6,7 @@ export default function TermsPage() {
   return (
     <LegalPage
       title="Terms & Conditions"
-      updated="4 June 2026"
+      updated="18 August 2026"
       sections={[
         {
           heading: '1. Company Details',
@@ -17,7 +17,7 @@ export default function TermsPage() {
         {
           heading: '2. Eligibility Requirements',
           body: [
-            'Users must be at least 18 years old (or higher if legally required for the vehicle category booked), hold a valid government-issued identity proof and a valid driving license appropriate for the booked vehicle, and have an accepted payment method on file.',
+            'Users must be at least 18 years old (or higher if legally required for the vehicle category booked), hold a valid government-issued identity proof and a valid driving license appropriate for the booked vehicle, complete identity verification through Aadhaar OTP eKYC, Arya.ai document KYC, or DigiLocker (where offered), complete licence verification through Arya.ai, and have an accepted payment method on file.',
             'The Company reserves discretionary authority to verify credentials and to refuse or suspend registrations.',
           ],
         },
@@ -89,7 +89,7 @@ export default function TermsPage() {
         {
           heading: '13. Privacy & Data',
           body: [
-            'The Company collects, processes, and stores user information per its Privacy Policy and applicable law. By using the platform, users consent to data collection, including GPS tracking, telematics, and usage analytics, for operational, safety, and security purposes.',
+            'The Company collects, processes, and stores user information per its Privacy Policy and applicable law. Identity checks may be performed via Aadhaar OTP eKYC (Sandbox.co.in), Arya.ai document extraction (with Aadhaar masking of any retained photo), or DigiLocker. Driving-licence, selfie liveness, and vehicle RC checks are performed by Arya.ai. By using the platform, users consent to data collection, including GPS tracking, telematics, usage analytics (Mixpanel), and KYC processing by these partners, for operational, safety, and security purposes.',
           ],
         },
         {

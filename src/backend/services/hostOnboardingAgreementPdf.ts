@@ -97,7 +97,7 @@ export function renderHostOnboardingAgreementPdf(data: HostOnboardingAgreementDa
 
     h1().text('6. Host Conduct & KYC');
     body();
-    doc.text('6.1. The Host must complete identity verification (KYC) via DigiLocker/Aadhaar before any vehicle can go live, and must keep contact and bank details current.');
+    doc.text('6.1. The Host must complete identity verification (KYC) via Aadhaar OTP or Arya.ai before any vehicle can go live, and must keep contact and bank details current.');
     doc.text('6.2. The Host agrees not to circumvent the Platform by arranging a rental directly with a Guest introduced through the Platform to avoid Platform fees; doing so voids KYC protection, insurance-relevant driver verification, and Platform support for that trip.');
     doc.moveDown(0.6);
 

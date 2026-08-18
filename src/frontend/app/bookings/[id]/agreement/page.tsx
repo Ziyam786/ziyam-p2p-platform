@@ -200,7 +200,7 @@ function AgreementInner() {
           <p className="mb-4">
             The vehicle shall be driven exclusively by the Lessee. Driving by any unauthorized individual or transfer
             of the vehicle to a third party is strictly prohibited. The Lessee's driver details are verified via the
-            Platform's KYC process (DigiLocker / Aadhaar-based verification), and the insurance policy is issued
+            Platform's KYC process (Arya.ai document, licence, and liveness checks), and the insurance policy is issued
             based on the verified driver information. In the event of any damage or incident, insurance claims may be
             denied if the vehicle is operated by a person other than the authorized Lessee.
           </p>
