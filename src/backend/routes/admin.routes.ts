@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, Role, BookingStatus, PayoutStatus } from '@prisma/client';
-import { v4 as uuidv4 } from 'uuid';
-import { randomInt } from 'crypto';
+import { randomInt, randomUUID } from 'crypto';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { recordAudit } from '../middleware/auditLog';
 import { PayoutEngine } from '../services/payoutEngine';
@@ -112,10 +111,10 @@ router.post('/admin/bookings', async (req: Request, res: Response) => {
       if (existingByContact) {
         return res.status(409).json({ error: 'A customer with that email or phone already exists — search for them instead of creating a new one.' });
       }
-      const passwordHash = await hashPassword(uuidv4());
+      const passwordHash = await hashPassword(randomUUID());
       const newCustomer = await prisma.user.create({
         data: {
-          id: uuidv4(), fullName: customerName, email: customerEmail, phoneNumber: customerPhone,
+          id: randomUUID(), fullName: customerName, email: customerEmail, phoneNumber: customerPhone,
           passwordHash, role: Role.CUSTOMER, isKycVerified: true,
         },
       });
@@ -132,7 +131,7 @@ router.post('/admin/bookings', async (req: Request, res: Response) => {
 
     const booking = await prisma.booking.create({
       data: {
-        id: uuidv4(),
+        id: randomUUID(),
         carId,
         customerId: finalCustomerId,
         startTime: start,

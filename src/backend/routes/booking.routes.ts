@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, BookingStatus, RefundRequestType, CancelledBy, TripStage, PhotoAngle } from '@prisma/client';
-import { v4 as uuidv4 } from 'uuid';
-import { randomInt } from 'crypto';
+import { randomInt, randomUUID } from 'crypto';
 import paymentGateway from '../services/paymentGateway';
 import { PayoutEngine } from '../services/payoutEngine';
 import { TelematicsService } from '../services/telematicsService';
@@ -214,7 +213,7 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
 
     const booking = await prisma.booking.create({
       data: {
-        id: uuidv4(),
+        id: randomUUID(),
         carId,
         customerId,
         startTime: start,

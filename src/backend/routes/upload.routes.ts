@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import axios from 'axios';
 import sharp from 'sharp';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { config } from '../config';
 import { requireAuth } from '../middleware/auth';
 import { isStorageConfigured, getStorageBucket } from '../services/firebaseAdmin';
@@ -65,7 +65,7 @@ async function verifyFileContent(buffer: Buffer, mimetype: string): Promise<bool
  * removed feature, so uploads still work in local dev without Firebase creds.
  */
 export async function saveFile(buffer: Buffer, mimetype: string): Promise<string> {
-  const filename = `${uuidv4()}${MIME_EXTENSION[mimetype] ?? ''}`;
+  const filename = `${randomUUID()}${MIME_EXTENSION[mimetype] ?? ''}`;
   if (isStorageConfigured()) {
     const file = getStorageBucket().file(filename);
     await file.save(buffer, { contentType: mimetype, public: true });
@@ -104,7 +104,8 @@ async function fetchSavedFileBuffer(url: string): Promise<Buffer> {
     if (!bucketName || parsed.protocol !== 'https:' || parsed.hostname !== 'storage.googleapis.com' || !parsed.pathname.startsWith(`/${bucketName}/`)) {
       throw new Error('Invalid file URL');
     }
-    const res = await axios.get(url, { responseType: 'arraybuffer', maxRedirects: 0, timeout: 15_000 });
+    const safeUrl = `${parsed.protocol}//${parsed.host}${parsed.pathname}${parsed.search}`;
+    const res = await axios.get(safeUrl, { responseType: 'arraybuffer', maxRedirects: 0, timeout: 15_000 });
     return Buffer.from(res.data);
   }
   const resolvedUploadDir = path.resolve(config.uploadDir);
