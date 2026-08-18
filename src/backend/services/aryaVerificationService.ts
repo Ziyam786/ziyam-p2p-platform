@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { randomUUID } from 'crypto';
 import { config } from '../config';
+import { readSavedUploadBytes } from '../utils/savedUpload';
 
 /**
  * Arya.ai (Aurionpro) document verification — three separate products under
@@ -152,12 +153,14 @@ export interface AryaCyberThreatResult {
   error_message?: string;
 }
 
-/** URL reputation check before fetching a caller-supplied document URL. */
-export async function checkCyberThreat(url: string): Promise<AryaCyberThreatResult> {
+/** URL reputation check. The scanned location is JSON body, not the HTTP request target. */
+export async function checkCyberThreat(documentLocation: string): Promise<AryaCyberThreatResult> {
   if (!isCyberThreatConfigured()) throw new Error('Arya cyber threat detection is not configured (ARYA_CYBER_THREAT_TOKEN)');
-  const res = await client(config.arya.cyberThreatToken).post('/v1/cyber-threat-detection', {
-    url,
-    req_id: randomUUID(),
+  const body = JSON.stringify({ req_id: randomUUID(), url: documentLocation });
+  const res = await axios.post(`${BASE_URL}/v1/cyber-threat-detection`, body, {
+    headers: { token: config.arya.cyberThreatToken, 'Content-Type': 'application/json' },
+    transformRequest: [(data) => data],
+    timeout: 30_000,
   });
   return res.data;
 }
@@ -280,16 +283,8 @@ export async function assertReadableDocument(docBase64: string): Promise<void> {
   }
 }
 
-/** Fetches an already-uploaded file (local disk or an absolute URL, e.g. Firebase Storage) and returns its base64 content. */
+/** Reads an already-uploaded file (our Storage bucket or local /uploads) and returns base64. */
 export async function fetchDocAsBase64(urlOrPath: string): Promise<string> {
-  if (/^https?:\/\//i.test(urlOrPath)) {
-    const res = await axios.get(urlOrPath, { responseType: 'arraybuffer' });
-    return Buffer.from(res.data).toString('base64');
-  }
-  const fs = await import('fs/promises');
-  const path = await import('path');
-  const filename = path.basename(urlOrPath);
-  const filePath = path.join(config.uploadDir, filename);
-  const buf = await fs.readFile(filePath);
+  const buf = await readSavedUploadBytes(urlOrPath);
   return buf.toString('base64');
 }
