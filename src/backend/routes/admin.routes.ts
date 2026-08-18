@@ -145,6 +145,10 @@ router.post('/admin/bookings', async (req: Request, res: Response) => {
         coDriverName: coDriverRequested ? String(coDriverName).trim() : null,
         coDriverLicenseNumber: coDriverRequested ? String(coDriverLicenseNumber).trim() : null,
         status: bookingStatus,
+        // Same pickup-handover code the guest-facing accept flow generates
+        // (hostReview.routes.ts) — an admin-created CONFIRMED booking needs
+        // one too, or its host would never see a start-OTP panel at pickup.
+        ...(bookingStatus === BookingStatus.CONFIRMED && { startOtp: String(Math.floor(1000 + Math.random() * 9000)) }),
       },
       include: { car: { select: { make: true, model: true, city: true } }, customer: { select: { fullName: true, email: true } } },
     });

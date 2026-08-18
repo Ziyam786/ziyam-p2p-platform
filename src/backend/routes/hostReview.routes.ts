@@ -34,9 +34,12 @@ router.post('/bookings/:id/host-review', requireAuth, async (req: Request, res: 
   }
 
   if (decision === 'ACCEPT') {
+    // Generated now, well before pickup, so it's ready the moment the host
+    // needs to show it — same 4-digit shape as endOtp (see /booking/:id/start).
+    const startOtp = String(Math.floor(1000 + Math.random() * 9000));
     const updated = await prisma.booking.update({
       where: { id },
-      data: { status: BookingStatus.CONFIRMED, hostReviewDeadline: null },
+      data: { status: BookingStatus.CONFIRMED, hostReviewDeadline: null, startOtp },
     });
     await notify(updated.customerId, 'BOOKING_CONFIRMED', 'Booking confirmed!', `Your trip in the ${booking.car.make} ${booking.car.model} is booked.`, `/account/trips/${updated.id}`);
 
