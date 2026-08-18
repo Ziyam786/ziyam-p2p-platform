@@ -5,7 +5,12 @@ import { requireAuth } from '../middleware/auth';
 import { notify } from '../services/notificationService';
 import { sandboxService } from '../services/sandboxService';
 import { digilockerApi, isSetuConfigured } from '../services/setuService';
-import { isKycExtractionConfigured, extractKycDocument } from '../services/aryaVerificationService';
+import {
+  isKycExtractionConfigured, extractKycDocument,
+  isLivenessConfigured, checkLiveness,
+  isDeepfakeConfigured, checkDeepfake,
+  isFaceMatchConfigured, verifyFaceMatch,
+} from '../services/aryaVerificationService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -138,36 +143,103 @@ router.get('/kyc/digilocker/status', requireAuth, async (req: Request, res: Resp
  * base64-encoded photo/scan directly (not run through the file-upload
  * pipeline — nothing else needs to reference this image afterward, only
  * Arya's own extraction result, which we store).
+ *
+ * An optional selfieBase64 hardens this into a real "is this actually you"
+ * check — the classic "hold your ID next to your face" KYC pattern: the
+ * selfie is checked for liveness (not a photo-of-a-photo) and deepfake
+ * manipulation, then face-matched against the license photo, all within
+ * this one request. Neither image is ever persisted — only the pass/fail
+ * results — and it's optional: selfieBase64 omitted just skips straight to
+ * document-only verification, same as before this was added.
+ *
+ * docBase64 itself is only required the first time — since the license
+ * photo is never persisted, a user who's already isDrivingLicenseVerified
+ * can submit selfieBase64 alone later to add/retry the selfie check (runs
+ * liveness + deepfake only in that case; face-match needs both images in
+ * the same request, so it's skipped when there's no fresh license photo).
  */
 router.post('/kyc/driving-license', requireAuth, async (req: Request, res: Response) => {
-  const { docBase64 } = req.body;
-  if (!docBase64 || typeof docBase64 !== 'string') {
+  const { docBase64, selfieBase64 } = req.body;
+  const hasDoc = typeof docBase64 === 'string' && docBase64.length > 0;
+  const hasSelfie = typeof selfieBase64 === 'string' && selfieBase64.length > 0;
+  if (!hasDoc && !hasSelfie) {
+    return res.status(400).json({ error: 'docBase64 (or selfieBase64, if your license is already verified) is required' });
+  }
+
+  const existing = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { isDrivingLicenseVerified: true } });
+  if (!hasDoc && !existing?.isDrivingLicenseVerified) {
     return res.status(400).json({ error: 'docBase64 is required — a base64-encoded photo/scan of the driving license' });
   }
-  if (!isKycExtractionConfigured()) {
+  if (hasDoc && !isKycExtractionConfigured()) {
     return res.status(503).json({ error: 'Driving license verification is not configured yet (ARYA_KYC_TOKEN)' });
   }
 
   try {
-    const result = await extractKycDocument(docBase64, 'image');
-    if (!result.success) {
-      await prisma.kycVerificationLog.create({
-        data: { userId: req.user!.userId, method: 'DRIVING_LICENSE', outcome: 'FAILED', detail: result.error_message ?? 'Extraction failed' },
-      });
-      return res.status(422).json({ error: result.error_message || 'Could not verify the driving license — try a clearer photo.' });
+    const updateData: Record<string, unknown> = {};
+
+    if (hasDoc) {
+      const result = await extractKycDocument(docBase64, 'image');
+      if (!result.success) {
+        await prisma.kycVerificationLog.create({
+          data: { userId: req.user!.userId, method: 'DRIVING_LICENSE', outcome: 'FAILED', detail: result.error_message ?? 'Extraction failed' },
+        });
+        return res.status(422).json({ error: result.error_message || 'Could not verify the driving license — try a clearer photo.' });
+      }
+      updateData.isDrivingLicenseVerified = true;
+      updateData.drivingLicenseExtractedData = result as unknown as Prisma.InputJsonValue;
+    }
+
+    let selfieOutcome: { attempted: boolean; passed?: boolean; detail?: Record<string, unknown> } = { attempted: false };
+
+    if (hasSelfie) {
+      selfieOutcome.attempted = true;
+      const checks: Record<string, unknown> = {};
+      let allConfiguredChecksPassed = true;
+      let anyConfigured = false;
+
+      if (isLivenessConfigured()) {
+        anyConfigured = true;
+        const liveness = await checkLiveness(selfieBase64);
+        checks.liveness = liveness;
+        if (!liveness.success) allConfiguredChecksPassed = false;
+      }
+      if (isDeepfakeConfigured()) {
+        anyConfigured = true;
+        const deepfake = await checkDeepfake(selfieBase64);
+        checks.deepfake = deepfake;
+        // result is a free-form string per Arya's docs — treat anything
+        // containing "fake"/"deepfake" as a fail, success:false as a fail.
+        const flagged = !deepfake.success || /fake/i.test(deepfake.result ?? '');
+        if (flagged) allConfiguredChecksPassed = false;
+      }
+      if (hasDoc && isFaceMatchConfigured()) {
+        anyConfigured = true;
+        const faceMatch = await verifyFaceMatch(selfieBase64, docBase64);
+        checks.faceMatch = faceMatch;
+        if (!faceMatch.success || !faceMatch.match) allConfiguredChecksPassed = false;
+      }
+
+      selfieOutcome.passed = anyConfigured && allConfiguredChecksPassed;
+      selfieOutcome.detail = checks;
+      updateData.isSelfieVerified = selfieOutcome.passed;
+      updateData.selfieVerificationData = checks as unknown as Prisma.InputJsonValue;
     }
 
     const user = await prisma.user.update({
       where: { id: req.user!.userId },
-      data: { isDrivingLicenseVerified: true, drivingLicenseExtractedData: result as unknown as Prisma.InputJsonValue },
-      select: { id: true, isDrivingLicenseVerified: true },
+      data: updateData,
+      select: { id: true, isDrivingLicenseVerified: true, isSelfieVerified: true },
     });
     await prisma.kycVerificationLog.create({
-      data: { userId: user.id, method: 'DRIVING_LICENSE', outcome: 'SUCCESS' },
+      data: { userId: user.id, method: 'DRIVING_LICENSE', outcome: 'SUCCESS', detail: selfieOutcome.attempted ? `selfie check: ${selfieOutcome.passed ? 'passed' : 'failed'}` : undefined },
     });
-    await notify(user.id, 'KYC_VERIFIED', 'Driving license verified', 'Your driving license has been confirmed.', '/account');
+    if (hasDoc) {
+      await notify(user.id, 'KYC_VERIFIED', 'Driving license verified', 'Your driving license has been confirmed.', '/account');
+    } else if (selfieOutcome.passed) {
+      await notify(user.id, 'KYC_VERIFIED', 'Identity verified', 'Your selfie has been matched and confirmed.', '/account');
+    }
 
-    res.json({ success: true, data: user });
+    res.json({ success: true, data: user, selfieCheck: selfieOutcome });
   } catch (err: any) {
     console.error('[KYC] Driving license verification failed:', err.response?.data ?? err.message);
     res.status(502).json({ error: 'Could not verify the driving license right now. Please try again shortly.' });

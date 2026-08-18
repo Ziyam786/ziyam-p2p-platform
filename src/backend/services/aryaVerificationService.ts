@@ -97,6 +97,76 @@ export async function checkImageQuality(docBase64: string): Promise<AryaImageQua
   return res.data;
 }
 
+export function isLivenessConfigured(): boolean {
+  return Boolean(config.arya.livenessToken);
+}
+export function isDeepfakeConfigured(): boolean {
+  return Boolean(config.arya.deepfakeToken);
+}
+export function isFaceMatchConfigured(): boolean {
+  return Boolean(config.arya.faceMatchToken);
+}
+
+export interface AryaLivenessResult {
+  req_id: string;
+  success: boolean;
+  doc_type?: string;
+  error_message?: string;
+  doc_json?: Record<string, unknown>;
+}
+
+/** Confirms a selfie is a live photo of a real person, not a photo-of-a-photo/screen replay. */
+export async function checkLiveness(docBase64: string): Promise<AryaLivenessResult> {
+  if (!isLivenessConfigured()) throw new Error('Arya liveness check is not configured (ARYA_LIVENESS_TOKEN)');
+  const res = await client(config.arya.livenessToken).post('/v1/liveness', {
+    req_id: uuidv4(),
+    doc_base64: docBase64,
+  });
+  return res.data;
+}
+
+export interface AryaDeepfakeResult {
+  req_id: string;
+  success: boolean;
+  doc_type?: string;
+  error_message?: string;
+  result?: string;
+}
+
+/** Flags AI-generated/manipulated selfie images. */
+export async function checkDeepfake(docBase64: string, docType: 'image' | 'video' = 'image'): Promise<AryaDeepfakeResult> {
+  if (!isDeepfakeConfigured()) throw new Error('Arya deepfake detection is not configured (ARYA_DEEPFAKE_TOKEN)');
+  const res = await client(config.arya.deepfakeToken).post('/v1/deepfake-detection/image', {
+    req_id: uuidv4(),
+    doc_base64: docBase64,
+    doc_type: docType,
+    isIOS: false,
+    orientation: 0,
+  });
+  return res.data;
+}
+
+export interface AryaFaceMatchResult {
+  req_id: string;
+  success: boolean;
+  error_message?: string;
+  score?: number;
+  match?: boolean;
+}
+
+/** Compares two face photos (e.g. a selfie against a driving-license photo) to confirm the same person. */
+export async function verifyFaceMatch(img1Base64: string, img2Base64: string): Promise<AryaFaceMatchResult> {
+  if (!isFaceMatchConfigured()) throw new Error('Arya face match is not configured (ARYA_FACE_MATCH_TOKEN)');
+  const res = await client(config.arya.faceMatchToken).post('/v1/verifyFace', {
+    req_id: uuidv4(),
+    doc1_type: 'image',
+    doc2_type: 'image',
+    img1_base64: img1Base64,
+    img2_base64: img2Base64,
+  });
+  return res.data;
+}
+
 /** Fetches an already-uploaded file (local disk or an absolute URL, e.g. Firebase Storage) and returns its base64 content. */
 export async function fetchDocAsBase64(urlOrPath: string): Promise<string> {
   if (/^https?:\/\//i.test(urlOrPath)) {

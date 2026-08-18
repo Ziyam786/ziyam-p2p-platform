@@ -32,6 +32,7 @@ function KycInner() {
   const [digilockerLoading, setDigilockerLoading] = useState(false);
   const [checkingDigilocker, setCheckingDigilocker] = useState(false);
   const [dlFile, setDlFile] = useState<File | null>(null);
+  const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [dlVerifying, setDlVerifying] = useState(false);
 
   // Returned from DigiLocker's consent screen — poll for the final status.
@@ -65,14 +66,20 @@ function KycInner() {
   }
 
   async function handleVerifyDrivingLicense() {
-    if (!dlFile) return;
+    if (!dlFile && !selfieFile) return;
     setDlVerifying(true);
     try {
-      const docBase64 = await fileToBase64(dlFile);
-      await kycApi.verifyDrivingLicense(docBase64);
+      const docBase64 = dlFile ? await fileToBase64(dlFile) : undefined;
+      const selfieBase64 = selfieFile ? await fileToBase64(selfieFile) : undefined;
+      const res = await kycApi.verifyDrivingLicense(docBase64, selfieBase64);
       await refresh();
       setDlFile(null);
-      show('Driving license verified!', 'success');
+      setSelfieFile(null);
+      if (res.selfieCheck.attempted) {
+        show(res.selfieCheck.passed ? 'Driving license and identity verified!' : "License verified, but the selfie didn't pass our identity checks — try a clearer, well-lit photo.", res.selfieCheck.passed ? 'success' : 'error');
+      } else {
+        show('Driving license verified!', 'success');
+      }
     } catch (err: any) {
       show(err.message ?? 'Could not verify driving license', 'error');
     } finally {
@@ -216,9 +223,30 @@ function KycInner() {
         </p>
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
           {user.isDrivingLicenseVerified ? (
-            <div className="text-center py-8">
+            <div className="text-center py-6">
               <span className="text-4xl block mb-3">✅</span>
               <p className="font-bold text-gray-900">Driving license verified</p>
+              {user.isSelfieVerified ? (
+                <p className="text-sm text-emerald-600 mt-2">✓ Identity confirmed via selfie match</p>
+              ) : (
+                <div className="mt-5 max-w-xs mx-auto space-y-3 text-left">
+                  <p className="text-xs text-gray-400 text-center">Add a selfie for stronger identity verification (optional)</p>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(e) => setSelfieFile(e.target.files?.[0] ?? null)}
+                    className="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-amber-50 file:text-amber-700 file:font-semibold"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyDrivingLicense}
+                    disabled={!selfieFile || dlVerifying}
+                    className="w-full text-xs font-semibold border-2 border-gray-900 text-gray-900 px-4 py-2.5 rounded-xl transition hover:bg-gray-900 hover:text-white disabled:opacity-50"
+                  >
+                    {dlVerifying ? 'Checking…' : 'Verify Selfie'}
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
@@ -228,6 +256,15 @@ function KycInner() {
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   onChange={(e) => setDlFile(e.target.files?.[0] ?? null)}
+                  className="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-amber-50 file:text-amber-700 file:font-semibold"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Add a selfie for stronger identity verification (optional)</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => setSelfieFile(e.target.files?.[0] ?? null)}
                   className="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-amber-50 file:text-amber-700 file:font-semibold"
                 />
               </label>
