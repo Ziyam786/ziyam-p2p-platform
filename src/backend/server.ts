@@ -86,7 +86,7 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '8mb' }));
 
 // Cookie-auth API: parse cookies and run double-submit CSRF on the same
 // router before any route handler. PayU is mounted on `app` above this, so

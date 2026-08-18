@@ -10,12 +10,31 @@ import { useAuth } from '../../../lib/auth-context';
 import { useToast } from '../../../components/Toast';
 import { kycApi } from '../../../lib/api';
 
-function fileToBase64(file: File): Promise<string> {
+function fileToCompressedBase64(file: File): Promise<string> {
+  const MAX_EDGE = 1600;
+  const JPEG_QUALITY = 0.72;
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve((reader.result as string).split(',')[1] ?? '');
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const scale = Math.min(1, MAX_EDGE / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Could not prepare that photo. Try another image.'));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve((canvas.toDataURL('image/jpeg', JPEG_QUALITY).split(',')[1]) ?? '');
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Could not read that photo. Use a JPEG or PNG.'));
+    };
+    img.src = objectUrl;
   });
 }
 
@@ -74,7 +93,7 @@ function KycInner() {
       const res = await kycApi.startDigilocker();
       window.location.href = res.data.url;
     } catch (err: any) {
-      show(err.message ?? 'Could not start DigiLocker verification', 'error');
+      show(err.message ?? 'Could not start DigiLocker. Try Aadhaar OTP or a photo of your ID.', 'error');
       setDigilockerLoading(false);
     }
   }
@@ -83,8 +102,8 @@ function KycInner() {
     if (!dlFile && !selfieFile) return;
     setDlVerifying(true);
     try {
-      const docBase64 = dlFile ? await fileToBase64(dlFile) : undefined;
-      const selfieBase64 = selfieFile ? await fileToBase64(selfieFile) : undefined;
+      const docBase64 = dlFile ? await fileToCompressedBase64(dlFile) : undefined;
+      const selfieBase64 = selfieFile ? await fileToCompressedBase64(selfieFile) : undefined;
       const res = await kycApi.verifyDrivingLicense(docBase64, selfieBase64);
       await refresh();
       setDlFile(null);
@@ -113,7 +132,7 @@ function KycInner() {
       setAadhaarRef(res.referenceId ?? null);
       show(res.message ?? 'OTP sent to the mobile number linked to your Aadhaar', 'success');
     } catch (err: any) {
-      show(err.message ?? 'Could not send Aadhaar OTP', 'error');
+        show(err.message ?? 'Could not send OTP. If this keeps happening, try a photo of your ID instead.', 'error');
     } finally {
       setAadhaarSending(false);
     }
@@ -134,7 +153,7 @@ function KycInner() {
       show('Identity verified via Aadhaar OTP', 'success');
       if (afterKyc && res.data.isKycVerified && user?.isDrivingLicenseVerified) router.push(afterKyc);
     } catch (err: any) {
-      show(err.message ?? 'Aadhaar verification failed', 'error');
+      show(err.message ?? 'Could not verify that OTP. Try again or use a photo of your ID.', 'error');
     } finally {
       setAadhaarVerifying(false);
     }
@@ -144,8 +163,8 @@ function KycInner() {
     if (!idFile) return;
     setIdVerifying(true);
     try {
-      const docBase64 = await fileToBase64(idFile);
-      const selfieBase64 = idSelfieFile ? await fileToBase64(idSelfieFile) : undefined;
+      const docBase64 = await fileToCompressedBase64(idFile);
+      const selfieBase64 = idSelfieFile ? await fileToCompressedBase64(idSelfieFile) : undefined;
       const res = await kycApi.verifyIdentityDocument(docBase64, selfieBase64);
       await refresh();
       setIdFile(null);
@@ -153,7 +172,7 @@ function KycInner() {
       if (res.selfieCheck.attempted && !res.selfieCheck.passed) {
         show('ID verified, but the selfie did not pass liveness/face-match — try a clearer, well-lit photo.', 'error');
       } else {
-        show('Identity verified via Arya.ai', 'success');
+        show('Identity verified', 'success');
         if (afterKyc && res.data.isKycVerified && user?.isDrivingLicenseVerified) router.push(afterKyc);
       }
     } catch (err: any) {
@@ -165,13 +184,25 @@ function KycInner() {
 
   if (!user) return null;
 
+  const isHost = user.role === 'SELF_HOST' || user.role === 'FLEET_OPERATOR';
+
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       <Navbar />
       <div className="max-w-xl mx-auto px-4 pt-28 pb-24">
-        <h1 className="text-2xl font-extrabold text-gray-900 mb-1">KYC Verification</h1>
+        <h1 className="text-2xl font-extrabold text-gray-900 mb-1">
+          {isHost ? 'Verify to list your car' : 'Verify to book a car'}
+        </h1>
+        <p className="text-gray-500 text-sm mb-3">
+          {isHost
+            ? 'Guests need to know who they are renting from. We confirm your identity before your listing can go live, and we confirm your driving licence if you also drive.'
+            : 'We confirm your identity and driving licence before your first trip, so hosts know who is picking up their car.'}
+        </p>
         <p className="text-gray-500 text-sm mb-8">
-          Identity KYC is Aadhaar OTP (UIDAI via Sandbox) or a photo of your ID through Arya.ai. Driving-licence and selfie checks run through Arya.ai. Required before booking or listing a car. We do not store your Aadhaar number. If we keep an Aadhaar photo for review, Arya masks the number first.
+          We do not store your 12-digit Aadhaar number. If we keep an Aadhaar photo for review, the number is masked first.{' '}
+          <Link href="/privacy" className="font-semibold text-gray-900 underline underline-offset-2">
+            How we use this data
+          </Link>
         </p>
 
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
@@ -207,7 +238,7 @@ function KycInner() {
                     identityPath === 'photo' ? 'border-amber-500 bg-amber-50 text-amber-800' : 'border-gray-100 text-gray-500'
                   }`}
                 >
-                  Photo ID (Arya.ai)
+                  Photo of ID
                 </button>
               </div>
 
@@ -288,7 +319,7 @@ function KycInner() {
                     disabled={!idFile || idVerifying}
                     className="w-full btn-gradient disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none text-white font-bold py-3 rounded-xl transition"
                   >
-                    {idVerifying ? 'Verifying with Arya.ai…' : 'Verify identity'}
+                    {idVerifying ? 'Checking your photo…' : 'Verify identity'}
                   </button>
                 </>
               )}
@@ -309,7 +340,7 @@ function KycInner() {
 
         <h2 className="text-lg font-bold text-gray-900 mt-8 mb-1">Driving License</h2>
         <p className="text-gray-500 text-sm mb-4">
-          Separate from identity KYC above — confirms you actually hold a valid license, required before renting a car.
+          Separate from identity above — we need a valid licence before you can drive a Ziyam car.
         </p>
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
           {user.isDrivingLicenseVerified ? (
