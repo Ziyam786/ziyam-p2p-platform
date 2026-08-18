@@ -82,6 +82,12 @@ export class PayoutEngine {
 
     const { platformFee, hostPayout } = await this.splitAmount(booking.totalAmount, booking.deliveryFeeAmount);
 
+    // Any accumulated flat fees (e.g. the ₹149 dispute-support resolution
+    // fee — see DisputeSupportRequest) come off whichever payout reaches
+    // the host first, this one or a fast issue-report reimbursement.
+    const feeDeducted = Math.min(host.pendingFeeDeductions, hostPayout);
+    const netPayout = hostPayout - feeDeducted;
+
     let scheduledFor: Date;
     if (host?.payoutFrequency === 'WEEKLY') {
       scheduledFor = this.nextWeeklyPayoutRun();
@@ -90,17 +96,21 @@ export class PayoutEngine {
       scheduledFor = new Date(booking.endTime.getTime() + settlementHours * 60 * 60 * 1000);
     }
 
-    return prisma.payoutLedger.create({
+    const ledger = await prisma.payoutLedger.create({
       data: {
         bookingId: booking.id,
         hostId: booking.car.ownerId,
         grossAmount: booking.totalAmount,
         ziyamCut: platformFee,
-        netPayout: hostPayout,
+        netPayout,
         status: PayoutStatus.HELD_IN_ESCROW,
         scheduledFor,
       },
     });
+    if (feeDeducted > 0) {
+      await prisma.user.update({ where: { id: host.id }, data: { pendingFeeDeductions: { decrement: feeDeducted } } });
+    }
+    return ledger;
   }
 
   /**
@@ -220,7 +230,7 @@ export class PayoutEngine {
           depositStatus: BookingDepositStatus.HELD,
           depositAmount: { gt: 0 },
           endTime: { lte: cutoff },
-          damageClaim: null,
+          damageClaims: { none: {} },
         },
       });
 
@@ -378,6 +388,85 @@ export class PayoutEngine {
       return updated;
     } catch (error: any) {
       await prisma.payoutLedger.update({ where: { id: ledgerId }, data: { status: PayoutStatus.FAILED } });
+      throw error;
+    }
+  }
+
+  /**
+   * Called immediately after an admin approves a trip issue report (see
+   * damageClaim.routes.ts's PATCH /admin/issue-reports/:id) — a SEPARATE
+   * payout from the trip's regular one (createEscrowLedger already ran at
+   * trip completion), reimbursing the host for the approved amount. Real
+   * money movement, not just a status flag: this is what "amount will be
+   * sent to host" in the reimbursement flow actually means.
+   *
+   * PayU's Split API splits ONE specific original transaction's held funds,
+   * so the approved amount is split into up to two legs depending on where
+   * it came from: the portion within the deposit splits from the booking's
+   * original transaction (the deposit was charged as part of it); any
+   * portion beyond the deposit splits from the guest's separate excess
+   * charge (see /issue-reports/:id/pay-excess), which must have actually
+   * succeeded first.
+   */
+  static async fastPayoutForIssueReport(claimId: string): Promise<void> {
+    const claim = await prisma.damageClaim.findUnique({ where: { id: claimId }, include: { booking: { include: { car: true } } } });
+    if (!claim || claim.approvedDeduction == null) throw new Error('Claim has no approved amount to pay out');
+    const { booking } = claim;
+
+    const host = await prisma.user.findUnique({ where: { id: booking.car.ownerId } });
+    if (!host) throw new Error('Host account not found');
+    this.assertPayoutEligible(host);
+    if (!host.payoutAccountId || !host.bankAccountVerified) throw new Error('Host has no linked, Sandbox-verified payout account');
+    if (!booking.paymentIntentId) throw new Error('Underlying booking has no PayU transaction id to split from');
+
+    const depositPortion = Math.min(claim.approvedDeduction, booking.depositAmount);
+    const excessPortion = Math.max(0, claim.approvedDeduction - booking.depositAmount);
+    if (excessPortion > 0 && !claim.excessChargePaidAt) {
+      throw new Error('The excess amount beyond the deposit has not been collected from the guest yet');
+    }
+    if (excessPortion > 0 && !claim.excessChargePaymentIntentId) {
+      throw new Error('Excess charge has no PayU transaction id to split from');
+    }
+
+    let netPayout = claim.approvedDeduction;
+    const feeDeducted = Math.min(host.pendingFeeDeductions, netPayout);
+    netPayout -= feeDeducted;
+
+    const ledger = await prisma.payoutLedger.create({
+      data: {
+        bookingId: booking.id,
+        hostId: host.id,
+        grossAmount: claim.approvedDeduction,
+        ziyamCut: 0, // full reimbursement passes through — Ziyam takes no cut on a damage/expense repayment
+        netPayout,
+        status: PayoutStatus.HELD_IN_ESCROW,
+        scheduledFor: new Date(),
+      },
+    });
+    if (feeDeducted > 0) {
+      await prisma.user.update({ where: { id: host.id }, data: { pendingFeeDeductions: { decrement: feeDeducted } } });
+    }
+
+    try {
+      const txnIds: string[] = [];
+      if (depositPortion > 0) {
+        const amount = excessPortion > 0 ? depositPortion : netPayout; // single-leg case carries the fee-adjusted total
+        txnIds.push(await this.executeBankTransfer(host.payoutAccountId, amount, booking.paymentIntentId, ledger.id));
+      }
+      if (excessPortion > 0) {
+        const amount = depositPortion > 0 ? netPayout - depositPortion : netPayout;
+        txnIds.push(await this.executeBankTransfer(host.payoutAccountId, amount, claim.excessChargePaymentIntentId!, ledger.id));
+      }
+      await prisma.payoutLedger.update({ where: { id: ledger.id }, data: { status: PayoutStatus.SETTLED, payoutTxnId: txnIds.join(',') } });
+      await notify(
+        host.id,
+        'PAYOUT_SETTLED',
+        'Reimbursement sent',
+        `₹${netPayout.toLocaleString()} for your approved trip issue report has been sent to your linked account.`,
+        '/host/dashboard'
+      );
+    } catch (error: any) {
+      await prisma.payoutLedger.update({ where: { id: ledger.id }, data: { status: PayoutStatus.FAILED } });
       throw error;
     }
   }

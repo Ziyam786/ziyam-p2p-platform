@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import Navbar from '../../../../components/Navbar';
@@ -12,10 +12,18 @@ import { useAuth } from '../../../../lib/auth-context';
 import TripChat from '../../../../components/TripChat';
 import ConditionPhotoCapture from '../../../../components/ConditionPhotoCapture';
 import { HostDeliverySharePanel, GuestDeliveryTracker } from '../../../../components/LiveDeliveryTracker';
-import { bookingsApi, reviewsApi } from '../../../../lib/api';
-import type { Booking, BookingConditionPhoto, PhotoAngle, TripStage } from '../../../../lib/types';
+import { bookingsApi, reviewsApi, damageClaimApi } from '../../../../lib/api';
+import type { Booking, BookingConditionPhoto, DamageClaim, PhotoAngle, TripStage } from '../../../../lib/types';
 
 const REQUIRED_PHOTO_ANGLES: PhotoAngle[] = ['FRONT', 'REAR', 'LEFT', 'RIGHT'];
+const ISSUE_TYPE_LABELS: Record<string, string> = { DAMAGE: 'Damage', FUEL: 'Fuel', FASTAG: 'FASTag' };
+const ISSUE_STATUS_STYLES: Record<string, string> = {
+  SUBMITTED: 'bg-amber-100 text-amber-700',
+  UNDER_REVIEW: 'bg-blue-100 text-blue-700',
+  BILL_SUBMITTED: 'bg-purple-100 text-purple-700',
+  APPROVED: 'bg-red-100 text-red-700',
+  REJECTED: 'bg-emerald-100 text-emerald-700',
+};
 
 function computeCancelPreview(trip: Booking) {
   const hoursUntilStart = (new Date(trip.startTime).getTime() - Date.now()) / (60 * 60 * 1000);
@@ -54,6 +62,10 @@ function TripDetailInner() {
   const [otpInput, setOtpInput] = useState('');
   const [washRequested, setWashRequested] = useState(false);
   const [conditionPhotos, setConditionPhotos] = useState<BookingConditionPhoto[]>([]);
+  const [issueReports, setIssueReports] = useState<DamageClaim[]>([]);
+  const [payingExcessId, setPayingExcessId] = useState<string | null>(null);
+  const [excessCheckout, setExcessCheckout] = useState<{ url: string; fields: Record<string, string> } | null>(null);
+  const excessFormRef = useRef<HTMLFormElement>(null);
   const [capturingStage, setCapturingStage] = useState<TripStage | null>(null);
   const [cancelPreviewOpen, setCancelPreviewOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
@@ -79,6 +91,22 @@ function TripDetailInner() {
 
   useEffect(load, [params.id]);
   useEffect(() => { loadConditionPhotos(params.id); }, [params.id]);
+  useEffect(() => {
+    damageClaimApi.list(params.id).then((res) => setIssueReports(res.data)).catch(() => {});
+  }, [params.id]);
+
+  async function handlePayExcess(claimId: string) {
+    setPayingExcessId(claimId);
+    try {
+      const res = await damageClaimApi.payExcess(claimId);
+      setExcessCheckout(res.data);
+      // Wait a tick for the hidden form's inputs to render with the new fields, then submit.
+      requestAnimationFrame(() => excessFormRef.current?.submit());
+    } catch (err: any) {
+      show(err.message ?? 'Could not start payment', 'error');
+      setPayingExcessId(null);
+    }
+  }
 
   useEffect(() => {
     if (trip?.status === 'CONFIRMED' && isHost) {
@@ -453,6 +481,75 @@ function TripDetailInner() {
 
         {trip.status === 'CONFIRMED' && trip.deliveryRequested && !isHost && (
           <GuestDeliveryTracker bookingId={trip.id} hostName={trip.car?.owner?.fullName} hostAvatarUrl={trip.car?.owner?.avatarUrl} />
+        )}
+
+        {/* Hidden auto-submitting form to PayU's hosted checkout for an issue report's excess amount. */}
+        <form ref={excessFormRef} action={excessCheckout?.url} method="POST" className="hidden">
+          {excessCheckout && Object.entries(excessCheckout.fields).map(([name, value]) => (
+            <input key={name} type="hidden" name={name} value={value} />
+          ))}
+        </form>
+
+        {issueReports.length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-6">
+            <h2 className="font-bold text-gray-900 mb-4">Trip Issue Reports</h2>
+            <div className="space-y-4">
+              {issueReports.map((r) => (
+                <div key={r.id} className="border border-gray-100 rounded-xl p-4">
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <span className="text-xs font-bold text-gray-700">{ISSUE_TYPE_LABELS[r.type]}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${ISSUE_STATUS_STYLES[r.status]}`}>{r.status.replace(/_/g, ' ')}</span>
+                  </div>
+                  <p className="text-sm text-gray-700 mb-2">{r.description}</p>
+                  {r.images.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {r.images.map((url) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={url} src={url} alt="" className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-400">Estimated: ₹{r.estimatedCost.toLocaleString('en-IN')}</p>
+
+                  {r.resolutionBillUrl && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Repair Bill (for transparency)</p>
+                      <a href={r.resolutionBillUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-amber-600 hover:underline font-semibold">
+                        View bill — ₹{r.resolutionBillAmount?.toLocaleString('en-IN')}
+                      </a>
+                      {r.resolutionPhotos.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {r.resolutionPhotos.map((url) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img key={url} src={url} alt="" className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {r.status === 'APPROVED' && r.approvedDeduction != null && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <p className="text-xs text-gray-600">
+                        Approved for <span className="font-bold">₹{r.approvedDeduction.toLocaleString('en-IN')}</span>
+                        {r.excessChargeAmount ? ` — ₹${r.excessChargeAmount.toLocaleString('en-IN')} beyond your deposit` : ' — covered fully by your deposit'}
+                      </p>
+                      {r.excessChargeAmount && !r.excessChargePaidAt && !isHost && (
+                        <button
+                          onClick={() => handlePayExcess(r.id)}
+                          disabled={payingExcessId === r.id}
+                          className="mt-2 btn-gradient disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none text-white text-xs font-bold px-4 py-2 rounded-xl transition"
+                        >
+                          {payingExcessId === r.id ? 'Starting payment…' : `Pay ₹${r.excessChargeAmount.toLocaleString('en-IN')}`}
+                        </button>
+                      )}
+                      {r.excessChargePaidAt && <p className="text-xs text-emerald-600 mt-1">✓ Paid</p>}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {['ACTIVE', 'COMPLETED'].includes(trip.status) && conditionPhotos.length > 0 && (

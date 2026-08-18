@@ -102,8 +102,18 @@ enum BookingDepositStatus {
 enum DamageClaimStatus {
   SUBMITTED
   UNDER_REVIEW
+  // Host has uploaded the real repair bill + photos (see resolutionBillUrl
+  // on DamageClaim) — queued for admin's fast-track review, distinct from
+  // UNDER_REVIEW's plain-estimate stage.
+  BILL_SUBMITTED
   APPROVED
   REJECTED
+}
+
+enum TripIssueType {
+  DAMAGE
+  FUEL
+  FASTAG
 }
 
 enum RefundRequestType {
@@ -167,6 +177,11 @@ model User {
   isSuspended         Boolean   @default(false)
   kycDocUrl           String?
   payoutAccountId     String? // Linked Razorpay Route / Stripe Connect sub-account
+  // Flat fees owed that get deducted from this host's NEXT payout rather than
+  // charged directly (hosts have no stored payment method for direct debits)
+  // — currently only the ₹149 dispute-support resolution fee (see
+  // DisputeSupportRequest, applied in payoutEngine.ts's createEscrowLedger).
+  pendingFeeDeductions Float @default(0)
 
   // Sandbox (sandbox.co.in) Aadhaar eKYC + bank penny-drop verification
   aadhaarVerifiedName String?
@@ -247,6 +262,8 @@ model User {
   assignedOpsTrips        OpsTrip[]         @relation("AgentOpsTrips")
   reportedDamageClaims    DamageClaim[]     @relation("ReportedDamageClaims")
   reviewedDamageClaims    DamageClaim[]     @relation("ReviewedDamageClaims")
+  requestedDisputeSupport DisputeSupportRequest[] @relation("RequestedDisputeSupport")
+  assignedDisputeSupport  DisputeSupportRequest[] @relation("AssignedDisputeSupport")
   completedRefundRequests RefundRequest[]   @relation("CompletedRefundRequests")
   conditionPhotosUploaded BookingConditionPhoto[]
   kycVerificationLogs     KycVerificationLog[]
@@ -541,7 +558,8 @@ model Booking {
   reservationPaidAt    DateTime?
   reservationDeadline  DateTime? // reservationPaidAt + 24h; auto-cancel cron watches this (payoutEngine.ts)
 
-  damageClaim       DamageClaim?
+  damageClaims           DamageClaim[]
+  disputeSupportRequests DisputeSupportRequest[]
   refundRequests    RefundRequest[]
   conditionPhotos   BookingConditionPhoto[]
 
@@ -584,7 +602,7 @@ model Booking {
   esignStatus      String? // sign_initiated | sign_pending | sign_in_progress | sign_complete
   esignDownloadUrl String?
   paymentIntentId  String?
-  payoutLedger     PayoutLedger?
+  payoutLedgers    PayoutLedger[]
   review           Review?
   serviceRequests  ServiceRequest[]
   messages         Message[]
@@ -597,13 +615,16 @@ model Booking {
   @@index([customerId])
 }
 
-// A host's report of trip damage against a completed booking's security
-// deposit — one per booking (1:1; amend via adminNotes rather than filing a
-// second claim). Replaces the old "contact support" advisory-only flow.
+// Either party's report of a trip issue (damage/fuel/FASTag) against a
+// completed booking's security deposit — a booking can have several (one
+// per issue; previously hard-capped at exactly one ever, which blocked a
+// guest from ever reporting anything alongside a host's damage claim).
+// Replaces the old "contact support" advisory-only flow.
 model DamageClaim {
   id                String            @id @default(uuid())
-  bookingId         String            @unique
+  bookingId         String
   booking           Booking           @relation(fields: [bookingId], references: [id])
+  type              TripIssueType     @default(DAMAGE)
   reportedById      String
   reportedBy        User              @relation("ReportedDamageClaims", fields: [reportedById], references: [id])
   description       String
@@ -618,6 +639,59 @@ model DamageClaim {
   reviewedByAdmin   User?             @relation("ReviewedDamageClaims", fields: [reviewedByAdminId], references: [id])
   createdAt         DateTime          @default(now())
   resolvedAt        DateTime?
+
+  // Host-uploaded real repair bill + photos (see PATCH /issue-reports/:id/submit-bill)
+  // — the "host is guided to the garage, repair is done, host uploads the
+  // accurate bill" step. Distinct from the initial self-reported estimate/images above.
+  resolutionBillUrl     String?
+  resolutionBillAmount  Float?
+  resolutionPhotos      String[] @default([])
+  resolutionSubmittedAt DateTime?
+
+  // When approvedDeduction exceeds the booking's held deposit, the excess is
+  // charged to the guest as a real PayU transaction (see
+  // /api/payments/payu/issue-report-callback) rather than silently going
+  // uncharged, which is what happened before this field existed.
+  excessChargeAmount          Float?
+  excessChargePaymentIntentId String?
+  excessChargePaidAt          DateTime?
+
+  @@index([status])
+  @@index([bookingId])
+}
+
+enum DisputeSupportChannel {
+  PHONE
+  WHATSAPP
+}
+
+enum DisputeSupportStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+// Phone/WhatsApp-routed human dispute mediation — gated to STANDARD/PREMIUM
+// protectionPlan bookings only (see POST /bookings/:id/dispute-support).
+// Reuses the same agent-assignment pool as OpsTrip (agentAssignment.ts's
+// pickLeastLoadedAgent) rather than a separate staffing system. The flat
+// host fee only applies once a request is actually resolved through this
+// channel — hosts have no stored payment method for direct charges, so it's
+// deducted from their next computed payout rather than billed separately.
+model DisputeSupportRequest {
+  id              String                @id @default(uuid())
+  bookingId       String
+  booking         Booking               @relation(fields: [bookingId], references: [id])
+  requestedById   String
+  requestedBy     User                  @relation("RequestedDisputeSupport", fields: [requestedById], references: [id])
+  channel         DisputeSupportChannel
+  status          DisputeSupportStatus  @default(OPEN)
+  assignedAgentId String?
+  assignedAgent   User?                 @relation("AssignedDisputeSupport", fields: [assignedAgentId], references: [id])
+  hostFeeAmount   Float                 @default(149)
+  hostFeeCharged  Boolean               @default(false)
+  createdAt       DateTime              @default(now())
+  resolvedAt      DateTime?
 
   @@index([status])
 }
@@ -681,7 +755,10 @@ model Message {
 
 model PayoutLedger {
   id           String       @id @default(uuid())
-  bookingId    String       @unique
+  // No longer @unique — a booking can have more than one ledger entry now:
+  // the regular trip payout (createEscrowLedger/confirmFleetReceipt) plus
+  // any fast-track issue-report reimbursements (fastPayoutForIssueReport).
+  bookingId    String
   booking      Booking      @relation(fields: [bookingId], references: [id])
   hostId       String
   host         User         @relation(fields: [hostId], references: [id])

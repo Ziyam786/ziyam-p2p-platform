@@ -80,9 +80,9 @@ export const adminApi = {
   payouts: (status?: string) => get<{ success: true; data: AdminPayout[] }>(`/admin/payouts${status ? `?status=${status}` : ''}`),
   retryPayout: (id: string) => post<{ success: true; data: AdminPayout }>(`/admin/payouts/${id}/retry`),
 
-  damageClaims: (status?: string) => get<{ success: true; data: AdminDamageClaim[] }>(`/admin/damage-claims${status ? `?status=${status}` : ''}`),
+  damageClaims: (status?: string) => get<{ success: true; data: AdminDamageClaim[] }>(`/admin/issue-reports${status ? `?status=${status}` : ''}`),
   resolveDamageClaim: (id: string, data: { status: 'APPROVED' | 'REJECTED'; approvedDeduction?: number; adminNotes?: string }) =>
-    patch<{ success: true; message: string }>(`/admin/damage-claims/${id}`, data),
+    patch<{ success: true; message: string }>(`/admin/issue-reports/${id}`, data),
 
   refundRequests: (status?: string) => get<{ success: true; data: AdminRefundRequest[] }>(`/admin/refund-requests${status ? `?status=${status}` : ''}`),
   completeRefundRequest: (id: string) => patch<{ success: true; data: AdminRefundRequest }>(`/admin/refund-requests/${id}/complete`),
