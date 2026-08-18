@@ -2,29 +2,28 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
 import CarOnboardingWizard, { wizardValuesToPayload, type WizardValues } from '../../../components/CarOnboardingWizard';
 import { useAuth } from '../../../lib/auth-context';
 import { useToast } from '../../../components/Toast';
-import { kycApi, hostApi } from '../../../lib/api';
+import { hostApi } from '../../../lib/api';
 
 const STEPS = ['Create account', 'Verify KYC', 'List your first car', 'Done'];
 
 const HOST_BENEFITS = [
   { icon: '💰', title: 'Highest payout in the market', desc: 'Keep 70% of every booking — no hidden platform cuts.' },
   { icon: '🔒', title: 'Payout guaranteed', desc: 'Fleet-managed cars follow our N+1 policy — your payout is never left waiting on a stalled booking.' },
-  { icon: '🪪', title: 'Every guest is verified', desc: 'DigiLocker or Aadhaar KYC is mandatory before anyone can book — no exceptions.' },
+  { icon: '🪪', title: 'Every guest is verified', desc: 'Aadhaar OTP or photo-ID KYC is mandatory before anyone can book — no exceptions.' },
   { icon: '🎛️', title: 'You stay in control', desc: 'Set your own price, availability, and delivery terms. Pause anytime.' },
 ];
 
 export default function HostOnboardingPage() {
-  const { user, loading, refresh } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
   const { show } = useToast();
 
-  const [docUrl, setDocUrl] = useState('');
-  const [kycSubmitting, setKycSubmitting] = useState(false);
   const [carSubmitting, setCarSubmitting] = useState(false);
   const [hasCar, setHasCar] = useState(false);
   const [checkingCars, setCheckingCars] = useState(true);
@@ -38,20 +37,6 @@ export default function HostOnboardingPage() {
   }, [user]);
 
   const currentStep = !user ? 0 : !user.isKycVerified ? 1 : !hasCar ? 2 : 3;
-
-  async function submitKyc(e: React.FormEvent) {
-    e.preventDefault();
-    setKycSubmitting(true);
-    try {
-      await kycApi.submit(docUrl);
-      await refresh();
-      show('KYC verified!', 'success');
-    } catch (err: any) {
-      show(err.message ?? 'KYC failed', 'error');
-    } finally {
-      setKycSubmitting(false);
-    }
-  }
 
   async function submitCar(values: WizardValues) {
     if (!user) return;
@@ -130,19 +115,15 @@ export default function HostOnboardingPage() {
         ) : currentStep === 1 ? (
           <div className="bg-white rounded-2xl border border-gray-100 p-8">
             <p className="font-bold text-gray-900 mb-2">Verify your identity</p>
-            <p className="text-gray-500 text-sm mb-6">Required before you can list a vehicle, for lessee safety and trust.</p>
-            <form onSubmit={submitKyc} className="space-y-4">
-              <input
-                required
-                value={docUrl}
-                onChange={(e) => setDocUrl(e.target.value)}
-                placeholder="https://digilocker.gov.in/documents/..."
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-              />
-              <button type="submit" disabled={kycSubmitting} className="w-full btn-gradient disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none text-white font-bold py-3 rounded-xl transition">
-                {kycSubmitting ? 'Verifying…' : 'Verify Instantly'}
-              </button>
-            </form>
+            <p className="text-gray-500 text-sm mb-6">
+              Identity KYC is mandatory before you can list a vehicle. Use Aadhaar OTP or upload a photo of your ID — do not paste a document link.
+            </p>
+            <Link
+              href="/account/kyc?next=/host/onboarding"
+              className="block w-full text-center btn-gradient text-white font-bold py-3 rounded-xl transition"
+            >
+              Continue with KYC
+            </Link>
           </div>
         ) : currentStep === 2 ? (
           <div className="bg-white rounded-2xl border border-gray-100 p-6">

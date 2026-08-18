@@ -89,14 +89,11 @@ export const config = {
     },
   },
 
-  // Arya.ai (Aurionpro) — document extraction/verification (see
-  // aryaVerificationService.ts). Separate products, separate tokens: KYC doc
-  // extraction (PAN/Aadhaar/Voter ID/Passport/Driving Licence) used for
-  // driving-license verification; RC Verification for vehicle registration
-  // certificates; image-quality-checker to reject unusable photos before
-  // spending a call on the others; liveness/deepfake/face-match harden the
-  // selfie step of driving-license verification (confirms a live, real,
-  // matching person — not just a valid document).
+  // Arya.ai (Aurionpro) — all KYC document checks (see aryaVerificationService.ts).
+  // Separate products, separate tokens: KYC v2 extraction for identity
+  // (Aadhaar/PAN/Voter/Passport) and driving licence; RC Verification;
+  // image-quality; liveness/deepfake/face-match; aadhaar-mask for stored
+  // copies; cyber-threat-detection for submitted document URLs.
   arya: {
     kycToken: process.env.ARYA_KYC_TOKEN ?? '',
     rcToken: process.env.ARYA_RC_TOKEN ?? '',
@@ -104,6 +101,8 @@ export const config = {
     livenessToken: process.env.ARYA_LIVENESS_TOKEN ?? '',
     deepfakeToken: process.env.ARYA_DEEPFAKE_TOKEN ?? '',
     faceMatchToken: process.env.ARYA_FACE_MATCH_TOKEN ?? '',
+    aadhaarMaskToken: process.env.ARYA_AADHAAR_MASK_TOKEN ?? '',
+    cyberThreatToken: process.env.ARYA_CYBER_THREAT_TOKEN ?? '',
   },
 
   ai: {

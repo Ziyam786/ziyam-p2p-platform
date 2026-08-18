@@ -17,7 +17,7 @@ function client(token: string) {
   return axios.create({
     baseURL: BASE_URL,
     headers: { token, 'content-type': 'application/json' },
-    timeout: 20000,
+    timeout: 30000,
   });
 }
 
@@ -107,6 +107,90 @@ export function isFaceMatchConfigured(): boolean {
   return Boolean(config.arya.faceMatchToken);
 }
 
+export function isAadhaarMaskConfigured(): boolean {
+  return Boolean(config.arya.aadhaarMaskToken);
+}
+
+export function isCyberThreatConfigured(): boolean {
+  return Boolean(config.arya.cyberThreatToken);
+}
+
+export interface AryaAadhaarMaskResult {
+  status: boolean;
+  masked_aadhar?: string;
+  error_message?: string;
+  source?: string;
+  number_of_pages?: number;
+  doc_type?: string;
+}
+
+function stripBase64Payload(value: string): string {
+  const comma = value.indexOf(',');
+  return comma >= 0 && /^data:/i.test(value) ? value.slice(comma + 1) : value;
+}
+
+/** Redacts the Aadhaar number on a document photo. Extraction should run on the original; persist only this masked copy. */
+export async function maskAadhaarDocument(docBase64: string, docType: 'image' | 'pdf' = 'image'): Promise<AryaAadhaarMaskResult> {
+  if (!isAadhaarMaskConfigured()) throw new Error('Arya Aadhaar mask is not configured (ARYA_AADHAAR_MASK_TOKEN)');
+  const res = await client(config.arya.aadhaarMaskToken).post('/v1/aadhaar-mask', {
+    doc_type: docType,
+    doc_base64: docBase64,
+    req_id: uuidv4(),
+  });
+  return res.data;
+}
+
+export function maskedAadhaarBuffer(result: AryaAadhaarMaskResult): Buffer | undefined {
+  if (!result.status || typeof result.masked_aadhar !== 'string' || result.masked_aadhar.length === 0) return undefined;
+  return Buffer.from(stripBase64Payload(result.masked_aadhar), 'base64');
+}
+
+export interface AryaCyberThreatResult {
+  req_id?: string;
+  success: boolean;
+  data?: Record<string, unknown>;
+  error_message?: string;
+}
+
+/** URL reputation check before fetching a caller-supplied document URL. */
+export async function checkCyberThreat(url: string): Promise<AryaCyberThreatResult> {
+  if (!isCyberThreatConfigured()) throw new Error('Arya cyber threat detection is not configured (ARYA_CYBER_THREAT_TOKEN)');
+  const res = await client(config.arya.cyberThreatToken).post('/v1/cyber-threat-detection', {
+    url,
+    req_id: uuidv4(),
+  });
+  return res.data;
+}
+
+export function isLikelyAadhaarKyc(result: AryaKycResult): boolean {
+  return /aadhaar|aadhar|uidai/.test(JSON.stringify(result).toLowerCase());
+}
+
+function cyberThreatLooksUnsafe(result: AryaCyberThreatResult): boolean {
+  if (!result.success) return true;
+  const blob = JSON.stringify(result.data ?? {}).toLowerCase();
+  if (/"safe"\s*:\s*false/.test(blob)) return true;
+  if (/"malicious"\s*:\s*true/.test(blob)) return true;
+  if (/"is_threat"\s*:\s*true/.test(blob)) return true;
+  if (/"phishing"\s*:\s*true/.test(blob)) return true;
+  if (/"unsafe"\s*:\s*true/.test(blob)) return true;
+  return false;
+}
+
+/**
+ * Optional URL scan: if ARYA_CYBER_THREAT_TOKEN is set, reject unsafe
+ * document URLs before we fetch them. No-ops when unconfigured.
+ */
+export async function assertSafeDocumentUrl(url: string): Promise<void> {
+  if (!isCyberThreatConfigured()) return;
+  const threat = await checkCyberThreat(url);
+  if (cyberThreatLooksUnsafe(threat)) {
+    const err = new Error(threat.error_message || 'That document URL failed our security check. Upload the file instead.') as Error & { status?: number };
+    err.status = 422;
+    throw err;
+  }
+}
+
 export interface AryaLivenessResult {
   req_id: string;
   success: boolean;
@@ -165,6 +249,35 @@ export async function verifyFaceMatch(img1Base64: string, img2Base64: string): P
     img2_base64: img2Base64,
   });
   return res.data;
+}
+
+/** Pulls a human name out of Arya's loosely-typed extraction payload. */
+export function pickExtractedName(result: AryaKycResult): string | undefined {
+  const pools: unknown[] = [result.extracted_data, result.verify_data, result];
+  for (const pool of pools) {
+    if (!pool || typeof pool !== 'object') continue;
+    const rec = pool as Record<string, unknown>;
+    for (const key of Object.keys(rec)) {
+      if (!/name/i.test(key) || /file|doc|type|error|req/i.test(key)) continue;
+      const value = rec[key];
+      if (typeof value === 'string' && value.trim().length > 1) return value.trim();
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Optional pre-check: if ARYA_IMAGE_QUALITY_TOKEN is set, reject blurry/blank
+ * photos before spending a KYC/RC extraction call. No-ops when unconfigured.
+ */
+export async function assertReadableDocument(docBase64: string): Promise<void> {
+  if (!isImageQualityConfigured()) return;
+  const qc = await checkImageQuality(docBase64);
+  if (!qc.success) {
+    const err = new Error(qc.error_message || 'That photo is too blurry or unreadable. Please retake it in good light.') as Error & { status?: number };
+    err.status = 422;
+    throw err;
+  }
 }
 
 /** Fetches an already-uploaded file (local disk or an absolute URL, e.g. Firebase Storage) and returns its base64 content. */

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { Suspense, useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
 import ProtectedRoute from '../../../components/ProtectedRoute';
@@ -21,14 +22,25 @@ function fileToBase64(file: File): Promise<string> {
 function KycInner() {
   const { user, refresh } = useAuth();
   const { show } = useToast();
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const [aadhaar, setAadhaar] = useState('');
-  const [otp, setOtp] = useState('');
-  const [referenceId, setReferenceId] = useState<string | number | undefined>();
-  const [stubbed, setStubbed] = useState(false);
-  const [stage, setStage] = useState<'aadhaar' | 'otp'>('aadhaar');
-  const [sending, setSending] = useState(false);
-  const [verifying, setVerifying] = useState(false);
+  const nextRaw = searchParams.get('next');
+  const nextPath = nextRaw && nextRaw.startsWith('/') && !nextRaw.startsWith('//') ? nextRaw : null;
+  const [storedNext] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    const stored = sessionStorage.getItem('kycNext');
+    return stored && stored.startsWith('/') && !stored.startsWith('//') ? stored : null;
+  });
+  const afterKyc = nextPath ?? storedNext;
+  const [identityPath, setIdentityPath] = useState<'aadhaar' | 'photo'>('aadhaar');
+  const [aadhaarNumber, setAadhaarNumber] = useState('');
+  const [aadhaarOtp, setAadhaarOtp] = useState('');
+  const [aadhaarRef, setAadhaarRef] = useState<string | number | null>(null);
+  const [aadhaarSending, setAadhaarSending] = useState(false);
+  const [aadhaarVerifying, setAadhaarVerifying] = useState(false);
+  const [idFile, setIdFile] = useState<File | null>(null);
+  const [idSelfieFile, setIdSelfieFile] = useState<File | null>(null);
+  const [idVerifying, setIdVerifying] = useState(false);
   const [digilockerLoading, setDigilockerLoading] = useState(false);
   const [checkingDigilocker, setCheckingDigilocker] = useState(false);
   const [dlFile, setDlFile] = useState<File | null>(null);
@@ -45,6 +57,7 @@ function KycInner() {
         if (res.data.isKycVerified) {
           await refresh();
           show('Verified via DigiLocker!', 'success');
+          if (afterKyc) router.push(afterKyc);
         } else {
           show('DigiLocker verification is still pending — try again in a moment.', 'error');
         }
@@ -57,6 +70,7 @@ function KycInner() {
   async function handleStartDigilocker() {
     setDigilockerLoading(true);
     try {
+      if (nextPath) sessionStorage.setItem('kycNext', nextPath);
       const res = await kycApi.startDigilocker();
       window.location.href = res.data.url;
     } catch (err: any) {
@@ -87,44 +101,69 @@ function KycInner() {
     }
   }
 
-  if (!user) return null;
-
-  async function handleSendOtp(e: React.FormEvent) {
-    e.preventDefault();
-    setSending(true);
+  async function handleSendAadhaarOtp() {
+    const digits = aadhaarNumber.replace(/\D/g, '');
+    if (!/^\d{12}$/.test(digits)) {
+      show('Enter your 12-digit Aadhaar number', 'error');
+      return;
+    }
+    setAadhaarSending(true);
     try {
-      const res = await kycApi.sendAadhaarOtp(aadhaar);
-      setStubbed(res.stubbed);
-      setReferenceId(res.referenceId);
-      if (res.stubbed) {
-        // No Sandbox key configured — skip straight to instant verification.
-        await kycApi.verifyAadhaarOtp(undefined, undefined);
-        await refresh();
-        show('KYC verified instantly (Sandbox not configured)', 'success');
+      const res = await kycApi.sendAadhaarOtp(digits);
+      setAadhaarRef(res.referenceId ?? null);
+      show(res.message ?? 'OTP sent to the mobile number linked to your Aadhaar', 'success');
+    } catch (err: any) {
+      show(err.message ?? 'Could not send Aadhaar OTP', 'error');
+    } finally {
+      setAadhaarSending(false);
+    }
+  }
+
+  async function handleVerifyAadhaarOtp() {
+    if (!/^\d{6}$/.test(aadhaarOtp)) {
+      show('Enter the 6-digit OTP', 'error');
+      return;
+    }
+    setAadhaarVerifying(true);
+    try {
+      const res = await kycApi.verifyAadhaarOtp(aadhaarRef ?? undefined, aadhaarOtp);
+      await refresh();
+      setAadhaarNumber('');
+      setAadhaarOtp('');
+      setAadhaarRef(null);
+      show('Identity verified via Aadhaar OTP', 'success');
+      if (afterKyc && res.data.isKycVerified && user?.isDrivingLicenseVerified) router.push(afterKyc);
+    } catch (err: any) {
+      show(err.message ?? 'Aadhaar verification failed', 'error');
+    } finally {
+      setAadhaarVerifying(false);
+    }
+  }
+
+  async function handleVerifyIdentity() {
+    if (!idFile) return;
+    setIdVerifying(true);
+    try {
+      const docBase64 = await fileToBase64(idFile);
+      const selfieBase64 = idSelfieFile ? await fileToBase64(idSelfieFile) : undefined;
+      const res = await kycApi.verifyIdentityDocument(docBase64, selfieBase64);
+      await refresh();
+      setIdFile(null);
+      setIdSelfieFile(null);
+      if (res.selfieCheck.attempted && !res.selfieCheck.passed) {
+        show('ID verified, but the selfie did not pass liveness/face-match — try a clearer, well-lit photo.', 'error');
       } else {
-        setStage('otp');
-        show('OTP sent to your Aadhaar-linked mobile number', 'success');
+        show('Identity verified via Arya.ai', 'success');
+        if (afterKyc && res.data.isKycVerified && user?.isDrivingLicenseVerified) router.push(afterKyc);
       }
     } catch (err: any) {
-      show(err.message ?? 'Failed to send OTP', 'error');
+      show(err.message ?? 'Could not verify ID', 'error');
     } finally {
-      setSending(false);
+      setIdVerifying(false);
     }
   }
 
-  async function handleVerifyOtp(e: React.FormEvent) {
-    e.preventDefault();
-    setVerifying(true);
-    try {
-      await kycApi.verifyAadhaarOtp(referenceId, otp);
-      await refresh();
-      show('KYC verified!', 'success');
-    } catch (err: any) {
-      show(err.message ?? 'OTP verification failed', 'error');
-    } finally {
-      setVerifying(false);
-    }
-  }
+  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
@@ -132,7 +171,7 @@ function KycInner() {
       <div className="max-w-xl mx-auto px-4 pt-28 pb-24">
         <h1 className="text-2xl font-extrabold text-gray-900 mb-1">KYC Verification</h1>
         <p className="text-gray-500 text-sm mb-8">
-          One-time Aadhaar identity verification, powered by Sandbox eKYC. Required before booking or listing a car.
+          Identity KYC is Aadhaar OTP (UIDAI via Sandbox) or a photo of your ID through Arya.ai. Driving-licence and selfie checks run through Arya.ai. Required before booking or listing a car. We do not store your Aadhaar number. If we keep an Aadhaar photo for review, Arya masks the number first.
         </p>
 
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
@@ -142,78 +181,129 @@ function KycInner() {
             <div className="text-center py-8">
               <span className="text-4xl block mb-3">✅</span>
               <p className="font-bold text-gray-900">You're verified</p>
-              <p className="text-sm text-gray-500 mt-1">Your identity has been confirmed. You're all set to book or list cars.</p>
+              <p className="text-sm text-gray-500 mt-1">Your identity has been confirmed. Complete driving-licence verification below if you still need it.</p>
+              {afterKyc && (
+                <Link href={afterKyc} className="inline-block mt-4 btn-gradient text-white font-bold px-5 py-2.5 rounded-xl text-sm">
+                  Continue onboarding
+                </Link>
+              )}
             </div>
-          ) : stage === 'aadhaar' ? (
-            <form onSubmit={handleSendOtp} className="space-y-5">
-              <div className="flex gap-3">
-                <span className="text-xs font-semibold bg-amber-50 text-amber-600 px-3 py-1.5 rounded-full">🪪 Aadhaar eKYC</span>
+          ) : (
+            <div className="space-y-5">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIdentityPath('aadhaar')}
+                  className={`text-xs font-bold py-2.5 rounded-xl border-2 transition ${
+                    identityPath === 'aadhaar' ? 'border-amber-500 bg-amber-50 text-amber-800' : 'border-gray-100 text-gray-500'
+                  }`}
+                >
+                  Aadhaar OTP
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIdentityPath('photo')}
+                  className={`text-xs font-bold py-2.5 rounded-xl border-2 transition ${
+                    identityPath === 'photo' ? 'border-amber-500 bg-amber-50 text-amber-800' : 'border-gray-100 text-gray-500'
+                  }`}
+                >
+                  Photo ID (Arya.ai)
+                </button>
               </div>
 
+              {identityPath === 'aadhaar' ? (
+                <>
+                  <p className="text-sm text-gray-600">OTP is sent to the mobile number linked to your Aadhaar. We do not store your Aadhaar number.</p>
+                  <label className="block">
+                    <span className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">12-digit Aadhaar number</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      maxLength={12}
+                      value={aadhaarNumber}
+                      onChange={(e) => setAadhaarNumber(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm tracking-widest"
+                      placeholder="XXXXXXXXXXXX"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleSendAadhaarOtp}
+                    disabled={aadhaarNumber.length !== 12 || aadhaarSending}
+                    className="w-full btn-gradient disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none text-white font-bold py-3 rounded-xl transition"
+                  >
+                    {aadhaarSending ? 'Sending OTP…' : aadhaarRef ? 'Resend OTP' : 'Send Aadhaar OTP'}
+                  </button>
+                  {aadhaarRef != null && (
+                    <>
+                      <label className="block">
+                        <span className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">6-digit OTP</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          maxLength={6}
+                          value={aadhaarOtp}
+                          onChange={(e) => setAadhaarOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm tracking-widest"
+                          placeholder="••••••"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleVerifyAadhaarOtp}
+                        disabled={aadhaarOtp.length !== 6 || aadhaarVerifying}
+                        className="w-full btn-gradient disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none text-white font-bold py-3 rounded-xl transition"
+                      >
+                        {aadhaarVerifying ? 'Verifying…' : 'Verify Aadhaar OTP'}
+                      </button>
+                    </>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-600">Upload a clear photo of your Aadhaar, PAN, voter ID, or passport. Optionally add a selfie so we can run liveness, deepfake, and face-match checks.</p>
+                  <label className="block">
+                    <span className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">ID document photo</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={(e) => setIdFile(e.target.files?.[0] ?? null)}
+                      className="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-amber-50 file:text-amber-700 file:font-semibold"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Selfie (optional, recommended)</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={(e) => setIdSelfieFile(e.target.files?.[0] ?? null)}
+                      className="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-amber-50 file:text-amber-700 file:font-semibold"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleVerifyIdentity}
+                    disabled={!idFile || idVerifying}
+                    className="w-full btn-gradient disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none text-white font-bold py-3 rounded-xl transition"
+                  >
+                    {idVerifying ? 'Verifying with Arya.ai…' : 'Verify identity'}
+                  </button>
+                </>
+              )}
+              <div className="flex items-center gap-3 text-xs text-gray-400">
+                <div className="flex-1 h-px bg-gray-100" /> or <div className="flex-1 h-px bg-gray-100" />
+              </div>
               <button
                 type="button"
                 onClick={handleStartDigilocker}
                 disabled={digilockerLoading}
                 className="w-full border-2 border-gray-900 text-gray-900 font-bold py-3 rounded-xl transition hover:bg-gray-900 hover:text-white disabled:opacity-50"
               >
-                {digilockerLoading ? 'Redirecting to DigiLocker…' : '🔒 Verify Instantly via DigiLocker'}
+                {digilockerLoading ? 'Redirecting to DigiLocker…' : 'Verify via DigiLocker instead'}
               </button>
-              <div className="flex items-center gap-3 text-xs text-gray-400">
-                <div className="flex-1 h-px bg-gray-100" /> or verify with OTP <div className="flex-1 h-px bg-gray-100" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                  Aadhaar Number
-                </label>
-                <input
-                  required
-                  inputMode="numeric"
-                  pattern="[0-9]{12}"
-                  maxLength={12}
-                  value={aadhaar}
-                  onChange={(e) => setAadhaar(e.target.value.replace(/\D/g, ''))}
-                  placeholder="12-digit Aadhaar number"
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  We'll send a one-time password to your Aadhaar-linked mobile number via UIDAI.
-                </p>
-              </div>
-              <button
-                type="submit"
-                disabled={sending || aadhaar.length !== 12}
-                className="w-full btn-gradient disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none text-white font-bold py-3 rounded-xl transition"
-              >
-                {sending ? 'Sending OTP…' : 'Send OTP'}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleVerifyOtp} className="space-y-5">
-              <p className="text-sm text-gray-600">Enter the 6-digit OTP sent to your Aadhaar-linked mobile number.</p>
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">OTP</label>
-                <input
-                  required
-                  inputMode="numeric"
-                  pattern="[0-9]{6}"
-                  maxLength={6}
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                  placeholder="6-digit OTP"
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-center tracking-[0.5em] font-bold focus:outline-none focus:ring-2 focus:ring-amber-400"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={verifying || otp.length !== 6}
-                className="w-full btn-gradient disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none text-white font-bold py-3 rounded-xl transition"
-              >
-                {verifying ? 'Verifying…' : 'Verify OTP'}
-              </button>
-              <button type="button" onClick={() => setStage('aadhaar')} className="w-full text-xs text-gray-400 hover:text-gray-600 font-semibold">
-                ← Change Aadhaar number
-              </button>
-            </form>
+            </div>
           )}
         </div>
 

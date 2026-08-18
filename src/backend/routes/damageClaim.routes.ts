@@ -257,7 +257,7 @@ router.patch('/admin/issue-reports/:id', requireAuth, requireRole('ADMIN'), asyn
     );
     // Whole approved amount fits inside the deposit — pay the host now, no guest action needed.
     PayoutEngine.fastPayoutForIssueReport(id).catch((err) => {
-      console.error(`[ISSUE REPORT] Fast payout failed for claim ${id}:`, err.message);
+      console.error('[ISSUE REPORT] Fast payout failed for claim %s:', id, err.message);
     });
   }
 

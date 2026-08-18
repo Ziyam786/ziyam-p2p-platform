@@ -4,6 +4,14 @@ on:
   push:
     branches: [main]
 
+# Least-privilege default for the GITHUB_TOKEN: this workflow only checks
+# out code and deploys over raw SSH using its own key secret — it never
+# calls the GitHub API to write anything (no commits, packages, or
+# security-event uploads like codeql.yml/codacy.yml do), so read-only
+# access to repo contents is all it needs.
+permissions:
+  contents: read
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -27,16 +35,21 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
+          command_timeout: 30m
           script: |
-            # Prune first — every deploy rebuilds 4 full images (backend/
-            # frontend/admin/agent) with nothing ever cleaning up old layers,
-            # so disk fills silently over enough deploys. Pruning before
-            # git pull/docker build guarantees there's room for them to run
-            # at all if the disk is already tight; pruning again after
-            # catches what this build just orphaned. Never touches named
-            # volumes (postgres_data/uploads_data) — that requires the
-            # explicit --volumes flag, which is deliberately not passed here.
-            sudo docker system prune -af
+            # Prune first, but WITHOUT -a: -a also drops every image's build
+            # cache, forcing docker compose --build to redo npm ci/npm run
+            # build from scratch for all 4 images on every single deploy —
+            # that's what blew through appleboy/ssh-action's 10m default
+            # command_timeout and killed the frontend build mid-step. The -f
+            # prune here only clears stopped containers/networks/dangling
+            # layers, a safety net if disk is tight, while leaving cache
+            # from the last build's images intact for docker to reuse.
+            # Full reclamation still happens below, after the new images
+            # are built and their predecessors are genuinely unused. Never
+            # touches named volumes (postgres_data/uploads_data) — that
+            # requires the explicit --volumes flag, deliberately not passed here.
+            sudo docker system prune -f
             cd /var/www/ziyam
             git pull origin main
             cd devops

@@ -134,7 +134,7 @@ export function initializeYieldAutoApplyCron() {
         const result = await applyYieldSuggestion(car.id);
         console.log(`[YIELD AUTO-APPLY] Car ${car.id}: ₹${result.currentPrice} -> ₹${result.suggestedPrice} (${result.tier})`);
       } catch (error: any) {
-        console.error(`[YIELD AUTO-APPLY ERROR] Car ${car.id}:`, error.message);
+        console.error('[YIELD AUTO-APPLY ERROR] Car %s:', car.id, error.message);
       }
     }
   });

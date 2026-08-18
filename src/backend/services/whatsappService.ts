@@ -15,7 +15,7 @@ export function isWhatsappConfigured(): boolean {
 
 export async function sendTemplateWhatsapp(phoneNumber: string, templateName: string, variables: Record<string, string>): Promise<void> {
   if (!isWhatsappConfigured()) {
-    console.log(`[WHATSAPP] (not configured — logged only) To ${phoneNumber}, template ${templateName}:`, variables);
+    console.log('[WHATSAPP] (not configured — logged only) To %s, template %s:', phoneNumber, templateName, variables);
     return;
   }
 
@@ -34,6 +34,6 @@ export async function sendTemplateWhatsapp(phoneNumber: string, templateName: st
       { headers: { authkey: config.whatsapp.authKey, 'Content-Type': 'application/json' } }
     );
   } catch (err: any) {
-    console.error(`[WHATSAPP] MSG91 send failed for ${phoneNumber}:`, err.response?.data ?? err.message);
+    console.error('[WHATSAPP] MSG91 send failed for %s:', phoneNumber, err.response?.data ?? err.message);
   }
 }

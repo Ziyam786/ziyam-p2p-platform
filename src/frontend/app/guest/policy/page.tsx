@@ -47,7 +47,7 @@ export default function GuestPolicyPage() {
               <ul className="space-y-1.5 list-disc list-inside">
                 <li>21 years or older</li>
                 <li>Valid driving licence, held for 1+ year</li>
-                <li>Completed KYC verification via DigiLocker/Aadhaar — mandatory before your first booking</li>
+                <li>Completed KYC verification (Aadhaar OTP or Arya.ai photo ID + driving licence) — mandatory before your first booking</li>
               </ul>
             </Card>
           </Section>

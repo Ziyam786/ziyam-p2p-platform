@@ -6,7 +6,7 @@ export default function PrivacyPage() {
   return (
     <LegalPage
       title="Privacy Policy"
-      updated="4 June 2026"
+      updated="18 August 2026"
       sections={[
         {
           heading: '1. Overview',
@@ -19,7 +19,7 @@ export default function PrivacyPage() {
           heading: '2. Information We Collect',
           body: [
             'Account data: full name, date of birth, gender, email, phone number, address, and login credentials.',
-            'Identity verification: your driving licence, and Aadhaar verified through DigiLocker or Aadhaar eKYC — we only ever receive a masked Aadhaar detail or a verified name from these providers, never your full Aadhaar number or biometric data.',
+            'Identity verification: you may complete Aadhaar OTP eKYC (UIDAI, via Sandbox.co.in). In that case we send your 12-digit Aadhaar number only to Sandbox to generate and verify the OTP; we do not store the Aadhaar number. Alternatively you may upload a photo of your Aadhaar, PAN, voter ID, or passport, plus a photo of your driving licence. Those documents (and optional liveness selfies) are checked by Arya.ai (Aurionpro Solutions) for extraction, image quality, liveness, deepfake detection, and face match. When the document is an Aadhaar card, Arya also produces a masked copy (Aadhaar number redacted) if we keep an image for review. Vehicle registration certificates uploaded by hosts are likewise checked by Arya. Document URLs submitted for verification are scanned with Arya cyber-threat detection before we fetch them. We store verification outcomes (pass/fail, extracted name, match flags) rather than unmasked ID images. DigiLocker remains an optional identity path where configured.',
             'Extended verification: where you sign a rental agreement, we capture your signature; a liveness selfie and an alternate contact number may also be collected as part of profile verification.',
             'Booking information: reservation dates, pickup and drop-off details, protection plan selection, co-driver details (if added), and trip history.',
             'Vehicle location & telematics: for the subset of vehicles fitted with our IoT hardware, we can retrieve on-demand GPS location, odometer, and fuel level, and issue remote lock/unlock commands during an active trip — used for keyless access, safety, and theft recovery. Cars without this hardware are not remotely tracked.',
@@ -32,7 +32,7 @@ export default function PrivacyPage() {
         {
           heading: '3. How We Collect Information',
           body: [
-            'We collect information directly from you during registration, KYC verification, and booking; automatically through the app and, where fitted, vehicle telematics hardware; and from our verification and payment partners — DigiLocker and Aadhaar eKYC providers for identity checks, and PayU for payments. Where legally required, we may also receive information from government databases, insurers, or law enforcement.',
+            'We collect information directly from you during registration, KYC verification, and booking; automatically through the app and, where fitted, vehicle telematics hardware; and from our verification and payment partners — Sandbox.co.in for Aadhaar OTP eKYC, Arya.ai for document extraction, Aadhaar masking, liveness, vehicle-RC, and URL security checks, DigiLocker (where you choose that path), and PayU for payments. Where legally required, we may also receive information from government databases, insurers, or law enforcement.',
           ],
         },
         {
@@ -56,13 +56,13 @@ export default function PrivacyPage() {
         {
           heading: '7. Cookies',
           body: [
-            'We use a single, essential session cookie to keep you signed in, plus lightweight, privacy-respecting analytics to understand how the platform is used. We do not use advertising trackers or sell data to advertisers. See our full Cookie Policy for details.',
+            'We use a single, essential session cookie to keep you signed in, Mixpanel analytics and session replay on the renter site, plus other strictly operational cookies. We do not use advertising trackers or sell data to advertisers. See our full Cookie Policy for details.',
           ],
         },
         {
           heading: '8. How We Share Your Information',
           body: [
-            'We share information with the partners needed to run the platform: PayU for payments, our identity-verification providers for KYC (DigiLocker and Aadhaar eKYC), our telematics hardware vendor, fleet operators (only for cars under their management), insurers, and cloud/infrastructure providers. Where legally required, we may share information with government authorities, regulators, courts, or law enforcement. We do not sell personal data.',
+            'We share information with the partners needed to run the platform: PayU for payments; Sandbox.co.in for Aadhaar OTP eKYC; Arya.ai (Aurionpro) for KYC document extraction, Aadhaar masking, image-quality, liveness, deepfake detection, face match, vehicle RC verification, and URL cyber-threat checks; DigiLocker where you opt into that identity path; Mixpanel for product analytics and session replay on the renter site; our telematics hardware vendor; fleet operators (only for cars under their management); insurers; and cloud/infrastructure providers. Where legally required, we may share information with government authorities, regulators, courts, or law enforcement. We do not sell personal data.',
           ],
         },
         {

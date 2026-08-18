@@ -11,7 +11,7 @@ const CATEGORIES: { title: string; icon: string; faqs: { q: string; a: string }[
     icon: '🚗',
     faqs: [
       { q: 'What are the requirements to list my car?', a: 'Your car must be under 6 years old with under 50,000 km, roadworthy, and carry a valid RC, active comprehensive insurance, and a valid PUC certificate. See our full Host Policy for details.' },
-      { q: 'How long does verification take?', a: 'KYC verification is usually instant via DigiLocker. Vehicle document verification (RC/insurance/PUC) typically completes within a few hours of upload.' },
+      { q: 'How long does verification take?', a: 'Aadhaar OTP or photo-ID KYC usually completes within minutes; driving-licence and vehicle RC are auto-checked by Arya.ai. Insurance/PUC still go to admin review.' },
       { q: "What's the difference between Self-Hosted and Fleet-Managed?", a: "Self-Hosted means you handle your own bookings and handovers. Fleet-Managed means a Ziyam fleet operator manages guest handovers and logistics for you — useful if you own multiple cars or don't have time to manage bookings yourself." },
       { q: 'Can I list more than one car?', a: 'Yes — there\'s no limit. Hosts with multiple vehicles often opt into Fleet-Managed for the cars they don\'t have time to personally manage.' },
     ],
@@ -72,7 +72,7 @@ const CATEGORIES: { title: string; icon: string; faqs: { q: string; a: string }[
     title: 'Trust & Safety',
     icon: '🪪',
     faqs: [
-      { q: 'How are lessees verified?', a: 'Every lessee completes mandatory KYC via DigiLocker/Aadhaar before their first booking — the same verification standard hosts go through.' },
+      { q: 'How are lessees verified?', a: 'Every lessee completes mandatory identity KYC (Aadhaar OTP or Arya.ai photo ID) plus driving-licence verification, with optional liveness selfie, before their first booking — the same standard hosts go through.' },
       { q: 'How does the trip handover code work?', a: "When a trip starts, a 4-digit code is shown only in your host app. The guest must enter this code to mark the trip complete when returning the car — this proves an actual in-person handover happened, protecting both sides from disputes." },
       { q: 'What if a guest tries to arrange a rental outside the platform?', a: "Don't. Off-platform arrangements void KYC verification, payout protection, and support coverage for that trip — if something goes wrong, you're on your own." },
       { q: 'Can I refer other hosts?', a: 'Yes — you earn ₹500 in platform credit once someone you refer completes their first trip.' },

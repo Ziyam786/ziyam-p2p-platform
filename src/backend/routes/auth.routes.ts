@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, Role } from '@prisma/client';
+import { randomInt } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
 import { hashPassword, comparePassword } from '../utils/password';
@@ -7,6 +8,7 @@ import { signAuthToken } from '../utils/jwt';
 import { requireAuth } from '../middleware/auth';
 import { requestOtp, verifyOtp } from '../services/otpService';
 import { authRateLimiter } from '../middleware/rateLimit';
+import { issueCsrfCookie, CSRF_COOKIE_NAME } from '../middleware/csrf';
 import { normalizeEmail, isValidEmail, normalizePhone, isValidPhone, normalizeFullName } from '../utils/validation';
 import { verifyCredentials } from '@supabase/server/core';
 import { isFirebaseConfigured, getAuthClient, mintFirebaseCustomToken } from '../services/firebaseAdmin';
@@ -58,8 +60,12 @@ function toPublicUser<T extends Record<string, unknown>>(user: T): Pick<T, keyof
   return picked;
 }
 
+const REFERRAL_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
 function randomCode() {
-  return Math.random().toString(36).slice(2, 6).toUpperCase();
+  let out = '';
+  for (let i = 0; i < 4; i++) out += REFERRAL_ALPHABET[randomInt(REFERRAL_ALPHABET.length)];
+  return out;
 }
 
 /** Generates a short, human-shareable referral code, retrying on the rare collision. */
@@ -137,6 +143,7 @@ router.post('/auth/signup', authRateLimiter, async (req: Request, res: Response)
 
   const token = signAuthToken({ userId: user.id, role: user.role });
   res.cookie(config.auth.cookieName, token, cookieOptions());
+  issueCsrfCookie(res);
   res.status(201).json({ success: true, data: user });
 });
 
@@ -184,6 +191,7 @@ router.post('/auth/login', authRateLimiter, async (req: Request, res: Response) 
 
   const token = signAuthToken({ userId: user.id, role: user.role });
   res.cookie(config.auth.cookieName, token, cookieOptions());
+  issueCsrfCookie(res);
 
   res.json({ success: true, data: toPublicUser(user) });
 });
@@ -232,6 +240,7 @@ router.post('/auth/otp/verify', authRateLimiter, async (req: Request, res: Respo
 
   const token = signAuthToken({ userId: user.id, role: user.role });
   res.cookie(config.auth.cookieName, token, cookieOptions());
+  issueCsrfCookie(res);
 
   res.json({ success: true, data: toPublicUser(user) });
 });
@@ -278,6 +287,7 @@ router.post('/auth/oauth/supabase', authRateLimiter, async (req: Request, res: R
 
   const token = signAuthToken({ userId: user.id, role: user.role });
   res.cookie(config.auth.cookieName, token, cookieOptions());
+  issueCsrfCookie(res);
   res.json({ success: true, data: toPublicUser(user) });
 });
 
@@ -318,6 +328,7 @@ router.post('/auth/oauth/firebase', authRateLimiter, async (req: Request, res: R
 
   const token = signAuthToken({ userId: user.id, role: user.role });
   res.cookie(config.auth.cookieName, token, cookieOptions());
+  issueCsrfCookie(res);
   res.json({ success: true, data: toPublicUser(user) });
 });
 
@@ -341,10 +352,18 @@ router.get('/auth/firebase-custom-token', requireAuth, async (req: Request, res:
 
 router.post('/auth/logout', (_req: Request, res: Response) => {
   res.clearCookie(config.auth.cookieName, { path: '/' });
+  res.clearCookie(CSRF_COOKIE_NAME, { path: '/' });
   res.json({ success: true });
 });
 
 router.get('/auth/me', requireAuth, async (req: Request, res: Response) => {
+  // Backfills the CSRF cookie for sessions that predate the CSRF gate — every
+  // frontend calls this on app load before any mutation is possible, so this
+  // is the one place a pre-existing session (cookie already set, but from
+  // before this cookie existed) picks it up transparently, with no forced
+  // re-login. Cheap to re-issue unconditionally on every call.
+  issueCsrfCookie(res);
+
   let user = await prisma.user.findUnique({
     where: { id: req.user!.userId },
     select: PUBLIC_USER_SELECT,

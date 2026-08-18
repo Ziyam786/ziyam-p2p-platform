@@ -1,4 +1,12 @@
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// The domain's first label deliberately excludes '.' (unlike the local part
+// and final segment, which both still allow it, e.g. "first.last@mail.co.uk").
+// Without that exclusion, the two [^\s@]+ groups on either side of the
+// literal \. both accept '.', so a long domain-like string with no valid
+// match (e.g. many "a." pairs followed by a stray '@') gives the backtracker
+// O(n) different places to try the literal dot, each retried against an
+// O(n) failure — O(n²) on attacker-controlled input, since this runs
+// unauthenticated on every signup/login attempt.
+const EMAIL_RE = /^[^\s@]+@[^\s@.]+\.[^\s@]+$/;
 
 /** Trims and lowercases an email so the same address always maps to the same stored/looked-up value, regardless of how a user typed it. */
 export function normalizeEmail(email: unknown): string {

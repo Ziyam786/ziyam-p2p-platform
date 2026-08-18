@@ -9,7 +9,7 @@ const STEPS = [
     title: 'Search Your City',
     desc: 'Enter your city, pickup date & drop-off date to see real-time available cars from verified hosts near you.',
     detail: [
-      'Choose from 30+ cities across India',
+      'Currently operating in Bengaluru',
       'Filter by category, fuel type, and transmission',
       'View exact pickup location on map',
     ],
@@ -18,11 +18,11 @@ const STEPS = [
     step: '02',
     icon: '📋',
     title: 'Instant KYC Verification',
-    desc: 'Complete a one-time digital KYC using your Aadhaar and Driving Licence via DigiLocker. It takes under 2 minutes.',
+    desc: 'Complete a one-time KYC: Aadhaar OTP, or upload your ID. Then upload your driving licence. Arya.ai verifies licence photos, optional liveness selfie, and face match.',
     detail: [
-      'Aadhaar-based identity verification',
-      'Driving licence validation via DigiLocker',
-      'KYC approved instantly — no re-submission',
+      'Aadhaar OTP eKYC, or PAN / voter ID / passport / Aadhaar photo via Arya.ai',
+      'Driving licence extraction and selfie liveness',
+      'KYC approved when the chosen identity check and licence check pass',
     ],
   },
   {

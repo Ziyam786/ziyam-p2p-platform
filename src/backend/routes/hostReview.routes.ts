@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, BookingStatus, RefundRequestType, CancelledBy } from '@prisma/client';
+import { randomInt } from 'crypto';
 import { requireAuth } from '../middleware/auth';
 import { notify } from '../services/notificationService';
 import { startLeaseAgreementEsign } from '../services/leaseAgreementEsign';
@@ -36,7 +37,7 @@ router.post('/bookings/:id/host-review', requireAuth, async (req: Request, res: 
   if (decision === 'ACCEPT') {
     // Generated now, well before pickup, so it's ready the moment the host
     // needs to show it — same 4-digit shape as endOtp (see /booking/:id/start).
-    const startOtp = String(Math.floor(1000 + Math.random() * 9000));
+    const startOtp = String(randomInt(1000, 10000));
     const updated = await prisma.booking.update({
       where: { id },
       data: { status: BookingStatus.CONFIRMED, hostReviewDeadline: null, startOtp },
@@ -46,13 +47,13 @@ router.post('/bookings/:id/host-review', requireAuth, async (req: Request, res: 
     // Best-effort, same as the original trigger site — never blocks the response.
     if (isSetuConfigured()) {
       startLeaseAgreementEsign(id).catch((err) => {
-        console.error(`[HOST REVIEW] Auto eSign trigger failed for booking ${id}:`, err.response?.data ?? err.message);
+        console.error('[HOST REVIEW] Auto eSign trigger failed for booking %s:', id, err.response?.data ?? err.message);
       });
     }
     // Best-effort SMS/WhatsApp/email to both parties — this is "the car is
     // booked" moment (see bookingConfirmationService.ts). Never blocks the response.
     sendBookingConfirmedNotifications(id).catch((err) => {
-      console.error(`[HOST REVIEW] Booking-confirmed notifications failed for booking ${id}:`, err.message);
+      console.error('[HOST REVIEW] Booking-confirmed notifications failed for booking %s:', id, err.message);
     });
     return res.json({ success: true, data: updated });
   }

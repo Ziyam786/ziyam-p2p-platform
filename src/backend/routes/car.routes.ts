@@ -7,7 +7,7 @@ import { pickFleetOperator } from '../services/fleetOperatorAssignment';
 import { esignApi, isSetuConfigured } from '../services/setuService';
 import { renderFleetPartnerAgreementPdf } from '../services/fleetPartnerAgreementPdf';
 import { computeYieldSuggestion, applyYieldSuggestion } from '../services/yieldEngine';
-import { isRcVerificationConfigured, extractRcDocument, fetchDocAsBase64 } from '../services/aryaVerificationService';
+import { isRcVerificationConfigured, extractRcDocument, fetchDocAsBase64, assertReadableDocument } from '../services/aryaVerificationService';
 import { safeErrorMessage } from '../utils/errorResponse';
 import { config } from '../config';
 
@@ -378,6 +378,7 @@ router.post('/cars/:id/verify-rc', requireAuth, async (req: Request, res: Respon
 
   try {
     const docBase64 = await fetchDocAsBase64(car.rcDocUrl);
+    await assertReadableDocument(docBase64);
     const result = await extractRcDocument(docBase64);
     const extractedRcNo = (result.rc_no ?? '').toString().replace(/\s+/g, '').toUpperCase();
     const enteredRcNo = car.registrationNo.replace(/\s+/g, '').toUpperCase();
@@ -396,6 +397,7 @@ router.post('/cars/:id/verify-rc', requireAuth, async (req: Request, res: Respon
       data: { rcNumberMatches: matches, extractedRcNo: result.rc_no ?? null, verifiedAt: updated.rcAutoVerifiedAt },
     });
   } catch (error: any) {
+    if (error.status === 422) return res.status(422).json({ error: error.message });
     console.error('[RC VERIFY] failed:', error.response?.data ?? error.message);
     res.status(502).json({ error: 'Could not run automated RC verification right now. Please try again shortly.' });
   }

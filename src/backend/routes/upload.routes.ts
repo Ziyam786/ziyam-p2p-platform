@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
 import { requireAuth } from '../middleware/auth';
 import { isStorageConfigured, getStorageBucket } from '../services/firebaseAdmin';
+import { isAadhaarMaskConfigured, maskAadhaarDocument, maskedAadhaarBuffer } from '../services/aryaVerificationService';
 
 const router = Router();
 
@@ -63,7 +64,7 @@ async function verifyFileContent(buffer: Buffer, mimetype: string): Promise<bool
  * app used before the Storage migration — a deliberate fallback, not a
  * removed feature, so uploads still work in local dev without Firebase creds.
  */
-async function saveFile(buffer: Buffer, mimetype: string): Promise<string> {
+export async function saveFile(buffer: Buffer, mimetype: string): Promise<string> {
   const filename = `${uuidv4()}${MIME_EXTENSION[mimetype] ?? ''}`;
   if (isStorageConfigured()) {
     const file = getStorageBucket().file(filename);
@@ -76,13 +77,34 @@ async function saveFile(buffer: Buffer, mimetype: string): Promise<string> {
 
 /**
  * Fetches the bytes of an already-saved upload, whichever backend it lives
- * on — an absolute Firebase Storage URL is fetched over HTTPS; a relative
- * /uploads/<file> path (files saved before the Storage migration, or saved
- * locally because Storage wasn't configured) is read straight off disk.
+ * on — a relative /uploads/<file> path (files saved before the Storage
+ * migration, or saved locally because Storage wasn't configured) is read
+ * straight off disk.
+ *
+ * `url` is client-supplied (POST /uploads/blur-region's body), so the HTTPS
+ * branch is an allowlist, not a generic fetch: only a URL that already
+ * points at OUR OWN Firebase Storage bucket is permitted. Anything looser
+ * is SSRF — a caller could otherwise hand the server an internal or
+ * cloud-metadata URL and have it fetched server-side. Host is checked via
+ * the parsed URL's `.hostname` (immune to userinfo/`@`-tricks and IDN
+ * lookalikes, unlike a substring test on the raw string), and the path
+ * check runs after WHATWG URL normalization so a `..`-segment can't escape
+ * the bucket prefix. Redirects are disabled so a 3xx can't be used to hop
+ * off the allowlisted host after the check has already passed.
  */
 async function fetchSavedFileBuffer(url: string): Promise<Buffer> {
   if (/^https?:\/\//i.test(url)) {
-    const res = await axios.get(url, { responseType: 'arraybuffer' });
+    const bucketName = isStorageConfigured() ? config.firebase.storageBucket : null;
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new Error('Invalid file URL');
+    }
+    if (!bucketName || parsed.protocol !== 'https:' || parsed.hostname !== 'storage.googleapis.com' || !parsed.pathname.startsWith(`/${bucketName}/`)) {
+      throw new Error('Invalid file URL');
+    }
+    const res = await axios.get(url, { responseType: 'arraybuffer', maxRedirects: 0, timeout: 15_000 });
     return Buffer.from(res.data);
   }
   const resolvedUploadDir = path.resolve(config.uploadDir);
@@ -111,6 +133,38 @@ router.post('/uploads', requireAuth, (req: Request, res: Response) => {
     } catch (saveErr: any) {
       console.error('[UPLOADS] save failed:', saveErr.message);
       res.status(502).json({ error: 'Could not save the uploaded file right now. Please try again.' });
+    }
+  });
+});
+
+/** Agent walk-in + ops: mask Aadhaar digits via Arya, then persist only the masked image. */
+router.post('/uploads/aadhaar-mask', requireAuth, (req: Request, res: Response) => {
+  upload.single('file')(req, res, async (err: any) => {
+    if (err) return res.status(400).json({ error: err.message ?? 'Upload failed' });
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    if (req.file.mimetype === 'application/pdf') {
+      return res.status(400).json({ error: 'Upload a photo of the Aadhaar, not a PDF' });
+    }
+    if (!isAadhaarMaskConfigured()) {
+      return res.status(503).json({ error: 'Aadhaar masking is not configured yet (ARYA_AADHAAR_MASK_TOKEN)' });
+    }
+
+    const valid = await verifyFileContent(req.file.buffer, req.file.mimetype);
+    if (!valid) {
+      return res.status(400).json({ error: 'File content does not match its declared type.' });
+    }
+
+    try {
+      const masked = await maskAadhaarDocument(req.file.buffer.toString('base64'), 'image');
+      const buf = maskedAadhaarBuffer(masked);
+      if (!buf) {
+        return res.status(422).json({ error: masked.error_message || 'Could not mask that Aadhaar photo — try a clearer, well-lit shot.' });
+      }
+      const url = await saveFile(buf, 'image/jpeg');
+      res.json({ success: true, data: { url } });
+    } catch (maskErr: any) {
+      console.error('[UPLOADS] aadhaar-mask failed:', maskErr.response?.data ?? maskErr.message);
+      res.status(502).json({ error: 'Could not mask the Aadhaar photo right now. Please try again.' });
     }
   });
 });

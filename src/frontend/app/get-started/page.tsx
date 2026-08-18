@@ -175,7 +175,7 @@ export default function GetStartedPage() {
               <div className="space-y-3 mb-8">
                 <div className="flex items-start gap-3">
                   <span className="text-emerald-500 mt-0.5">✓</span>
-                  <p className="text-sm text-gray-700">Every host is KYC-verified — DigiLocker or Aadhaar, no exceptions.</p>
+                  <p className="text-sm text-gray-700">Every host is KYC-verified (Aadhaar OTP or Arya.ai) — no exceptions.</p>
                 </div>
                 <div className="flex items-start gap-3">
                   <span className="text-emerald-500 mt-0.5">✓</span>

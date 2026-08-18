@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { authApi, ApiError } from './api';
+import { identifyMixpanelUser, trackEvent } from './mixpanel';
 import type { PublicUser } from './types';
 
 interface AuthContextValue {
@@ -73,6 +74,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signup = useCallback(async (data: { fullName: string; email: string; phoneNumber: string; password: string; role?: string; referralCode?: string }) => {
     const res = await authApi.signup(data);
     setUser(res.data);
+    identifyMixpanelUser(res.data);
+    const properties: Record<string, string> = {
+      sign_up_method: 'email',
+      platform: 'web',
+      role: res.data.role,
+    };
+    if (data.referralCode) properties.referral_source = data.referralCode;
+    trackEvent('sign_up_completed', properties);
     return res.data;
   }, []);
 

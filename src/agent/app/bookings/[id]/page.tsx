@@ -9,7 +9,7 @@ import BottomNav from '../../../components/BottomNav';
 import LoadingScreen from '../../../components/LoadingScreen';
 import SignaturePad from '../../../components/SignaturePad';
 import { useToast } from '../../../components/Toast';
-import { ApiError, cashLogApi, opsTripApi, openWhatsApp, uploadFile } from '../../../lib/api';
+import { ApiError, cashLogApi, opsTripApi, openWhatsApp, uploadFile, uploadMaskedAadhaar } from '../../../lib/api';
 import type { OpsTripHandoverPayload, OpsTripCheckOutPayload } from '../../../lib/api';
 import type { OpsTripRow } from '../../../lib/types';
 
@@ -201,7 +201,7 @@ function TripDetailInner() {
     if (!file) return;
     setMaskedIdUploading(true);
     try {
-      const url = await uploadFile(file, file.name);
+      const url = await uploadMaskedAadhaar(file, file.name);
       setMaskedIdPhotoUrl(url);
     } catch (err) {
       show(err instanceof ApiError ? err.message : 'Upload failed', 'error');

@@ -6,12 +6,13 @@ import { ToastProvider } from '../components/Toast';
 import ChatWidget from '../components/ChatWidget';
 import PushNotificationSetup from '../components/PushNotificationSetup';
 import FirebaseAuthBridge from '../components/FirebaseAuthBridge';
+import MixpanelProvider from '../components/MixpanelProvider';
 
 export const metadata: Metadata = {
   title: "ZiyamSelfDrive — India's P2P Self-Drive Car Rental",
   description:
-    'Rent verified self-drive cars from trusted hosts across 30+ Indian cities. No driver. No hassle. Just open roads.',
-  keywords: ['self-drive car rental', 'p2p car rental', 'zoomcar alternative', 'india car rental'],
+    'Rent verified self-drive cars from trusted hosts in Bengaluru. No driver. No hassle. Just open roads.',
+  keywords: ['self-drive car rental', 'p2p car rental', 'bengaluru car rental', 'ziyam selfdrive'],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -27,14 +28,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="antialiased">
         <AuthProvider>
-          <WishlistProvider>
-            <ToastProvider>
-              {children}
-              <ChatWidget />
-              <PushNotificationSetup />
-              <FirebaseAuthBridge />
-            </ToastProvider>
-          </WishlistProvider>
+          <MixpanelProvider>
+            <WishlistProvider>
+              <ToastProvider>
+                {children}
+                <ChatWidget />
+                <PushNotificationSetup />
+                <FirebaseAuthBridge />
+              </ToastProvider>
+            </WishlistProvider>
+          </MixpanelProvider>
         </AuthProvider>
       </body>
     </html>
