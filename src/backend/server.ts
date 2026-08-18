@@ -8,7 +8,7 @@ import { PayoutEngine } from './services/payoutEngine';
 import { initializeYieldAutoApplyCron } from './services/yieldEngine';
 import { initializeDocExpiryCron } from './services/carVerificationService';
 import { apiRateLimiter } from './middleware/rateLimit';
-import { requireCsrfToken } from './middleware/csrf';
+import { csrf } from './middleware/csrf';
 import { safeErrorMessage } from './utils/errorResponse';
 import authRoutes from './routes/auth.routes';
 import carRoutes from './routes/car.routes';
@@ -87,16 +87,14 @@ app.use(cors({
 }));
 
 app.use(express.json());
-// Cookie parsing + CSRF only on /api. CodeQL's missing-token-validation query
-// treats cookieParser() as covering every later handler; applying it globally
-// would flag /health and static /uploads as cookie-auth without CSRF, even
-// though those paths never read the session cookie. PayU is already mounted
-// above, before cookies exist, and carries none.
-app.use('/api', cookieParser());
-// Baseline per-IP limit across the whole API — authRateLimiter (stricter,
-// applied per-route in auth.routes.ts) still layers on top for login/OTP.
-app.use('/api', apiRateLimiter);
-app.use('/api', requireCsrfToken);
+
+// Cookie-auth API: parse cookies and run double-submit CSRF on the same
+// router before any route handler. PayU is mounted on `app` above this, so
+// it never hits cookieParser. /health and /uploads stay off this router.
+const api = express.Router();
+api.use(cookieParser());
+api.use(csrf());
+api.use(apiRateLimiter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'ZiyamSelfDrive API' }));
 
@@ -112,33 +110,34 @@ app.use(
   express.static(config.uploadDir)
 );
 
-app.use('/api', authRoutes);
-app.use('/api', carRoutes);
-app.use('/api', bookingRoutes);
-app.use('/api', hostRoutes);
-app.use('/api', userRoutes);
-app.use('/api', reviewRoutes);
-app.use('/api', kycRoutes);
-app.use('/api', adminRoutes);
-app.use('/api', settingsRoutes);
-app.use('/api', aiRoutes);
-app.use('/api', promoCodeRoutes);
-app.use('/api', wishlistRoutes);
-app.use('/api', notificationRoutes);
-app.use('/api', fleetLedgerRoutes);
-app.use('/api', serviceRequestRoutes);
-app.use('/api', uploadRoutes);
-app.use('/api', agentRoutes);
-app.use('/api', opsTripRoutes);
-app.use('/api', financeErpRoutes);
-app.use('/api', itineraryRoutes);
-app.use('/api', damageClaimRoutes);
-app.use('/api', disputeSupportRoutes);
-app.use('/api', refundRequestRoutes);
-app.use('/api', hostReviewRoutes);
+app.use('/api', api);
+api.use(authRoutes);
+api.use(carRoutes);
+api.use(bookingRoutes);
+api.use(hostRoutes);
+api.use(userRoutes);
+api.use(reviewRoutes);
+api.use(kycRoutes);
+api.use(adminRoutes);
+api.use(settingsRoutes);
+api.use(aiRoutes);
+api.use(promoCodeRoutes);
+api.use(wishlistRoutes);
+api.use(notificationRoutes);
+api.use(fleetLedgerRoutes);
+api.use(serviceRequestRoutes);
+api.use(uploadRoutes);
+api.use(agentRoutes);
+api.use(opsTripRoutes);
+api.use(financeErpRoutes);
+api.use(itineraryRoutes);
+api.use(damageClaimRoutes);
+api.use(disputeSupportRoutes);
+api.use(refundRequestRoutes);
+api.use(hostReviewRoutes);
 
 // 404 handler for unmatched API routes
-app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
+api.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 
 // Centralized error handler (catches anything routes forgot to try/catch)
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
