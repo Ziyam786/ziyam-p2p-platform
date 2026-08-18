@@ -5,6 +5,7 @@ import { WishlistProvider } from '../lib/wishlist-context';
 import { ToastProvider } from '../components/Toast';
 import ChatWidget from '../components/ChatWidget';
 import PushNotificationSetup from '../components/PushNotificationSetup';
+import FirebaseAuthBridge from '../components/FirebaseAuthBridge';
 
 export const metadata: Metadata = {
   title: "ZiyamSelfDrive — India's P2P Self-Drive Car Rental",
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               {children}
               <ChatWidget />
               <PushNotificationSetup />
+              <FirebaseAuthBridge />
             </ToastProvider>
           </WishlistProvider>
         </AuthProvider>

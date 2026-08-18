@@ -3,8 +3,21 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { bookingsApi, ApiError, type TripMessage } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
+import { subscribeToTripChat, type TripChatMessageUpdate } from '../lib/firebase';
 
 const POLL_MS = 8000;
+
+function toTripMessage(bookingId: string, m: TripChatMessageUpdate): TripMessage {
+  return {
+    id: m.id,
+    bookingId,
+    senderId: m.senderId,
+    sender: { id: m.senderId, fullName: m.senderName, avatarUrl: m.senderAvatarUrl },
+    body: m.body,
+    read: true,
+    createdAt: m.createdAt,
+  };
+}
 
 export default function TripChat({ bookingId, otherPartyName }: { bookingId: string; otherPartyName?: string }) {
   const { user } = useAuth();
@@ -23,10 +36,36 @@ export default function TripChat({ bookingId, otherPartyName }: { bookingId: str
       .finally(() => !silent && setLoading(false));
   }
 
+  // One initial REST fetch either way — real-time listener takes over from
+  // there if it can attach.
+  useEffect(load, [bookingId]);
+
+  // Real-time first (subscribeToTripChat resolves to null if Firebase isn't
+  // configured for this deployment); polling is the fallback, not the default.
   useEffect(() => {
-    load();
-    const interval = setInterval(() => load(true), POLL_MS);
-    return () => clearInterval(interval);
+    let active = true;
+    let unsubscribe: (() => void) | null = null;
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    subscribeToTripChat(bookingId, (updates) => {
+      if (active) setMessages(updates.map((u) => toTripMessage(bookingId, u)));
+    }).then((unsub) => {
+      if (!active) {
+        unsub?.();
+        return;
+      }
+      if (unsub) {
+        unsubscribe = unsub;
+      } else {
+        interval = setInterval(() => load(true), POLL_MS);
+      }
+    });
+
+    return () => {
+      active = false;
+      unsubscribe?.();
+      if (interval) clearInterval(interval);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookingId]);
 

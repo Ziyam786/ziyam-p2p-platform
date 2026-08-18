@@ -115,6 +115,89 @@ export async function signInWithApple(): Promise<AppleSignInResult> {
   }
 }
 
+/**
+ * Bridges the Ziyam JWT session into Firebase Auth — called once per
+ * session (see FirebaseAuthBridge.tsx) with a custom token from
+ * GET /auth/firebase-custom-token, so Firestore Security Rules can key off
+ * request.auth.uid for the real-time listeners below. Never throws.
+ */
+export async function signInToFirebase(customToken: string): Promise<boolean> {
+  if (!isFirebaseAuthConfigured()) return false;
+  try {
+    const [{ getAuth, signInWithCustomToken }, app] = await Promise.all([import('firebase/auth'), getFirebaseApp()]);
+    await signInWithCustomToken(getAuth(app), customToken);
+    return true;
+  } catch (err) {
+    console.error('[AUTH] signInToFirebase failed:', err);
+    return false;
+  }
+}
+
+export interface DeliveryLocationUpdate {
+  latitude: number;
+  longitude: number;
+  updatedAt: string;
+  source: 'TELEMATICS' | 'HOST_APP';
+}
+
+/**
+ * Real-time delivery-location listener — replaces the old 8s poll of
+ * GET /bookings/:id/delivery-location. Falls back to null (caller should
+ * keep polling) if Firebase isn't configured, so this never breaks
+ * delivery tracking for a deployment without Firebase set up.
+ */
+export async function subscribeToDeliveryLocation(
+  bookingId: string,
+  callback: (update: DeliveryLocationUpdate | null) => void
+): Promise<(() => void) | null> {
+  if (!isFirebaseAuthConfigured()) return null;
+  try {
+    const [{ getFirestore, doc, onSnapshot }, app] = await Promise.all([import('firebase/firestore'), getFirebaseApp()]);
+    const ref = doc(getFirestore(app), 'deliveryTracking', bookingId);
+    return onSnapshot(
+      ref,
+      (snap) => callback(snap.exists() ? (snap.data() as DeliveryLocationUpdate) : null),
+      (err) => console.error('[FIRESTORE] delivery-location listener failed:', err)
+    );
+  } catch (err) {
+    console.error('[FIRESTORE] subscribeToDeliveryLocation setup failed:', err);
+    return null;
+  }
+}
+
+export interface TripChatMessageUpdate {
+  id: string;
+  body: string;
+  createdAt: string;
+  senderId: string;
+  senderName: string;
+  senderAvatarUrl: string | null;
+}
+
+/**
+ * Real-time trip-chat listener — replaces the old 8s poll of
+ * GET /bookings/:id/messages. Falls back to null (caller should keep
+ * polling) if Firebase isn't configured.
+ */
+export async function subscribeToTripChat(
+  bookingId: string,
+  callback: (messages: TripChatMessageUpdate[]) => void
+): Promise<(() => void) | null> {
+  if (!isFirebaseAuthConfigured()) return null;
+  try {
+    const [{ getFirestore, collection, query, orderBy, onSnapshot }, app] = await Promise.all([import('firebase/firestore'), getFirebaseApp()]);
+    const q = query(collection(getFirestore(app), `tripChats/${bookingId}/messages`), orderBy('createdAt', 'asc'));
+    return onSnapshot(
+      q,
+      (snap) => callback(snap.docs.map((d) => d.data() as TripChatMessageUpdate)),
+      (err) => console.error('[FIRESTORE] trip-chat listener failed:', err)
+    );
+  } catch (err) {
+    console.error('[FIRESTORE] subscribeToTripChat setup failed:', err);
+    return null;
+  }
+}
+
 /** Foreground push (tab is open/focused) — background pushes are handled by the service worker instead. */
 export async function onForegroundPush(callback: (title: string, body: string, link?: string) => void): Promise<() => void> {
   try {

@@ -8,6 +8,32 @@ import { requireAuth, requireRole } from '../middleware/auth';
 import { notify } from '../services/notificationService';
 import { pickLeastLoadedAgent } from '../services/agentAssignment';
 import { safeErrorMessage } from '../utils/errorResponse';
+import { isFirebaseConfigured, getFirestoreClient } from '../services/firebaseAdmin';
+
+// Best-effort mirror write to Firestore for real-time delivery-location/
+// chat updates (see LiveDeliveryTracker.tsx / TripChat.tsx's onSnapshot
+// listeners) — Postgres stays the system of record for both; this never
+// blocks or fails the actual request if Firestore is unconfigured or the
+// write itself fails, since the REST routes already work standalone
+// (the frontend falls back to polling when Firebase isn't configured).
+function mirrorToFirestore(collectionPath: string, docId: string, data: Record<string, unknown>): void {
+  if (!isFirebaseConfigured()) return;
+  getFirestoreClient()
+    .collection(collectionPath)
+    .doc(docId)
+    .set(data, { merge: true })
+    .catch((err: any) => console.error(`[FIRESTORE MIRROR] Failed to write ${collectionPath}/${docId}:`, err.message ?? err));
+}
+
+// Firestore Security Rules can't query Postgres to check who a booking's
+// guest/host actually are — this mirrors just those two IDs into Firestore
+// itself so firestore.rules can compare them against request.auth.uid.
+// Idempotent (merge: true), called alongside every real mirror write so the
+// participants doc always exists before a client tries to read the
+// protected delivery-location/chat documents.
+function mirrorBookingParticipants(bookingId: string, customerId: string, hostId: string): void {
+  mirrorToFirestore('bookingParticipants', bookingId, { customerId, hostId });
+}
 
 const WASH_SERVICE_PRICE = 349;
 
@@ -612,6 +638,13 @@ router.post('/bookings/:id/delivery-location', requireAuth, async (req: Request,
     data: { deliveryLatitude: latitude, deliveryLongitude: longitude, deliveryLocationUpdatedAt: new Date() },
     select: { deliveryLatitude: true, deliveryLongitude: true, deliveryLocationUpdatedAt: true },
   });
+  mirrorBookingParticipants(id, booking.customerId, booking.car.ownerId);
+  mirrorToFirestore('deliveryTracking', id, {
+    latitude: updated.deliveryLatitude,
+    longitude: updated.deliveryLongitude,
+    updatedAt: updated.deliveryLocationUpdatedAt?.toISOString(),
+    source: 'HOST_APP',
+  });
   res.json({ success: true, data: updated });
 });
 
@@ -682,6 +715,15 @@ router.post('/bookings/:id/messages', requireAuth, async (req: Request, res: Res
   const message = await prisma.message.create({
     data: { bookingId: id, senderId: req.user!.userId, body: String(body).trim() },
     include: { sender: { select: { id: true, fullName: true, avatarUrl: true } } },
+  });
+  mirrorBookingParticipants(id, booking.customerId, booking.car.ownerId);
+  mirrorToFirestore(`tripChats/${id}/messages`, message.id, {
+    id: message.id,
+    body: message.body,
+    createdAt: message.createdAt.toISOString(),
+    senderId: message.sender.id,
+    senderName: message.sender.fullName,
+    senderAvatarUrl: message.sender.avatarUrl ?? null,
   });
 
   const recipientId = isCustomer ? booking.car.ownerId : booking.customerId;

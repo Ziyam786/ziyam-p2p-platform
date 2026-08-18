@@ -1,0 +1,47 @@
+rules_version = '2';
+
+// Real-time delivery-tracking + trip-chat mirror data (see
+// src/backend/routes/booking.routes.ts's mirrorToFirestore /
+// mirrorBookingParticipants, and src/frontend/lib/firebase.ts's
+// subscribeToDeliveryLocation / subscribeToTripChat).
+//
+// The backend (Firebase Admin SDK) always writes here directly and bypasses
+// these rules entirely — they only gate what a signed-in BROWSER client can
+// read. Every user is bridged into Firebase Auth via a custom token keyed
+// to their Ziyam user id (see FirebaseAuthBridge.tsx), so request.auth.uid
+// here is the same id as Postgres's User.id.
+//
+// Deploy this file from the repo root:
+//   firebase deploy --only firestore:rules
+// (needs `firebase init` once, selecting this project) — or paste its
+// contents directly into Firebase Console > Firestore Database > Rules.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isBookingParticipant(bookingId) {
+      let participants = get(/databases/$(database)/documents/bookingParticipants/$(bookingId)).data;
+      return request.auth != null &&
+        (request.auth.uid == participants.customerId || request.auth.uid == participants.hostId);
+    }
+
+    match /bookingParticipants/{bookingId} {
+      allow read: if isBookingParticipant(bookingId);
+      allow write: if false; // backend-only
+    }
+
+    match /deliveryTracking/{bookingId} {
+      allow read: if isBookingParticipant(bookingId);
+      allow write: if false; // backend-only
+    }
+
+    match /tripChats/{bookingId}/messages/{messageId} {
+      allow read: if isBookingParticipant(bookingId);
+      allow write: if false; // backend-only
+    }
+
+    // Deny everything else by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

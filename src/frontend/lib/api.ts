@@ -100,6 +100,7 @@ export const authApi = {
     post<{ success: true; data: PublicUser }>('/auth/oauth/supabase', { accessToken }),
   loginWithFirebase: (idToken: string) =>
     post<{ success: true; data: PublicUser }>('/auth/oauth/firebase', { idToken }),
+  firebaseCustomToken: () => get<{ success: true; data: { token: string } }>('/auth/firebase-custom-token'),
 };
 
 /* ── Cars ─────────────────────────────────────────────────────────── */

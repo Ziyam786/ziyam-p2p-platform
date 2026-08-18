@@ -9,7 +9,7 @@ import { requestOtp, verifyOtp } from '../services/otpService';
 import { authRateLimiter } from '../middleware/rateLimit';
 import { normalizeEmail, isValidEmail, normalizePhone, isValidPhone, normalizeFullName } from '../utils/validation';
 import { verifyCredentials } from '@supabase/server/core';
-import { isFirebaseConfigured, getAuthClient } from '../services/firebaseAdmin';
+import { isFirebaseConfigured, getAuthClient, mintFirebaseCustomToken } from '../services/firebaseAdmin';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -319,6 +319,24 @@ router.post('/auth/oauth/firebase', authRateLimiter, async (req: Request, res: R
   const token = signAuthToken({ userId: user.id, role: user.role });
   res.cookie(config.auth.cookieName, token, cookieOptions());
   res.json({ success: true, data: toPublicUser(user) });
+});
+
+// Mints a Firebase custom token for the current Ziyam session, regardless
+// of how the user actually logged in — lets the frontend silently sign
+// into Firebase Auth so Firestore Security Rules can key off
+// request.auth.uid for the real-time delivery-tracking/trip-chat listeners
+// (see FirebaseAuthBridge.tsx). Not a login mechanism itself.
+router.get('/auth/firebase-custom-token', requireAuth, async (req: Request, res: Response) => {
+  if (!isFirebaseConfigured()) {
+    return res.status(503).json({ error: 'Firebase is not configured' });
+  }
+  try {
+    const token = await mintFirebaseCustomToken(req.user!.userId);
+    res.json({ success: true, data: { token } });
+  } catch (err) {
+    console.error('[AUTH] Failed to mint Firebase custom token:', err);
+    res.status(502).json({ error: 'Could not set up real-time features right now.' });
+  }
 });
 
 router.post('/auth/logout', (_req: Request, res: Response) => {
