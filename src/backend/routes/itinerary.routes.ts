@@ -62,4 +62,25 @@ router.get('/itineraries/:id', async (req: Request, res: Response) => {
   res.json({ success: true, data: unlock });
 });
 
+/** Persist Firebase-generated copy once payment has already succeeded. First write only. */
+router.post('/itineraries/:id/content', async (req: Request, res: Response) => {
+  const content = typeof req.body?.generatedContent === 'string' ? req.body.generatedContent.trim() : '';
+  if (content.length < 80 || content.length > 50_000) {
+    return res.status(400).json({ error: 'generatedContent must be between 80 and 50,000 characters' });
+  }
+
+  const unlock = await prisma.itineraryUnlock.findUnique({ where: { id: req.params.id } });
+  if (!unlock) return res.status(404).json({ error: 'Itinerary not found' });
+  if (unlock.status !== 'PAID') return res.status(409).json({ error: 'Itinerary is not paid yet' });
+  if (unlock.generatedContent && unlock.generatedContent.length >= 80 && !/couldn't generate your itinerary/i.test(unlock.generatedContent)) {
+    return res.json({ success: true, data: unlock });
+  }
+
+  const updated = await prisma.itineraryUnlock.update({
+    where: { id: unlock.id },
+    data: { generatedContent: content },
+  });
+  res.json({ success: true, data: updated });
+});
+
 export default router;

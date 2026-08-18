@@ -14,7 +14,7 @@ import YieldBadge from '../../../components/YieldBadge';
 import { useAuth } from '../../../lib/auth-context';
 import { useToast } from '../../../components/Toast';
 import { hostApi, carsApi, hostReviewApi, usersApi, ApiError } from '../../../lib/api';
-import type { Car, EarningsOverview, UtilizationEntry } from '../../../lib/types';
+import type { Car, EarningsOverview, UtilizationEntry, Booking } from '../../../lib/types';
 
 const EMPTY: EarningsOverview = {
   totalGross: 0, ziyamCut: 0, netEarnings: 0, pendingEscrow: 0, settledPayouts: 0,
@@ -28,6 +28,7 @@ function DashboardInner() {
   const [metrics, setMetrics] = useState<EarningsOverview>(EMPTY);
   const [cars, setCars] = useState<Car[]>([]);
   const [utilization, setUtilization] = useState<UtilizationEntry[]>([]);
+  const [trips, setTrips] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [blackoutCar, setBlackoutCar] = useState<Car | null>(null);
   const [requestCount, setRequestCount] = useState(0);
@@ -60,11 +61,14 @@ function DashboardInner() {
     if (!user) return;
     let active = true;
     Promise.all([hostApi.earnings(user.id), hostApi.myCars(user.id), hostApi.utilization(user.id)])
-      .then(([earnings, myCars, util]) => {
+      .then(async ([earnings, myCars, util]) => {
         if (!active) return;
         setMetrics(earnings.data);
         setCars(myCars.data);
         setUtilization(util.data);
+        const bookingGroups = await Promise.all(myCars.data.map((car) => carsApi.bookings(car.id).catch(() => ({ data: [] as Booking[] }))));
+        if (!active) return;
+        setTrips(bookingGroups.flatMap((g) => g.data).sort((a, b) => +new Date(b.startTime) - +new Date(a.startTime)));
       })
       .catch((err) => show(err.message ?? 'Failed to load dashboard data', 'error'))
       .finally(() => active && setLoading(false));
@@ -146,6 +150,7 @@ function DashboardInner() {
             { key: 'requests', label: `Booking Requests${requestCount > 0 ? ` (${requestCount})` : ''}` },
             { key: 'cars', label: `My Cars (${cars.length})` },
             { key: 'utilization', label: 'Utilization' },
+            { key: 'trips', label: 'Trips' },
             { key: 'payout', label: 'Payout Setup' },
           ]}
         />
@@ -254,6 +259,30 @@ function DashboardInner() {
                   </div>
                 </div>
               ))
+            )}
+          </div>
+        ) : tab === 'trips' ? (
+          <div className="space-y-3">
+            {trips.length === 0 ? (
+              <p className="text-gray-400">No active or completed trips yet.</p>
+            ) : (
+              trips.map((b) => {
+                const car = cars.find((c) => c.id === b.carId);
+                return (
+                  <div key={b.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-semibold">{car ? `${car.make} ${car.model}` : 'Car'} · {b.customer?.fullName ?? 'Guest'}</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {new Date(b.startTime).toLocaleDateString('en-IN')} – {new Date(b.endTime).toLocaleDateString('en-IN')}
+                        {' · '}₹{b.hostPayoutAmount.toLocaleString('en-IN')} host share
+                      </p>
+                    </div>
+                    <span className={`text-xs font-semibold px-3 py-1 rounded-full ${b.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-gray-800 text-gray-300'}`}>
+                      {b.status}
+                    </span>
+                  </div>
+                );
+              })
             )}
           </div>
         ) : (

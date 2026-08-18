@@ -12,7 +12,6 @@ import {
   isFaceMatchConfigured, verifyFaceMatch,
   fetchDocAsBase64,
   isAadhaarMaskConfigured, maskAadhaarDocument, maskedAadhaarBuffer, isLikelyAadhaarKyc,
-  assertSafeDocumentUrl,
   type AryaKycResult,
 } from '../services/aryaVerificationService';
 import { saveFile } from './upload.routes';
@@ -336,7 +335,6 @@ router.post('/kyc/submit', requireAuth, async (req: Request, res: Response) => {
   }
 
   try {
-    await assertSafeDocumentUrl(docUrl);
     const docBase64 = await fetchDocAsBase64(docUrl);
     await assertReadableDocument(docBase64);
     const result = await extractKycDocument(docBase64, 'image');

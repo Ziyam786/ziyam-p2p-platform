@@ -1,0 +1,33 @@
+---
+# Prisma emits PostgreSQL, frontends use Tailwind, and the FCM worker uses
+# modern JS — Codacy's default Tsqllint/Csslint/JSHint tools misread all three
+# and flood GitHub code scanning with false positives.
+engines:
+  tsqllint:
+    exclude_paths:
+      - "prisma/**"
+      - "**/*.sql"
+  csslint:
+    exclude_paths:
+      - "**/*.css"
+  stylelint:
+    exclude_paths:
+      - "**/*.css"
+  jshint:
+    exclude_paths:
+      - "**/firebase-messaging-sw.js"
+      - "**/*.min.js"
+  remark-lint:
+    exclude_paths:
+      - ".agents/**"
+      - ".claude/**"
+      - "**/*.md"
+exclude_paths:
+  - "prisma/migrations/**"
+  - "**/*.sql"
+  - "**/globals.css"
+  - "**/firebase-messaging-sw.js"
+  - "**/node_modules/**"
+  - "**/*.min.js"
+  - ".agents/**"
+  - ".claude/**"
