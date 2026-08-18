@@ -25,6 +25,6 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
       { headers: { Authorization: `Bearer ${config.email.apiKey}`, 'Content-Type': 'application/json' } }
     );
   } catch (err: any) {
-    console.error(`[EMAIL] Resend send failed for ${to}:`, err.response?.data ?? err.message);
+    console.error('[EMAIL] Resend send failed for %s:', to, err.response?.data ?? err.message);
   }
 }

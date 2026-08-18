@@ -15,7 +15,7 @@ export class TelematicsService {
       );
       return response.data.status === 'SUCCESS';
     } catch (error) {
-      console.error(`Failed to unlock vehicle IMEI ${telematicsImei}`, error);
+      console.error('Failed to unlock vehicle IMEI %s', telematicsImei, error);
       throw new Error('Hardware command failed. Use manual backup or contact support.');
     }
   }
@@ -30,7 +30,7 @@ export class TelematicsService {
       );
       return response.data.status === 'SUCCESS';
     } catch (error) {
-      console.error(`Failed to lock vehicle IMEI ${telematicsImei}`, error);
+      console.error('Failed to lock vehicle IMEI %s', telematicsImei, error);
       throw new Error('Hardware command failed.');
     }
   }

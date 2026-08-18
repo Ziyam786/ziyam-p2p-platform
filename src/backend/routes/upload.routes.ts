@@ -76,13 +76,34 @@ async function saveFile(buffer: Buffer, mimetype: string): Promise<string> {
 
 /**
  * Fetches the bytes of an already-saved upload, whichever backend it lives
- * on — an absolute Firebase Storage URL is fetched over HTTPS; a relative
- * /uploads/<file> path (files saved before the Storage migration, or saved
- * locally because Storage wasn't configured) is read straight off disk.
+ * on — a relative /uploads/<file> path (files saved before the Storage
+ * migration, or saved locally because Storage wasn't configured) is read
+ * straight off disk.
+ *
+ * `url` is client-supplied (POST /uploads/blur-region's body), so the HTTPS
+ * branch is an allowlist, not a generic fetch: only a URL that already
+ * points at OUR OWN Firebase Storage bucket is permitted. Anything looser
+ * is SSRF — a caller could otherwise hand the server an internal or
+ * cloud-metadata URL and have it fetched server-side. Host is checked via
+ * the parsed URL's `.hostname` (immune to userinfo/`@`-tricks and IDN
+ * lookalikes, unlike a substring test on the raw string), and the path
+ * check runs after WHATWG URL normalization so a `..`-segment can't escape
+ * the bucket prefix. Redirects are disabled so a 3xx can't be used to hop
+ * off the allowlisted host after the check has already passed.
  */
 async function fetchSavedFileBuffer(url: string): Promise<Buffer> {
   if (/^https?:\/\//i.test(url)) {
-    const res = await axios.get(url, { responseType: 'arraybuffer' });
+    const bucketName = isStorageConfigured() ? config.firebase.storageBucket : null;
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new Error('Invalid file URL');
+    }
+    if (!bucketName || parsed.protocol !== 'https:' || parsed.hostname !== 'storage.googleapis.com' || !parsed.pathname.startsWith(`/${bucketName}/`)) {
+      throw new Error('Invalid file URL');
+    }
+    const res = await axios.get(url, { responseType: 'arraybuffer', maxRedirects: 0, timeout: 15_000 });
     return Buffer.from(res.data);
   }
   const resolvedUploadDir = path.resolve(config.uploadDir);
