@@ -397,8 +397,7 @@ router.post('/cars/:id/verify-rc', requireAuth, async (req: Request, res: Respon
       data: { rcNumberMatches: matches, extractedRcNo: result.rc_no ?? null, verifiedAt: updated.rcAutoVerifiedAt },
     });
   } catch (error: any) {
-    if (error.status === 400) return res.status(400).json({ error: error.message });
-    if (error.status === 422) return res.status(422).json({ error: error.message });
+      if (error.status === 422 || error.status === 400) return res.status(error.status).json({ error: error.message });
     console.error('[RC VERIFY] failed:', error.response?.data ?? error.message);
     res.status(502).json({ error: 'Could not run automated RC verification right now. Please try again shortly.' });
   }
