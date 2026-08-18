@@ -59,7 +59,7 @@ const HERO_SUBTITLE_FALLBACK =
   'Rent verified self-drive cars from trusted Bengaluru hosts, or list your own and turn it into passive income — one platform, zero hidden fees.';
 
 const TRUST_BADGES_FALLBACK: TrustBadge[] = [
-  { label: 'DigiLocker', sub: 'KYC Verified' },
+  { label: 'Arya.ai', sub: 'KYC Verified' },
   { label: 'Escrow-Held', sub: 'Security Deposits' },
   { label: 'N+1', sub: 'Guaranteed Payouts' },
   { label: 'Zero', sub: 'Hidden Fees' },
@@ -89,7 +89,7 @@ const TESTIMONIALS_FALLBACK: Testimonial[] = [];
 
 const HOW_STEPS = [
   { icon: Search, title: 'Search & Filter', desc: 'Choose your city, dates, and preferred car category. We show real-time availability.' },
-  { icon: FileCheck, title: 'Instant KYC', desc: 'Upload your driving licence once. Verification is instant via DigiLocker.' },
+  { icon: FileCheck, title: 'Instant KYC', desc: 'Aadhaar OTP or upload your ID, then your driving licence. Arya.ai verifies licence photos, liveness, and face match.' },
   { icon: CreditCard, title: 'Pay Securely', desc: 'Pay via UPI, card, or wallet. Security deposit held in escrow — released at trip end.' },
   { icon: Key, title: 'Drive Free', desc: 'Pick up the car at the host location. Drive wherever you want — you are in control.' },
 ];

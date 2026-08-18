@@ -20,11 +20,16 @@ const CUSTOM_ROLE_ELIGIBLE: Role[] = ['FLEET_ADMIN', 'OPERATIONS_EXECUTIVE', 'ME
 
 const inputCls = 'w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500';
 
-/** Which of the three KYC paths (see kyc.routes.ts) actually produced this user's verified state. */
-function kycMethod(u: AdminUser): { label: string; trust: 'high' | 'low' | 'none' } {
+/** Which KYC path actually produced this user's verified state. */
+function kycMethod(u: AdminUser, log: KycVerificationLogRow[] = []): { label: string; trust: 'high' | 'low' | 'none' } {
+  const success = log.find((e) => e.outcome === 'SUCCESS');
+  if (success?.method === 'AADHAAR_OTP') return { label: 'Aadhaar OTP eKYC', trust: 'high' };
+  if (success?.method === 'DIGILOCKER') return { label: 'DigiLocker (government-backed)', trust: 'high' };
+  if (success?.method === 'DOC_UPLOAD') return { label: 'Arya.ai document KYC', trust: 'high' };
   if (u.digilockerStatus === 'authenticated') return { label: 'DigiLocker (government-backed)', trust: 'high' };
-  if (u.aadhaarVerifiedName) return { label: 'Aadhaar OTP via Sandbox (government-backed)', trust: 'high' };
-  if (u.kycDocUrl) return { label: 'Legacy document upload (no automated check)', trust: 'low' };
+  if (u.aadhaarVerifiedName) return { label: 'Verified identity (Aadhaar OTP or Arya.ai)', trust: 'high' };
+  if (u.isKycVerified) return { label: 'Identity verified', trust: 'high' };
+  if (u.kycDocUrl) return { label: 'Legacy document upload', trust: 'low' };
   return { label: 'No verification on file', trust: 'none' };
 }
 
@@ -268,7 +273,7 @@ export default function UsersPage() {
 
       <Modal open={Boolean(kycUser)} onClose={() => setKycUser(null)} title={kycUser ? `KYC — ${kycUser.fullName}` : 'KYC'}>
         {kycUser && (() => {
-          const method = kycMethod(kycUser);
+          const method = kycMethod(kycUser, kycLog);
           const nameMismatch = kycUser.aadhaarVerifiedName && kycUser.aadhaarVerifiedName.trim().toLowerCase() !== kycUser.fullName.trim().toLowerCase();
           return (
             <div className="space-y-4">

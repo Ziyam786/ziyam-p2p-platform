@@ -6,20 +6,127 @@ import { notify } from '../services/notificationService';
 import { sandboxService } from '../services/sandboxService';
 import { digilockerApi, isSetuConfigured } from '../services/setuService';
 import {
-  isKycExtractionConfigured, extractKycDocument,
+  isKycExtractionConfigured, extractKycDocument, pickExtractedName, assertReadableDocument,
   isLivenessConfigured, checkLiveness,
   isDeepfakeConfigured, checkDeepfake,
   isFaceMatchConfigured, verifyFaceMatch,
+  fetchDocAsBase64,
+  isAadhaarMaskConfigured, maskAadhaarDocument, maskedAadhaarBuffer, isLikelyAadhaarKyc,
+  assertSafeDocumentUrl,
+  type AryaKycResult,
 } from '../services/aryaVerificationService';
+import { saveFile } from './upload.routes';
 
 const router = Router();
 const prisma = new PrismaClient();
 
+async function runSelfieChecks(selfieBase64: string, matchAgainstBase64?: string) {
+  const checks: Record<string, unknown> = {};
+  let allConfiguredChecksPassed = true;
+  let anyConfigured = false;
+
+  if (isLivenessConfigured()) {
+    anyConfigured = true;
+    const liveness = await checkLiveness(selfieBase64);
+    checks.liveness = liveness;
+    if (!liveness.success) allConfiguredChecksPassed = false;
+  }
+  if (isDeepfakeConfigured()) {
+    anyConfigured = true;
+    const deepfake = await checkDeepfake(selfieBase64);
+    checks.deepfake = deepfake;
+    const flagged = !deepfake.success || /fake/i.test(deepfake.result ?? '');
+    if (flagged) allConfiguredChecksPassed = false;
+  }
+  if (matchAgainstBase64 && isFaceMatchConfigured()) {
+    anyConfigured = true;
+    const faceMatch = await verifyFaceMatch(selfieBase64, matchAgainstBase64);
+    checks.faceMatch = faceMatch;
+    if (!faceMatch.success || !faceMatch.match) allConfiguredChecksPassed = false;
+  }
+
+  return {
+    attempted: true,
+    passed: anyConfigured && allConfiguredChecksPassed,
+    detail: checks,
+  };
+}
+
+async function maybePersistMaskedAadhaar(docBase64: string, result: AryaKycResult): Promise<string | undefined> {
+  if (!isLikelyAadhaarKyc(result) || !isAadhaarMaskConfigured()) return undefined;
+  try {
+    const masked = await maskAadhaarDocument(docBase64);
+    const buf = maskedAadhaarBuffer(masked);
+    if (!buf) return undefined;
+    return saveFile(buf, 'image/jpeg');
+  } catch (err: any) {
+    console.error('[KYC] Aadhaar mask persist failed:', err.response?.data ?? err.message);
+    return undefined;
+  }
+}
+
 /**
- * Step 1: send an Aadhaar OTP via Sandbox's eKYC API. Falls back to the old
- * "instant pass" stub (see kyc.routes.ts history) if SANDBOX_API_KEY/SECRET
- * aren't set, same "stub the unavailable external service" pattern used by
- * paymentGateway.ts / telematicsService.ts.
+ * Photo identity KYC via Arya.ai v2 extraction (Aadhaar / PAN / Voter ID /
+ * Passport). Alternative to Aadhaar OTP. Unmasked images are sent to Arya
+ * for extraction and are not stored. If the document is Aadhaar, a masked
+ * copy may be kept for review. Optional selfie runs liveness + deepfake +
+ * face-match against the ID photo.
+ */
+router.post('/kyc/identity-document', requireAuth, async (req: Request, res: Response) => {
+  const { docBase64, selfieBase64 } = req.body;
+  if (typeof docBase64 !== 'string' || docBase64.length === 0) {
+    return res.status(400).json({ error: 'docBase64 is required — a clear photo of your Aadhaar, PAN, voter ID, or passport' });
+  }
+  if (!isKycExtractionConfigured()) {
+    return res.status(503).json({ error: 'Identity verification is not configured yet (ARYA_KYC_TOKEN)' });
+  }
+
+  try {
+    await assertReadableDocument(docBase64);
+    const result = await extractKycDocument(docBase64, 'image');
+    if (!result.success) {
+      await prisma.kycVerificationLog.create({
+        data: { userId: req.user!.userId, method: 'DOC_UPLOAD', outcome: 'FAILED', detail: result.error_message ?? 'Arya extraction failed' },
+      });
+      return res.status(422).json({ error: result.error_message || 'Could not verify that ID — try a clearer, well-lit photo.' });
+    }
+
+    const verifiedName = pickExtractedName(result);
+    const maskedUrl = await maybePersistMaskedAadhaar(docBase64, result);
+    const updateData: Record<string, unknown> = {
+      isKycVerified: true,
+      ...(verifiedName && { aadhaarVerifiedName: verifiedName }),
+      ...(maskedUrl && { kycDocUrl: maskedUrl }),
+    };
+
+    let selfieOutcome: { attempted: boolean; passed?: boolean; detail?: Record<string, unknown> } = { attempted: false };
+    if (typeof selfieBase64 === 'string' && selfieBase64.length > 0) {
+      selfieOutcome = await runSelfieChecks(selfieBase64, docBase64);
+      updateData.isSelfieVerified = selfieOutcome.passed;
+      updateData.selfieVerificationData = selfieOutcome.detail as Prisma.InputJsonValue;
+    }
+
+    const user = await prisma.user.update({
+      where: { id: req.user!.userId },
+      data: updateData,
+      select: { id: true, isKycVerified: true, aadhaarVerifiedName: true, isSelfieVerified: true },
+    });
+    await prisma.kycVerificationLog.create({
+      data: { userId: user.id, method: 'DOC_UPLOAD', outcome: 'SUCCESS', detail: `arya.ai${verifiedName ? `: ${verifiedName}` : ''}` },
+    });
+    await notify(user.id, 'KYC_VERIFIED', "You're verified!", 'Your identity has been confirmed via Arya.ai. You can now book or list cars.', '/account');
+    res.json({ success: true, message: 'KYC verified', data: user, selfieCheck: selfieOutcome });
+  } catch (err: any) {
+    if (err.status === 422) return res.status(422).json({ error: err.message });
+    console.error('[KYC] Arya identity verification failed:', err.response?.data ?? err.message);
+    res.status(502).json({ error: 'Could not verify your ID right now. Please try again shortly.' });
+  }
+});
+
+/**
+ * Aadhaar OTP eKYC via Sandbox (sandbox.co.in). First-class identity path
+ * alongside Arya photo KYC. Never stubs an instant pass — if Sandbox is
+ * unconfigured, users should use photo ID or DigiLocker instead.
  */
 router.post('/kyc/aadhaar/otp', requireAuth, async (req: Request, res: Response) => {
   const { aadhaarNumber } = req.body;
@@ -28,7 +135,7 @@ router.post('/kyc/aadhaar/otp', requireAuth, async (req: Request, res: Response)
   }
 
   if (!sandboxService.isConfigured()) {
-    return res.json({ success: true, stubbed: true, message: 'KYC provider not configured — using instant verification instead.' });
+    return res.status(503).json({ error: 'Aadhaar OTP is not configured yet — use photo ID verification or DigiLocker instead.' });
   }
 
   try {
@@ -41,28 +148,28 @@ router.post('/kyc/aadhaar/otp', requireAuth, async (req: Request, res: Response)
 });
 
 /**
- * Step 2: verify the OTP. If Sandbox isn't configured, this is called with no
- * referenceId and just performs the old instant-pass behavior.
+ * Step 2: verify the Sandbox Aadhaar OTP. Instant-pass without a provider is
+ * not allowed.
  */
 router.post('/kyc/aadhaar/verify', requireAuth, async (req: Request, res: Response) => {
+  if (!sandboxService.isConfigured()) {
+    return res.status(503).json({ error: 'Aadhaar OTP is not configured yet — use photo ID verification or DigiLocker instead.' });
+  }
   const { referenceId, otp } = req.body;
+  if (!referenceId || !/^[0-9]{6}$/.test(otp ?? '')) {
+    return res.status(400).json({ error: 'referenceId and a 6-digit otp are required' });
+  }
 
   let verifiedName: string | undefined;
-
-  if (sandboxService.isConfigured()) {
-    if (!referenceId || !/^[0-9]{6}$/.test(otp ?? '')) {
-      return res.status(400).json({ error: 'referenceId and a 6-digit otp are required' });
-    }
-    try {
-      const result = await sandboxService.verifyAadhaarOtp(referenceId, otp);
-      verifiedName = result.name;
-    } catch (err: any) {
-      console.error('[KYC] Aadhaar OTP verify failed:', err.response?.data ?? err.message);
-      await prisma.kycVerificationLog.create({
-        data: { userId: req.user!.userId, method: 'AADHAAR_OTP', outcome: 'FAILED', detail: err.response?.data?.message ?? err.message },
-      });
-      return res.status(422).json({ error: 'Aadhaar verification failed — check the OTP and try again.' });
-    }
+  try {
+    const result = await sandboxService.verifyAadhaarOtp(referenceId, otp);
+    verifiedName = result.name;
+  } catch (err: any) {
+    console.error('[KYC] Aadhaar OTP verify failed:', err.response?.data ?? err.message);
+    await prisma.kycVerificationLog.create({
+      data: { userId: req.user!.userId, method: 'AADHAAR_OTP', outcome: 'FAILED', detail: err.response?.data?.message ?? err.message },
+    });
+    return res.status(422).json({ error: 'Aadhaar verification failed — check the OTP and try again.' });
   }
 
   const user = await prisma.user.update({
@@ -74,7 +181,7 @@ router.post('/kyc/aadhaar/verify', requireAuth, async (req: Request, res: Respon
     data: { userId: user.id, method: 'AADHAAR_OTP', outcome: 'SUCCESS', detail: verifiedName },
   });
 
-  await notify(user.id, 'KYC_VERIFIED', "You're verified!", 'Your identity has been confirmed. You can now book or list cars.', '/account');
+  await notify(user.id, 'KYC_VERIFIED', "You're verified!", 'Your identity has been confirmed via Aadhaar OTP. You can now book or list cars.', '/account');
 
   res.json({ success: true, message: 'KYC verified', data: user });
 });
@@ -178,6 +285,7 @@ router.post('/kyc/driving-license', requireAuth, async (req: Request, res: Respo
     const updateData: Record<string, unknown> = {};
 
     if (hasDoc) {
+      await assertReadableDocument(docBase64);
       const result = await extractKycDocument(docBase64, 'image');
       if (!result.success) {
         await prisma.kycVerificationLog.create({
@@ -192,37 +300,9 @@ router.post('/kyc/driving-license', requireAuth, async (req: Request, res: Respo
     let selfieOutcome: { attempted: boolean; passed?: boolean; detail?: Record<string, unknown> } = { attempted: false };
 
     if (hasSelfie) {
-      selfieOutcome.attempted = true;
-      const checks: Record<string, unknown> = {};
-      let allConfiguredChecksPassed = true;
-      let anyConfigured = false;
-
-      if (isLivenessConfigured()) {
-        anyConfigured = true;
-        const liveness = await checkLiveness(selfieBase64);
-        checks.liveness = liveness;
-        if (!liveness.success) allConfiguredChecksPassed = false;
-      }
-      if (isDeepfakeConfigured()) {
-        anyConfigured = true;
-        const deepfake = await checkDeepfake(selfieBase64);
-        checks.deepfake = deepfake;
-        // result is a free-form string per Arya's docs — treat anything
-        // containing "fake"/"deepfake" as a fail, success:false as a fail.
-        const flagged = !deepfake.success || /fake/i.test(deepfake.result ?? '');
-        if (flagged) allConfiguredChecksPassed = false;
-      }
-      if (hasDoc && isFaceMatchConfigured()) {
-        anyConfigured = true;
-        const faceMatch = await verifyFaceMatch(selfieBase64, docBase64);
-        checks.faceMatch = faceMatch;
-        if (!faceMatch.success || !faceMatch.match) allConfiguredChecksPassed = false;
-      }
-
-      selfieOutcome.passed = anyConfigured && allConfiguredChecksPassed;
-      selfieOutcome.detail = checks;
+      selfieOutcome = await runSelfieChecks(selfieBase64, hasDoc ? docBase64 : undefined);
       updateData.isSelfieVerified = selfieOutcome.passed;
-      updateData.selfieVerificationData = checks as unknown as Prisma.InputJsonValue;
+      updateData.selfieVerificationData = selfieOutcome.detail as Prisma.InputJsonValue;
     }
 
     const user = await prisma.user.update({
@@ -241,32 +321,52 @@ router.post('/kyc/driving-license', requireAuth, async (req: Request, res: Respo
 
     res.json({ success: true, data: user, selfieCheck: selfieOutcome });
   } catch (err: any) {
+    if (err.status === 422) return res.status(422).json({ error: err.message });
     console.error('[KYC] Driving license verification failed:', err.response?.data ?? err.message);
     res.status(502).json({ error: 'Could not verify the driving license right now. Please try again shortly.' });
   }
 });
 
-/** Legacy single-step submit (kept for the .env-less / doc-URL fallback path). */
+/** Legacy URL submit — runs the file through Arya.ai instead of an instant pass. */
 router.post('/kyc/submit', requireAuth, async (req: Request, res: Response) => {
   const { docUrl } = req.body;
-  if (!docUrl) return res.status(400).json({ error: 'docUrl is required (driving licence / Aadhaar document)' });
-
-  if (config.nodeEnv === 'production' && !config.kyc.apiKey && !sandboxService.isConfigured()) {
-    return res.status(503).json({ error: 'No KYC provider is configured' });
+  if (!docUrl) return res.status(400).json({ error: 'docUrl is required (Aadhaar / PAN / voter ID / passport image URL)' });
+  if (!isKycExtractionConfigured()) {
+    return res.status(503).json({ error: 'Identity verification is not configured yet (ARYA_KYC_TOKEN)' });
   }
 
-  const user = await prisma.user.update({
-    where: { id: req.user!.userId },
-    data: { isKycVerified: true, kycDocUrl: docUrl },
-    select: { id: true, isKycVerified: true, kycDocUrl: true },
-  });
-  await prisma.kycVerificationLog.create({
-    data: { userId: user.id, method: 'DOC_UPLOAD', outcome: 'SUCCESS', detail: docUrl },
-  });
-
-  await notify(user.id, 'KYC_VERIFIED', "You're verified!", 'Your identity has been confirmed. You can now book or list cars.', '/account');
-
-  res.json({ success: true, message: 'KYC verified instantly', data: user });
+  try {
+    await assertSafeDocumentUrl(docUrl);
+    const docBase64 = await fetchDocAsBase64(docUrl);
+    await assertReadableDocument(docBase64);
+    const result = await extractKycDocument(docBase64, 'image');
+    if (!result.success) {
+      await prisma.kycVerificationLog.create({
+        data: { userId: req.user!.userId, method: 'DOC_UPLOAD', outcome: 'FAILED', detail: result.error_message ?? 'Arya extraction failed' },
+      });
+      return res.status(422).json({ error: result.error_message || 'Could not verify that document — try a clearer photo.' });
+    }
+    const verifiedName = pickExtractedName(result);
+    const maskedUrl = await maybePersistMaskedAadhaar(docBase64, result);
+    const user = await prisma.user.update({
+      where: { id: req.user!.userId },
+      data: {
+        isKycVerified: true,
+        ...(verifiedName && { aadhaarVerifiedName: verifiedName }),
+        ...(maskedUrl && { kycDocUrl: maskedUrl }),
+      },
+      select: { id: true, isKycVerified: true, aadhaarVerifiedName: true },
+    });
+    await prisma.kycVerificationLog.create({
+      data: { userId: user.id, method: 'DOC_UPLOAD', outcome: 'SUCCESS', detail: `arya.ai via url${verifiedName ? `: ${verifiedName}` : ''}` },
+    });
+    await notify(user.id, 'KYC_VERIFIED', "You're verified!", 'Your identity has been confirmed via Arya.ai. You can now book or list cars.', '/account');
+    res.json({ success: true, message: 'KYC verified', data: user });
+  } catch (err: any) {
+    if (err.status === 422) return res.status(422).json({ error: err.message });
+    console.error('[KYC] Arya submit failed:', err.response?.data ?? err.message);
+    res.status(502).json({ error: 'Could not verify that document right now. Please try again shortly.' });
+  }
 });
 
 export default router;
