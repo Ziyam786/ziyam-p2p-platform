@@ -266,6 +266,10 @@ export const usersApi = {
     get<{ success: true; data: { status: string | null; downloadUrl?: string } }>('/users/me/partner-agreement/esign/status'),
   verifyBankAccount: (ifsc: string, accountNumber: string) =>
     post<{ success: true; data: PublicUser }>('/users/me/bank/verify', { ifsc, accountNumber }),
+  registerPushToken: (token: string, platform?: string) =>
+    post<{ success: true }>('/users/me/push-token', { token, platform }),
+  unregisterPushToken: (token: string) =>
+    request<{ success: true }>('/users/me/push-token', { method: 'DELETE', body: JSON.stringify({ token }) }),
 };
 
 /* ── KYC ──────────────────────────────────────────────────────────── */
