@@ -5,7 +5,7 @@ import Link from 'next/link';
 import ProtectedRoute from '../components/ProtectedRoute';
 import BottomNav from '../components/BottomNav';
 import { useAuth } from '../lib/auth-context';
-import { cashLogApi, opsTripApi } from '../lib/api';
+import { agentApi, cashLogApi, opsTripApi } from '../lib/api';
 import type { OpsTripRow } from '../lib/types';
 
 function inr(n?: number | null) {
@@ -24,11 +24,16 @@ function HomeInner() {
   const [trips, setTrips] = useState<OpsTripRow[]>([]);
   const [tripsLoading, setTripsLoading] = useState(true);
   const [cashNet, setCashNet] = useState<number | null>(null);
+  const [openJobs, setOpenJobs] = useState<number | null>(null);
 
   function load() {
     setTripsLoading(true);
     opsTripApi.list({ status: 'RUNNING' }).then((res) => setTrips(res.data)).finally(() => setTripsLoading(false));
     cashLogApi.list(60).then((res) => setCashNet(res.summary.net)).catch(() => {});
+    agentApi
+      .queue()
+      .then((res) => setOpenJobs(res.data.filter((j) => j.status === 'REQUESTED' || j.status === 'CONFIRMED').length))
+      .catch(() => {});
   }
 
   useEffect(load, []);
@@ -51,7 +56,11 @@ function HomeInner() {
             <p className="text-xs text-slate-500 mb-1">Active Trips</p>
             <p className="text-2xl font-extrabold">{tripsLoading ? '—' : trips.length}</p>
           </div>
-          <Link href="/cash-log" className="bg-slate-900 border border-slate-800 rounded-2xl p-4 hover:border-slate-700 transition">
+          <Link href="/jobs" className="bg-slate-900 border border-slate-800 rounded-2xl p-4 hover:border-slate-700 transition">
+            <p className="text-xs text-slate-500 mb-1">Open Jobs</p>
+            <p className="text-2xl font-extrabold text-amber-400">{openJobs == null ? '—' : openJobs}</p>
+          </Link>
+          <Link href="/cash-log" className="bg-slate-900 border border-slate-800 rounded-2xl p-4 hover:border-slate-700 transition col-span-2">
             <p className="text-xs text-slate-500 mb-1">Cash Net (60d)</p>
             <p className={`text-2xl font-extrabold ${cashNet != null && cashNet < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
               {cashNet == null ? '—' : inr(cashNet)}

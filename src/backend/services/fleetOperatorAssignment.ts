@@ -1,3 +1,4 @@
+import { randomInt } from 'crypto';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -14,5 +15,5 @@ export async function pickFleetOperator(): Promise<string | null> {
     select: { id: true },
   });
   if (operators.length === 0) return null;
-  return operators[Math.floor(Math.random() * operators.length)].id;
+  return operators[randomInt(operators.length)].id;
 }
