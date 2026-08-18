@@ -9,6 +9,7 @@ import { requestOtp, verifyOtp } from '../services/otpService';
 import { authRateLimiter } from '../middleware/rateLimit';
 import { normalizeEmail, isValidEmail, normalizePhone, isValidPhone, normalizeFullName } from '../utils/validation';
 import { verifyCredentials } from '@supabase/server/core';
+import { isFirebaseConfigured, getAuthClient } from '../services/firebaseAdmin';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -270,6 +271,46 @@ router.post('/auth/oauth/supabase', authRateLimiter, async (req: Request, res: R
   const user = await prisma.user.findUnique({ where: { email: supabaseEmail } });
   if (!user) {
     return res.status(404).json({ error: 'No Ziyam account found for that Google email yet. Please sign up first.', code: 'NO_ACCOUNT' });
+  }
+  if (user.isSuspended) {
+    return res.status(403).json({ error: 'This account has been suspended. Contact eightlinesfleet@gmail.com.' });
+  }
+
+  const token = signAuthToken({ userId: user.id, role: user.role });
+  res.cookie(config.auth.cookieName, token, cookieOptions());
+  res.json({ success: true, data: toPublicUser(user) });
+});
+
+// Apple Sign-In via real Firebase Auth (not routed through Supabase, unlike
+// Google above) — the frontend does signInWithPopup(auth, new
+// OAuthProvider('apple.com')) client-side, then hands the resulting ID
+// token here for verification. Login-only, same as Google: Apple's email
+// can be a private relay address the account was never created with, so
+// there's no attempt to auto-create an account from it.
+router.post('/auth/oauth/firebase', authRateLimiter, async (req: Request, res: Response) => {
+  if (!isFirebaseConfigured()) {
+    return res.status(503).json({ error: 'Apple sign-in is not configured yet' });
+  }
+  const { idToken } = req.body;
+  if (!idToken) {
+    return res.status(400).json({ error: 'idToken is required' });
+  }
+
+  let firebaseEmail: string;
+  try {
+    const decoded = await getAuthClient().verifyIdToken(idToken);
+    if (!decoded.email) {
+      return res.status(401).json({ error: 'Apple did not share an email for this sign-in' });
+    }
+    firebaseEmail = normalizeEmail(decoded.email);
+  } catch (err) {
+    console.error('[AUTH] Firebase token verification failed:', err);
+    return res.status(401).json({ error: 'Apple sign-in session is invalid or expired' });
+  }
+
+  const user = await prisma.user.findUnique({ where: { email: firebaseEmail } });
+  if (!user) {
+    return res.status(404).json({ error: 'No Ziyam account found for that Apple email yet. Please sign up first.', code: 'NO_ACCOUNT' });
   }
   if (user.isSuspended) {
     return res.status(403).json({ error: 'This account has been suspended. Contact eightlinesfleet@gmail.com.' });

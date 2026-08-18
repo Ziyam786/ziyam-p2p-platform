@@ -94,6 +94,8 @@ export const authApi = {
     post<{ success: true; data: PublicUser }>('/auth/otp/verify', { phoneNumber, code }),
   loginWithSupabase: (accessToken: string) =>
     post<{ success: true; data: PublicUser }>('/auth/oauth/supabase', { accessToken }),
+  loginWithFirebase: (idToken: string) =>
+    post<{ success: true; data: PublicUser }>('/auth/oauth/firebase', { idToken }),
 };
 
 /* ── Cars ─────────────────────────────────────────────────────────── */
