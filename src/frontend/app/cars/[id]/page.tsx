@@ -190,6 +190,11 @@ export default function CarDetailPage() {
         router.push('/account/kyc');
         return;
       }
+      if (err instanceof ApiError && err.code === 'DRIVING_LICENSE_REQUIRED') {
+        show('Verify your driving license to book a car — taking you there now.', 'error');
+        router.push('/account/kyc');
+        return;
+      }
       show(err.message ?? 'Could not start booking', 'error');
     } finally {
       setSubmitting(false);
@@ -673,6 +678,11 @@ export default function CarDetailPage() {
               {user && !user.isKycVerified && (
                 <a href="/account/kyc" className="block text-center text-xs font-semibold bg-amber-50 text-amber-700 rounded-xl px-3 py-2.5 hover:bg-amber-100 transition">
                   🪪 KYC verification is required to book — complete it here first
+                </a>
+              )}
+              {user && user.isKycVerified && !user.isDrivingLicenseVerified && (
+                <a href="/account/kyc" className="block text-center text-xs font-semibold bg-amber-50 text-amber-700 rounded-xl px-3 py-2.5 hover:bg-amber-100 transition">
+                  🪪 Driving license verification is required to book — complete it here first
                 </a>
               )}
 

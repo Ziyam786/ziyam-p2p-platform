@@ -7,7 +7,7 @@ export type PayoutStatus = 'HELD_IN_ESCROW' | 'QUEUED_FOR_N1' | 'SETTLED' | 'FAI
 export type CancelledBy = 'CUSTOMER' | 'HOST' | 'SYSTEM' | 'ADMIN';
 export type TripStage = 'PRE_TRIP' | 'POST_TRIP';
 export type PhotoAngle = 'FRONT' | 'REAR' | 'LEFT' | 'RIGHT' | 'MIRROR_LEFT' | 'MIRROR_RIGHT' | 'ODOMETER' | 'OTHER';
-export type KycMethod = 'AADHAAR_OTP' | 'DIGILOCKER' | 'DOC_UPLOAD';
+export type KycMethod = 'AADHAAR_OTP' | 'DIGILOCKER' | 'DOC_UPLOAD' | 'DRIVING_LICENSE';
 export type KycOutcome = 'SUCCESS' | 'FAILED';
 
 export interface AdminUser {
@@ -17,6 +17,8 @@ export interface AdminUser {
   phoneNumber: string;
   role: Role;
   isKycVerified: boolean;
+  isDrivingLicenseVerified?: boolean;
+  isSelfieVerified?: boolean;
   isSuspended: boolean;
   avatarUrl?: string | null;
   bio?: string | null;

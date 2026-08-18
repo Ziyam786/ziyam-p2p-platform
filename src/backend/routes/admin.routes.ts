@@ -177,7 +177,7 @@ router.get('/admin/users', async (req: Request, res: Response) => {
     where: role ? { role: role as Role } : undefined,
     select: {
       id: true, fullName: true, email: true, phoneNumber: true, role: true, bio: true,
-      isKycVerified: true, isSuspended: true, createdAt: true,
+      isKycVerified: true, isDrivingLicenseVerified: true, isSelfieVerified: true, isSuspended: true, createdAt: true,
       // KYC evidence — which of the three verification paths (see kyc.routes.ts)
       // a user actually went through, so an admin isn't just flipping a blind
       // boolean. aadhaarVerifiedName/digilockerStatus set = real Sandbox/DigiLocker

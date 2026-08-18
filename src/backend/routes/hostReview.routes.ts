@@ -90,7 +90,10 @@ router.post('/bookings/:id/host-review', requireAuth, async (req: Request, res: 
 router.get('/host/booking-requests', requireAuth, async (req: Request, res: Response) => {
   const bookings = await prisma.booking.findMany({
     where: { status: BookingStatus.PENDING_HOST_REVIEW, car: { ownerId: req.user!.userId } },
-    include: { car: { select: { make: true, model: true, id: true } }, customer: { select: { fullName: true } } },
+    include: {
+      car: { select: { make: true, model: true, id: true } },
+      customer: { select: { fullName: true, isKycVerified: true, isDrivingLicenseVerified: true, isSelfieVerified: true } },
+    },
     orderBy: { hostReviewDeadline: 'asc' },
   });
   res.json({ success: true, count: bookings.length, data: bookings });

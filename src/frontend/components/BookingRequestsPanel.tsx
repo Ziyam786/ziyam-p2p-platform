@@ -113,6 +113,17 @@ export default function BookingRequestsPanel({ onChanged }: { onChanged?: () => 
                 <p className="text-xs text-gray-400">
                   {new Date(r.startTime).toLocaleString()} → {new Date(r.endTime).toLocaleString()}
                 </p>
+                <div className="flex gap-1.5 mt-1.5">
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${r.customer?.isKycVerified ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                    {r.customer?.isKycVerified ? '✓ KYC' : '✗ KYC'}
+                  </span>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${r.customer?.isDrivingLicenseVerified ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                    {r.customer?.isDrivingLicenseVerified ? '✓ License' : '✗ License'}
+                  </span>
+                  {r.customer?.isSelfieVerified && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">✓ Identity Match</span>
+                  )}
+                </div>
               </div>
               <span className="text-xs font-semibold px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 whitespace-nowrap">
                 {timeLeft(r.hostReviewDeadline)}
