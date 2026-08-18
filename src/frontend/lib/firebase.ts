@@ -11,6 +11,11 @@ const firebaseConfig = {
 };
 const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
 
+/** Sync, zero-bundle-cost check — safe to call at render time. Auth doesn't need the VAPID key (that's push-only). */
+export function isFirebaseAuthConfigured(): boolean {
+  return Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId);
+}
+
 /** Sync, zero-bundle-cost check — safe to call at render time. */
 export function isPushConfigured(): boolean {
   return Boolean(
@@ -76,6 +81,36 @@ export async function setupPushNotifications(): Promise<PushSetupResult> {
     return { status: 'granted', token };
   } catch (err) {
     console.error('[PUSH] setupPushNotifications failed:', err);
+    return { status: 'error' };
+  }
+}
+
+export type AppleSignInResult =
+  | { status: 'unconfigured' }
+  | { status: 'cancelled' }
+  | { status: 'error' }
+  | { status: 'signed-in'; idToken: string };
+
+/**
+ * "Continue with Apple" — a real Firebase Auth popup, hands the resulting
+ * ID token back to the caller to POST to /auth/oauth/firebase for
+ * verification (see auth.routes.ts). Never throws — 'cancelled' covers the
+ * user closing the popup, a normal outcome, not an error to log/alert on.
+ */
+export async function signInWithApple(): Promise<AppleSignInResult> {
+  if (!isFirebaseAuthConfigured()) return { status: 'unconfigured' };
+  try {
+    const [{ getAuth, signInWithPopup, OAuthProvider }, app] = await Promise.all([import('firebase/auth'), getFirebaseApp()]);
+    const auth = getAuth(app);
+    const provider = new OAuthProvider('apple.com');
+    const result = await signInWithPopup(auth, provider);
+    const idToken = await result.user.getIdToken();
+    return { status: 'signed-in', idToken };
+  } catch (err: any) {
+    if (err?.code === 'auth/popup-closed-by-user' || err?.code === 'auth/cancelled-popup-request') {
+      return { status: 'cancelled' };
+    }
+    console.error('[AUTH] signInWithApple failed:', err);
     return { status: 'error' };
   }
 }

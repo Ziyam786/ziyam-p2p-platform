@@ -144,6 +144,9 @@ export const config = {
   // env var string (paste the whole downloaded JSON file's contents).
   firebase: {
     serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON ?? '',
+    // Same bucket the frontend's NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET points
+    // at — used server-side by upload.routes.ts (see firebaseAdmin.ts).
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET ?? '',
   },
 
   // Only used for the config.supabase.url/publishableKey guard in

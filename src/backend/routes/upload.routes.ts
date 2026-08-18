@@ -2,10 +2,12 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import axios from 'axios';
 import sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
 import { requireAuth } from '../middleware/auth';
+import { isStorageConfigured, getStorageBucket } from '../services/firebaseAdmin';
 
 const router = Router();
 
@@ -23,13 +25,11 @@ const MIME_EXTENSION: Record<string, string> = {
   'application/pdf': '.pdf',
 };
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, config.uploadDir),
-  filename: (_req, file, cb) => cb(null, `${uuidv4()}${MIME_EXTENSION[file.mimetype] ?? ''}`),
-});
-
+// Buffered in memory, not written to local disk first — the destination
+// (Firebase Storage, or local disk as a fallback when it's not configured)
+// is decided after content verification, not before.
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (!MIME_EXTENSION[file.mimetype]) {
@@ -43,39 +43,75 @@ const upload = multer({
 // Checks the file's actual bytes match what its declared mimetype claimed —
 // a declared Content-Type is just a client-supplied header, not proof of
 // content. Images are re-parsed with sharp (throws on anything that isn't a
-// genuinely decodable image); PDFs are checked for the real %PDF- magic
-// header. Deletes the file and returns false on any mismatch.
-async function verifyFileContent(filePath: string, mimetype: string): Promise<boolean> {
+// genuinely decodable image); PDFs are checked for the real %PDF- magic header.
+async function verifyFileContent(buffer: Buffer, mimetype: string): Promise<boolean> {
   try {
     if (mimetype === 'application/pdf') {
-      const head = Buffer.alloc(5);
-      const fd = fs.openSync(filePath, 'r');
-      fs.readSync(fd, head, 0, 5, 0);
-      fs.closeSync(fd);
-      return head.toString('ascii') === '%PDF-';
+      return buffer.subarray(0, 5).toString('ascii') === '%PDF-';
     }
-    const metadata = await sharp(filePath).metadata();
+    const metadata = await sharp(buffer).metadata();
     return Boolean(metadata.format);
   } catch {
     return false;
   }
 }
 
+/**
+ * Saves a verified file buffer and returns its URL. Firebase Storage when
+ * configured (absolute, CDN-backed public URL); local disk otherwise, same
+ * relative /uploads/<file> path (served by server.ts's express.static) this
+ * app used before the Storage migration — a deliberate fallback, not a
+ * removed feature, so uploads still work in local dev without Firebase creds.
+ */
+async function saveFile(buffer: Buffer, mimetype: string): Promise<string> {
+  const filename = `${uuidv4()}${MIME_EXTENSION[mimetype] ?? ''}`;
+  if (isStorageConfigured()) {
+    const file = getStorageBucket().file(filename);
+    await file.save(buffer, { contentType: mimetype, public: true });
+    return file.publicUrl();
+  }
+  await fs.promises.writeFile(path.join(config.uploadDir, filename), buffer);
+  return `/uploads/${filename}`;
+}
+
+/**
+ * Fetches the bytes of an already-saved upload, whichever backend it lives
+ * on — an absolute Firebase Storage URL is fetched over HTTPS; a relative
+ * /uploads/<file> path (files saved before the Storage migration, or saved
+ * locally because Storage wasn't configured) is read straight off disk.
+ */
+async function fetchSavedFileBuffer(url: string): Promise<Buffer> {
+  if (/^https?:\/\//i.test(url)) {
+    const res = await axios.get(url, { responseType: 'arraybuffer' });
+    return Buffer.from(res.data);
+  }
+  const resolvedUploadDir = path.resolve(config.uploadDir);
+  const absolutePath = path.resolve(resolvedUploadDir, path.basename(url));
+  if (absolutePath !== resolvedUploadDir && !absolutePath.startsWith(resolvedUploadDir + path.sep)) {
+    throw new Error('Invalid file path');
+  }
+  return fs.promises.readFile(absolutePath);
+}
+
 // Used for car photos, RC/insurance/PUC documents, KYC selfies, and
-// signatures — hosts and guests upload the actual file rather than pasting a
-// URL. Returns a relative /uploads/<file> path, served statically by server.ts.
+// signatures — hosts and guests upload the actual file rather than pasting a URL.
 router.post('/uploads', requireAuth, (req: Request, res: Response) => {
   upload.single('file')(req, res, async (err: any) => {
     if (err) return res.status(400).json({ error: err.message ?? 'Upload failed' });
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
 
-    const valid = await verifyFileContent(req.file.path, req.file.mimetype);
+    const valid = await verifyFileContent(req.file.buffer, req.file.mimetype);
     if (!valid) {
-      fs.unlink(req.file.path, () => {});
       return res.status(400).json({ error: 'File content does not match its declared type.' });
     }
 
-    res.json({ success: true, data: { url: `/uploads/${req.file.filename}` } });
+    try {
+      const url = await saveFile(req.file.buffer, req.file.mimetype);
+      res.json({ success: true, data: { url } });
+    } catch (saveErr: any) {
+      console.error('[UPLOADS] save failed:', saveErr.message);
+      res.status(502).json({ error: 'Could not save the uploaded file right now. Please try again.' });
+    }
   });
 });
 
@@ -88,7 +124,7 @@ function isFraction(n: unknown): n is number {
 // Manually blurs a host-drawn rectangle (license plate) on an already-uploaded
 // car photo. Coordinates are fractional [0,1] relative to the image's own
 // pixel dimensions — resolution-independent regardless of how large the
-// image was rendered in the browser. Writes a NEW file rather than
+// image was rendered in the browser. Saves a NEW file rather than
 // overwriting the original, since Car.originalImages must keep the
 // untouched original around for admin verification against registrationNo.
 router.post('/uploads/blur-region', requireAuth, async (req: Request, res: Response) => {
@@ -97,19 +133,6 @@ router.post('/uploads/blur-region', requireAuth, async (req: Request, res: Respo
   if (typeof url !== 'string' || !url) {
     return res.status(400).json({ error: 'url is required' });
   }
-
-  // Resolve the /uploads/<file> URL back to an absolute path the same way
-  // multer's diskStorage writes it, and reject any attempt to escape uploadDir.
-  const filename = path.basename(url);
-  const resolvedUploadDir = path.resolve(config.uploadDir);
-  const absolutePath = path.resolve(resolvedUploadDir, filename);
-  if (absolutePath !== resolvedUploadDir && !absolutePath.startsWith(resolvedUploadDir + path.sep)) {
-    return res.status(400).json({ error: 'Invalid file path' });
-  }
-  if (!fs.existsSync(absolutePath)) {
-    return res.status(404).json({ error: 'File not found' });
-  }
-
   if (![x, y, width, height].every(isFraction)) {
     return res.status(400).json({ error: 'x, y, width, and height must all be numbers in [0, 1]' });
   }
@@ -121,7 +144,8 @@ router.post('/uploads/blur-region', requireAuth, async (req: Request, res: Respo
   }
 
   try {
-    const metadata = await sharp(absolutePath).metadata();
+    const original = await fetchSavedFileBuffer(url);
+    const metadata = await sharp(original).metadata();
     const imgWidth = metadata.width;
     const imgHeight = metadata.height;
     if (!imgWidth || !imgHeight) {
@@ -135,23 +159,17 @@ router.post('/uploads/blur-region', requireAuth, async (req: Request, res: Respo
 
     // 1-2. Extract the plate region and blur it heavily (sigma 25 — strong
     // enough that no plate character stays legible, not just a soft blur).
-    const blurredRegion = await sharp(absolutePath)
-      .extract({ left, top, width: regionWidth, height: regionHeight })
-      .blur(25)
+    const blurredRegion = await sharp(original).extract({ left, top, width: regionWidth, height: regionHeight }).blur(25).toBuffer();
+
+    // 3-4. Composite the blurred region back onto a FRESH decode of the full
+    // original image, then save as a brand-new file — the original is never touched.
+    const composited = await sharp(original)
+      .composite([{ input: blurredRegion, left, top }])
       .toBuffer();
 
-    // 3-4. Composite the blurred region back onto a FRESH read of the full
-    // original image, then write to a brand-new file — the original on disk
-    // (referenced by Car.originalImages) is never touched.
-    const ext = path.extname(filename).toLowerCase() || '.jpg';
-    const newFilename = `${uuidv4()}${ext}`;
-    const newAbsolutePath = path.join(resolvedUploadDir, newFilename);
-
-    await sharp(absolutePath)
-      .composite([{ input: blurredRegion, left, top }])
-      .toFile(newAbsolutePath);
-
-    res.json({ success: true, data: { url: `/uploads/${newFilename}` } });
+    const mimetype = metadata.format === 'png' ? 'image/png' : metadata.format === 'webp' ? 'image/webp' : 'image/jpeg';
+    const newUrl = await saveFile(composited, mimetype);
+    res.json({ success: true, data: { url: newUrl } });
   } catch (err: any) {
     console.error('[UPLOADS] blur-region failed:', err.message);
     res.status(500).json({ error: 'Failed to process image' });
