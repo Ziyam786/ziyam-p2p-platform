@@ -60,7 +60,18 @@ export default function GuestPolicyPage() {
               <p>Dates you pick on the homepage or search page carry over to whichever car you click into — no re-entering them per car.</p>
             </Card>
             <Card title="Cancellation">
-              <p>Free cancellation up to 24 hours before pickup. If a host cancels a confirmed booking on you, you get a full refund instantly plus priority rebooking help from our support team.</p>
+              <p className="mb-2">Free cancellation up to 24 hours before pickup. Cancelling closer to pickup retains a portion of the trip cost (your security deposit is always refunded in full, regardless of when you cancel):</p>
+              <ul className="space-y-1 list-disc list-inside">
+                <li>More than 24h before pickup — 100% refund, no charge</li>
+                <li>6–24h before pickup — 25% of the trip cost retained</li>
+                <li>Under 6h before pickup — 50% of the trip cost retained</li>
+                <li>After the trip has started — no refund of the trip cost</li>
+              </ul>
+              <p className="mt-2 text-xs text-gray-500">Full breakdown, including non-refundable fees and refund processing times, in our <a href="/refund-policy" className="text-amber-600 underline">Refund &amp; Cancellation Policy</a>.</p>
+              <p className="mt-2">If a host cancels a confirmed booking on you, you get a full refund instantly plus priority rebooking help from our support team.</p>
+            </Card>
+            <Card title="Reserving a car (two-stage checkout)">
+              <p>Some bookings start with a smaller reservation fee to hold your dates, with the balance due within 24 hours. If the balance isn't paid in that window, the reservation is automatically released and <span className="font-semibold text-gray-800">the reservation fee is not refunded</span> — this is separate from, and not covered by, the cancellation tiers above.</p>
             </Card>
           </Section>
 
@@ -70,6 +81,7 @@ export default function GuestPolicyPage() {
             </Card>
             <Card title="Protection Plans">
               <p>Basic (free), Standard (+₹149/day), and Premium (+₹349/day) only change your deposit-hold amount and support priority — they don't transfer any damage liability away from you. See our full <a href="/insurance" className="text-amber-600 underline">Insurance &amp; Damage Policy</a>.</p>
+              <p className="mt-2">Standard and Premium also include access to a Ziyam agent by phone or WhatsApp if you need help resolving a dispute with your host directly — not available on Basic.</p>
             </Card>
           </Section>
 

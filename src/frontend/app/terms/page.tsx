@@ -65,7 +65,7 @@ export default function TermsPage() {
         {
           heading: '9. Insurance Coverage',
           body: [
-            'Vehicles may carry insurance subject to insurer terms. Coverage typically excludes intoxicated driving, reckless operation, unauthorized use, legal violations, and use outside permitted geographic areas. Users remain responsible for excluded liabilities.',
+            'The Company does not itself provide vehicle damage insurance and is not an insurer — ZiyamSelfDrive is a peer-to-peer marketplace connecting hosts and guests. Every listed vehicle must carry a host-arranged, host-paid comprehensive (not merely third-party) insurance policy, verified at listing time. Coverage under that policy is subject to the issuing insurer\'s own terms, and typically excludes intoxicated driving, reckless operation, unauthorized use, legal violations, and use outside permitted geographic areas. Users remain responsible for any liabilities excluded from the host\'s policy. See our full Insurance & Damage Policy for the complete damage-recovery process, including the Company\'s own limited goodwill contribution toward eligible claims.',
           ],
         },
         {
