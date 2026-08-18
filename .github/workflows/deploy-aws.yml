@@ -57,6 +57,7 @@ jobs:
             -f ${{ matrix.dockerfile }} \
             --build-arg NEXT_PUBLIC_API_URL="${{ secrets.NEXT_PUBLIC_API_URL }}" \
             --build-arg NEXT_PUBLIC_GOOGLE_MAPS_API_KEY="${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}" \
+            --build-arg NEXT_PUBLIC_MIXPANEL_TOKEN="${{ secrets.NEXT_PUBLIC_MIXPANEL_TOKEN }}" \
             -t "$IMAGE_URI" -t "$IMAGE_LATEST" .
           docker push "$IMAGE_URI"
           docker push "$IMAGE_LATEST"

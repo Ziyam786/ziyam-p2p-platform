@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, BookingStatus, RefundRequestType, CancelledBy, TripStage, PhotoAngle } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
+import { randomInt } from 'crypto';
 import paymentGateway from '../services/paymentGateway';
 import { PayoutEngine } from '../services/payoutEngine';
 import { TelematicsService } from '../services/telematicsService';
@@ -22,7 +23,7 @@ function mirrorToFirestore(collectionPath: string, docId: string, data: Record<s
     .collection(collectionPath)
     .doc(docId)
     .set(data, { merge: true })
-    .catch((err: any) => console.error(`[FIRESTORE MIRROR] Failed to write ${collectionPath}/${docId}:`, err.message ?? err));
+    .catch((err: any) => console.error('[FIRESTORE MIRROR] Failed to write %s/%s:', collectionPath, docId, err.message ?? err));
 }
 
 // Firestore Security Rules can't query Postgres to check who a booking's
@@ -347,7 +348,7 @@ router.post('/booking/:id/start', requireAuth, async (req: Request, res: Respons
   // Generate the trip-end handover code now — shown only to the host, and
   // required from whoever calls /complete, so a trip can't be closed out
   // without the two parties actually meeting for the handover.
-  const endOtp = String(Math.floor(1000 + Math.random() * 9000));
+  const endOtp = String(randomInt(1000, 10000));
   const updated = await prisma.booking.update({ where: { id }, data: { status: BookingStatus.ACTIVE, endOtp } });
   await notify(
     booking.car.ownerId,

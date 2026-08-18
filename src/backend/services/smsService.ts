@@ -18,7 +18,7 @@ export function isSmsConfigured(): boolean {
 
 export async function sendTemplateSms(phoneNumber: string, templateId: string, variables: Record<string, string>): Promise<void> {
   if (!isSmsConfigured() || !templateId) {
-    console.log(`[SMS] (not configured — logged only) To ${phoneNumber}, template ${templateId}:`, variables);
+    console.log('[SMS] (not configured — logged only) To %s, template %s:', phoneNumber, templateId, variables);
     return;
   }
 
@@ -33,6 +33,6 @@ export async function sendTemplateSms(phoneNumber: string, templateId: string, v
       { headers: { authkey: config.sms.authKey, 'Content-Type': 'application/json' } }
     );
   } catch (err: any) {
-    console.error(`[SMS] MSG91 send failed for ${phoneNumber}:`, err.response?.data ?? err.message);
+    console.error('[SMS] MSG91 send failed for %s:', phoneNumber, err.response?.data ?? err.message);
   }
 }

@@ -7,8 +7,10 @@ import { getSetting } from '../services/settingsService';
 import { generateChatReply } from '../services/aiService';
 import { ITINERARY_DESTINATIONS } from './itinerary.routes';
 import { PayoutEngine } from '../services/payoutEngine';
+import { payuCallbackRateLimiter } from '../middleware/rateLimit';
 
 const router = Router();
+router.use(payuCallbackRateLimiter);
 const prisma = new PrismaClient();
 
 // How long a guest has to pay the balance after reserving before the dates
@@ -235,7 +237,7 @@ router.post('/payments/payu/issue-report-callback', async (req: Request, res: Re
   await prisma.damageClaim.update({ where: { id: claim.id }, data: { excessChargePaidAt: new Date() } });
 
   PayoutEngine.fastPayoutForIssueReport(claim.id).catch((err) => {
-    console.error(`[ISSUE REPORT] Fast payout failed after excess payment for claim ${claim.id}:`, err.message);
+    console.error('[ISSUE REPORT] Fast payout failed after excess payment for claim %s:', claim.id, err.message);
   });
 
   return res.redirect(303, `${redirectBase}/account/trips/${bookingId}`);
@@ -319,7 +321,7 @@ router.post('/payments/payu/itinerary-callback', async (req: Request, res: Respo
       { enableTools: true, toolNames: ['search_available_cars'] }
     );
   } catch (err: any) {
-    console.error(`[PAYU ITINERARY CALLBACK] AI generation failed for unlock ${unlockId}:`, err.message ?? err);
+    console.error('[PAYU ITINERARY CALLBACK] AI generation failed for unlock %s:', unlockId, err.message ?? err);
     generatedContent =
       "We've confirmed your payment, but couldn't generate your itinerary just yet — please contact support and we'll " +
       'get it to you directly, or check back here shortly as we retry automatically.';

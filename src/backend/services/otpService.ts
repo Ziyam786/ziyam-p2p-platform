@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { randomInt } from 'crypto';
 import { sendTemplateSms } from './smsService';
 import { config } from '../config';
 
@@ -9,7 +10,7 @@ const MIN_RESEND_INTERVAL_MS = 60 * 1000; // 1 request per phone number per minu
 const MAX_VERIFY_ATTEMPTS = 5;
 
 function generateCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return randomInt(100000, 1000000).toString();
 }
 
 /**
