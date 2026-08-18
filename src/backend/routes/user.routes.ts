@@ -66,7 +66,12 @@ router.delete('/users/me/push-token', requireAuth, async (req: Request, res: Res
 });
 
 router.patch('/users/me', requireAuth, async (req: Request, res: Response) => {
-  const { fullName, bio, avatarUrl, payoutAccountId, signatureUrl, selfieUrl, alternatePhoneNumber, payoutFrequency } = req.body;
+  // payoutAccountId is deliberately NOT accepted here — it must only ever be
+  // set by POST /users/me/bank/verify on a successful Sandbox penny-drop.
+  // Accepting it on a generic profile PATCH let a user self-supply an
+  // unverified account and still pass the payoutAccountId-truthy checks
+  // gating payouts elsewhere.
+  const { fullName, bio, avatarUrl, signatureUrl, selfieUrl, alternatePhoneNumber, payoutFrequency } = req.body;
   if (payoutFrequency !== undefined && !['STANDARD', 'WEEKLY'].includes(payoutFrequency)) {
     return res.status(400).json({ error: 'payoutFrequency must be STANDARD or WEEKLY' });
   }
@@ -76,7 +81,6 @@ router.patch('/users/me', requireAuth, async (req: Request, res: Response) => {
       ...(fullName !== undefined && { fullName }),
       ...(bio !== undefined && { bio }),
       ...(avatarUrl !== undefined && { avatarUrl }),
-      ...(payoutAccountId !== undefined && { payoutAccountId }),
       ...(signatureUrl !== undefined && { signatureUrl }),
       ...(selfieUrl !== undefined && { selfieUrl }),
       ...(alternatePhoneNumber !== undefined && { alternatePhoneNumber }),

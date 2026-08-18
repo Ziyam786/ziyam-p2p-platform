@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import { config } from './config';
 import { PayoutEngine } from './services/payoutEngine';
 import { initializeYieldAutoApplyCron } from './services/yieldEngine';
+import { initializeDocExpiryCron } from './services/carVerificationService';
 import { apiRateLimiter } from './middleware/rateLimit';
 import { safeErrorMessage } from './utils/errorResponse';
 import authRoutes from './routes/auth.routes';
@@ -143,6 +144,7 @@ PayoutEngine.initializeDepositReleaseCron();
 PayoutEngine.initializeHostReviewTimeoutCron();
 PayoutEngine.initializeReservationTimeoutCron();
 initializeYieldAutoApplyCron();
+initializeDocExpiryCron();
 
 app.listen(config.port, () => {
   console.log(`🚀 ZiyamSelfDrive API running on port ${config.port} (${config.nodeEnv})`);

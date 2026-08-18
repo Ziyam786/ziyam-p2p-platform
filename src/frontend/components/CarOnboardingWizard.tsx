@@ -19,6 +19,7 @@ export interface WizardValues {
   fuelType: string; transmission: string; seats: number; city: string;
   address: string; latitude: number | null; longitude: number | null;
   rcDocUrl: string; pollutionCertUrl: string; insuranceDocUrl: string;
+  rcExpiry: string; insuranceExpiry: string; pucExpiry: string;
   images: string[]; originalImages: string[]; description: string; features: string[];
   dailyRate: number; securityDeposit: number; kmIncludedPerDay: number; extraKmCharge: number;
   instantBook: boolean; offersDelivery: boolean; deliveryFee: number; offersPickup: boolean; pickupFee: number;
@@ -29,6 +30,7 @@ const DEFAULTS: WizardValues = {
   fuelType: 'Petrol', transmission: 'Manual', seats: 5, city: 'Bengaluru',
   address: '', latitude: null, longitude: null,
   rcDocUrl: '', pollutionCertUrl: '', insuranceDocUrl: '',
+  rcExpiry: '', insuranceExpiry: '', pucExpiry: '',
   images: [], originalImages: [], description: '', features: ['Air Conditioning', 'Power Steering', 'Bluetooth', 'Power Windows', 'Music System'],
   dailyRate: 1200, securityDeposit: 3000, kmIncludedPerDay: 300, extraKmCharge: 10,
   instantBook: true, offersDelivery: false, deliveryFee: 0, offersPickup: false, pickupFee: 0,
@@ -46,6 +48,7 @@ export function wizardValuesToPayload(v: WizardValues) {
     instantBook: v.instantBook, offersDelivery: v.offersDelivery, deliveryFee: Number(v.deliveryFee),
     offersPickup: v.offersPickup, pickupFee: Number(v.pickupFee),
     rcDocUrl: v.rcDocUrl || undefined, pollutionCertUrl: v.pollutionCertUrl || undefined, insuranceDocUrl: v.insuranceDocUrl || undefined,
+    rcExpiry: v.rcExpiry || undefined, insuranceExpiry: v.insuranceExpiry || undefined, pucExpiry: v.pucExpiry || undefined,
     onboardingStep: 4,
   };
 }
@@ -85,7 +88,10 @@ export default function CarOnboardingWizard({
     : step === 3 ? values.features.length >= 5 && Number(values.dailyRate) > 0
     : true;
 
-  const docsComplete = Boolean(values.rcDocUrl && values.pollutionCertUrl && values.insuranceDocUrl);
+  const docsComplete = Boolean(
+    values.rcDocUrl && values.pollutionCertUrl && values.insuranceDocUrl &&
+      values.rcExpiry && values.insuranceExpiry && values.pucExpiry
+  );
   const photosCount = values.images.length;
   const stepsCompleted = [
     Boolean(values.registrationNo && values.make && values.model),
@@ -189,20 +195,29 @@ export default function CarOnboardingWizard({
             onChange={(url) => set('rcDocUrl', url)}
             kind="document"
           />
+          <Field label="RC Expiry Date">
+            <input type="date" value={values.rcExpiry} onChange={(e) => set('rcExpiry', e.target.value)} className={inputCls} />
+          </Field>
           <FileUploadField
             label="Pollution Certificate (PUC)"
             value={values.pollutionCertUrl}
             onChange={(url) => set('pollutionCertUrl', url)}
             kind="document"
           />
+          <Field label="PUC Expiry Date">
+            <input type="date" value={values.pucExpiry} onChange={(e) => set('pucExpiry', e.target.value)} className={inputCls} />
+          </Field>
           <FileUploadField
             label="Comprehensive Insurance Document"
             value={values.insuranceDocUrl}
             onChange={(url) => set('insuranceDocUrl', url)}
             kind="document"
           />
+          <Field label="Insurance Expiry Date">
+            <input type="date" value={values.insuranceExpiry} onChange={(e) => set('insuranceExpiry', e.target.value)} className={inputCls} />
+          </Field>
           {docsComplete ? (
-            <p className="text-xs text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2">✓ All three documents provided — this car will show as Verified.</p>
+            <p className="text-xs text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2">✓ All three documents and expiry dates provided — queued for our team to review before this car shows as Verified.</p>
           ) : (
             <p className="text-xs text-gray-400">You can skip this for now and add documents later from "Manage your car", but verified listings get more bookings.</p>
           )}

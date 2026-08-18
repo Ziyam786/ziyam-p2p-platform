@@ -24,14 +24,16 @@ export default function PushNotificationSetup() {
     if (typeof Notification === 'undefined' || Notification.permission === 'denied') return;
 
     let cancelled = false;
-    setupPushNotifications().then((result) => {
-      if (cancelled || result.status !== 'granted') return;
-      if (localStorage.getItem(REGISTERED_TOKEN_KEY) === result.token) return;
-      usersApi
-        .registerPushToken(result.token, 'web')
-        .then(() => localStorage.setItem(REGISTERED_TOKEN_KEY, result.token))
-        .catch((err) => console.error('[PUSH] Failed to register token:', err));
-    });
+    setupPushNotifications()
+      .then((result) => {
+        if (cancelled || result.status !== 'granted') return;
+        if (localStorage.getItem(REGISTERED_TOKEN_KEY) === result.token) return;
+        usersApi
+          .registerPushToken(result.token, 'web')
+          .then(() => localStorage.setItem(REGISTERED_TOKEN_KEY, result.token))
+          .catch((err) => console.error('[PUSH] Failed to register token:', err));
+      })
+      .catch((err) => console.error('[PUSH] Setup failed:', err));
 
     return () => {
       cancelled = true;
@@ -43,9 +45,11 @@ export default function PushNotificationSetup() {
     let unsubscribe: (() => void) | undefined;
     onForegroundPush((title, body) => {
       show(`${title} — ${body}`, 'info');
-    }).then((fn) => {
-      unsubscribe = fn;
-    });
+    })
+      .then((fn) => {
+        unsubscribe = fn;
+      })
+      .catch((err) => console.error('[PUSH] Foreground listener failed:', err));
     return () => unsubscribe?.();
   }, [user, show]);
 

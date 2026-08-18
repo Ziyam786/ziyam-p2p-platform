@@ -95,7 +95,7 @@ router.post('/admin/bookings', async (req: Request, res: Response) => {
     const car = await prisma.car.findUnique({ where: { id: carId }, include: { owner: true } });
     if (!car) return res.status(404).json({ error: 'Car not found' });
     if (!car.isAvailable) return res.status(409).json({ error: 'Car is not available for booking' });
-    if (!car.owner.payoutAccountId) return res.status(422).json({ error: 'Host payout account not configured' });
+    if (!car.owner.payoutAccountId || !car.owner.bankAccountVerified) return res.status(422).json({ error: 'Host payout account not configured' });
 
     const conflictingBooking = await prisma.booking.findFirst({
       where: { carId, status: { notIn: [BookingStatus.CANCELLED] }, startTime: { lt: end }, endTime: { gt: start } },
@@ -349,16 +349,16 @@ router.patch('/admin/cars/:id', async (req: Request, res: Response) => {
   res.json({ success: true, data: car });
 });
 
-// Manual document review — car.routes.ts auto-marks VERIFIED the moment a
-// host has all three docs on file (self-attested, no review gate), which is
-// enough to unblock listing but not a substitute for someone actually looking
-// at the RC/insurance/PUC. This lets an admin override that to REJECTED (with
-// a reason the host sees) or confirm it back to VERIFIED after review.
+// Manual document review — car.routes.ts queues a car as PENDING_REVIEW the
+// moment a host has all three docs + expiry dates on file, but never
+// auto-verifies. This is the only path to VERIFIED: an admin actually opens
+// the RC/insurance/PUC and confirms them, or REJECTED (with a reason the
+// host sees) if something's wrong.
 router.patch('/admin/cars/:id/verification', async (req: Request, res: Response) => {
   const { id } = req.params;
   const { verificationStatus, reason } = req.body;
-  if (!['PENDING', 'VERIFIED', 'REJECTED'].includes(verificationStatus)) {
-    return res.status(400).json({ error: 'verificationStatus must be PENDING, VERIFIED, or REJECTED' });
+  if (!['PENDING', 'PENDING_REVIEW', 'VERIFIED', 'REJECTED'].includes(verificationStatus)) {
+    return res.status(400).json({ error: 'verificationStatus must be PENDING, PENDING_REVIEW, VERIFIED, or REJECTED' });
   }
   if (verificationStatus === 'REJECTED' && !String(reason ?? '').trim()) {
     return res.status(400).json({ error: 'A reason is required when rejecting documents' });

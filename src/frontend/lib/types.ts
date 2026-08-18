@@ -16,7 +16,7 @@ export type CancelledBy = 'CUSTOMER' | 'HOST' | 'SYSTEM' | 'ADMIN';
 export type TripStage = 'PRE_TRIP' | 'POST_TRIP';
 export type PhotoAngle = 'FRONT' | 'REAR' | 'LEFT' | 'RIGHT' | 'MIRROR_LEFT' | 'MIRROR_RIGHT' | 'ODOMETER' | 'OTHER';
 
-export type CarVerificationStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
+export type CarVerificationStatus = 'PENDING' | 'PENDING_REVIEW' | 'VERIFIED' | 'REJECTED';
 
 export interface PublicUser {
   id: string;
@@ -87,6 +87,9 @@ export interface Car {
   rcDocUrl?: string | null;
   pollutionCertUrl?: string | null;
   insuranceDocUrl?: string | null;
+  rcExpiry?: string | null;
+  insuranceExpiry?: string | null;
+  pucExpiry?: string | null;
   onboardingStep: number;
 
   noNightBookings: boolean;
