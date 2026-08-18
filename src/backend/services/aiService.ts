@@ -138,9 +138,9 @@ async function runTool(name: string, input: unknown, userId: string | null): Pro
 export async function generateChatReply(
   systemPrompt: string,
   history: ChatTurn[],
-  opts: { userId?: string | null; enableTools?: boolean } = {}
+  opts: { userId?: string | null; enableTools?: boolean; toolNames?: string[] } = {}
 ): Promise<string> {
-  const { userId = null, enableTools = false } = opts;
+  const { userId = null, enableTools = false, toolNames } = opts;
   const anthropic = getClient();
   if (!anthropic) {
     return (
@@ -148,6 +148,12 @@ export async function generateChatReply(
       'before I can answer questions. In the meantime, reach a human at eightlinesfleet@gmail.com.'
     );
   }
+
+  // toolNames lets a caller allow-list a subset — e.g. the itinerary flow
+  // (no logged-in user) exposes search_available_cars but never
+  // get_my_bookings, which needs a userId it doesn't have. Omitted =
+  // every tool, unchanged from before this param existed.
+  const activeTools = toolNames ? TOOLS.filter((t) => toolNames.includes(t.name)) : TOOLS;
 
   try {
     const messages: Anthropic.MessageParam[] = history.map((turn) => ({ role: turn.role, content: turn.content }));
@@ -158,7 +164,7 @@ export async function generateChatReply(
         max_tokens: 512,
         system: systemPrompt,
         messages,
-        ...(enableTools && { tools: TOOLS }),
+        ...(enableTools && { tools: activeTools }),
       });
 
       if (response.stop_reason !== 'tool_use') {

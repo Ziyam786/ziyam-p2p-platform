@@ -242,13 +242,20 @@ router.post('/payments/payu/itinerary-callback', async (req: Request, res: Respo
     '(use line breaks and simple dashes for structure, no markdown headers). Include: route overview and driving ' +
     'distance/time from Bengaluru, recommended trip duration, suggested stops along the way, key attractions at the ' +
     'destination, best time to visit, and practical self-drive tips (fuel stops, road conditions, parking). Keep it ' +
-    'genuinely useful and specific to the destination, not generic filler.';
+    'genuinely useful and specific to the destination, not generic filler.\n\n' +
+    'You have a search_available_cars tool — use it (city: "Bengaluru") to find 1-2 real, currently-bookable Ziyam ' +
+    'cars suited to this trip (prefer an SUV/sedan with good boot space for a road trip over a hatchback, unless ' +
+    "none are available) and recommend them by make/model/daily rate near the end, under a short 'Suggested Ziyam " +
+    "cars for this trip' section. If the tool returns no cars, skip that section entirely — never invent a car or " +
+    'price that search_available_cars did not actually return.';
 
   let generatedContent: string;
   try {
-    generatedContent = await generateChatReply(systemPrompt, [
-      { role: 'user', content: `Write the itinerary for a Bengaluru to ${unlock.destination} road trip. ${destinationBrief}.` },
-    ]);
+    generatedContent = await generateChatReply(
+      systemPrompt,
+      [{ role: 'user', content: `Write the itinerary for a Bengaluru to ${unlock.destination} road trip. ${destinationBrief}.` }],
+      { enableTools: true, toolNames: ['search_available_cars'] }
+    );
   } catch (err: any) {
     console.error(`[PAYU ITINERARY CALLBACK] AI generation failed for unlock ${unlockId}:`, err.message ?? err);
     generatedContent =
