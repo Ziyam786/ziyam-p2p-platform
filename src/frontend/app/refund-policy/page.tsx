@@ -27,6 +27,7 @@ export default function RefundPolicyPage() {
             'Between 6 and 24 hours before trip start: up to 25% of the booking amount may be retained as a cancellation charge; the remainder is refunded.',
             'Within 6 hours of trip start: up to 50% of the booking amount may be retained; the remainder is refunded.',
             'After the scheduled trip start: no refund — the entire booking amount may be forfeited.',
+            'These tiers apply once your booking has moved past the reservation stage. If your booking is still awaiting the balance payment (a smaller reservation fee was paid to hold your dates), a separate rule applies: the balance must be paid within 24 hours of reserving, or the reservation automatically expires and the reservation fee is forfeited in full — this is not a cancellation and none of the percentage tiers above apply to it.',
           ],
         },
         {
