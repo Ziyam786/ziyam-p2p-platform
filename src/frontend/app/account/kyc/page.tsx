@@ -9,6 +9,15 @@ import { useAuth } from '../../../lib/auth-context';
 import { useToast } from '../../../components/Toast';
 import { kycApi } from '../../../lib/api';
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve((reader.result as string).split(',')[1] ?? '');
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 function KycInner() {
   const { user, refresh } = useAuth();
   const { show } = useToast();
@@ -22,6 +31,8 @@ function KycInner() {
   const [verifying, setVerifying] = useState(false);
   const [digilockerLoading, setDigilockerLoading] = useState(false);
   const [checkingDigilocker, setCheckingDigilocker] = useState(false);
+  const [dlFile, setDlFile] = useState<File | null>(null);
+  const [dlVerifying, setDlVerifying] = useState(false);
 
   // Returned from DigiLocker's consent screen — poll for the final status.
   useEffect(() => {
@@ -50,6 +61,22 @@ function KycInner() {
     } catch (err: any) {
       show(err.message ?? 'Could not start DigiLocker verification', 'error');
       setDigilockerLoading(false);
+    }
+  }
+
+  async function handleVerifyDrivingLicense() {
+    if (!dlFile) return;
+    setDlVerifying(true);
+    try {
+      const docBase64 = await fileToBase64(dlFile);
+      await kycApi.verifyDrivingLicense(docBase64);
+      await refresh();
+      setDlFile(null);
+      show('Driving license verified!', 'success');
+    } catch (err: any) {
+      show(err.message ?? 'Could not verify driving license', 'error');
+    } finally {
+      setDlVerifying(false);
     }
   }
 
@@ -180,6 +207,39 @@ function KycInner() {
                 ← Change Aadhaar number
               </button>
             </form>
+          )}
+        </div>
+
+        <h2 className="text-lg font-bold text-gray-900 mt-8 mb-1">Driving License</h2>
+        <p className="text-gray-500 text-sm mb-4">
+          Separate from identity KYC above — confirms you actually hold a valid license, required before renting a car.
+        </p>
+        <div className="bg-white rounded-2xl border border-gray-100 p-6">
+          {user.isDrivingLicenseVerified ? (
+            <div className="text-center py-8">
+              <span className="text-4xl block mb-3">✅</span>
+              <p className="font-bold text-gray-900">Driving license verified</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <label className="block">
+                <span className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Upload a clear photo of your license</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => setDlFile(e.target.files?.[0] ?? null)}
+                  className="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-amber-50 file:text-amber-700 file:font-semibold"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={handleVerifyDrivingLicense}
+                disabled={!dlFile || dlVerifying}
+                className="w-full btn-gradient disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none text-white font-bold py-3 rounded-xl transition"
+              >
+                {dlVerifying ? 'Verifying…' : 'Verify Driving License'}
+              </button>
+            </div>
           )}
         </div>
       </div>

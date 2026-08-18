@@ -136,6 +136,8 @@ export const carsApi = {
     get<{ success: true; data: { asOf: string; photos: BookingConditionPhoto[] } | null }>(`/cars/${carId}/latest-condition-photos`),
   yieldSuggestion: (carId: string) => get<{ success: true; data: YieldSuggestion }>(`/cars/${carId}/yield-suggestion`),
   applyYieldSuggestion: (carId: string) => post<{ success: true; data: YieldSuggestion }>(`/cars/${carId}/apply-yield-suggestion`),
+  verifyRc: (carId: string) =>
+    post<{ success: true; data: { rcNumberMatches: boolean; extractedRcNo: string | null; verifiedAt: string } }>(`/cars/${carId}/verify-rc`),
   marketPulse: (city?: string) =>
     get<{ success: true; data: { city: string | null; availableCount: number; averageDailyRate: number | null; popularCategory: string | null } }>(
       `/cars/market-pulse${city ? `?city=${encodeURIComponent(city)}` : ''}`
@@ -281,6 +283,8 @@ export const kycApi = {
     post<{ success: true; message: string; data: { isKycVerified: boolean; aadhaarVerifiedName?: string } }>('/kyc/aadhaar/verify', { referenceId, otp }),
   startDigilocker: () => post<{ success: true; data: { url: string } }>('/kyc/digilocker/start'),
   digilockerStatus: () => get<{ success: true; data: { status: string; isKycVerified: boolean } }>('/kyc/digilocker/status'),
+  verifyDrivingLicense: (docBase64: string) =>
+    post<{ success: true; data: { id: string; isDrivingLicenseVerified: boolean } }>('/kyc/driving-license', { docBase64 }),
 };
 
 /* ── Bank account verification ───────────────────────────────────── */

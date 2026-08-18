@@ -84,6 +84,7 @@ enum KycMethod {
   AADHAAR_OTP
   DIGILOCKER
   DOC_UPLOAD
+  DRIVING_LICENSE
 }
 
 enum KycOutcome {
@@ -183,6 +184,14 @@ model User {
   // Setu DigiLocker KYC (OAuth-style consent redirect — see setuService.ts)
   digilockerRequestId String?
   digilockerStatus    String? // unauthenticated | authenticated
+
+  // Arya.ai driving-license extraction/verification (see aryaVerificationService.ts)
+  // — separate from isKycVerified (identity), since holding a valid license is
+  // a distinct requirement for a self-drive rental platform. extractedData is
+  // stored as-is from Arya's response rather than picking out named fields,
+  // since their generic KYC endpoint doesn't document a fixed per-doc-type schema.
+  isDrivingLicenseVerified    Boolean @default(false)
+  drivingLicenseExtractedData Json?
 
   // Refer & Earn
   referralCode   String? @unique // backfilled lazily on first login post-migration; new signups always get one
@@ -350,6 +359,15 @@ model Car {
   pollutionCertUrl   String?
   insuranceDocUrl    String?
   onboardingStep     Int                   @default(0) // 0-4, drives the "Steps Completed" progress ring
+
+  // Automated RC cross-check via Arya.ai's RC Verification API (see
+  // aryaVerificationService.ts) — extracts the registration number from the
+  // uploaded rcDocUrl and compares it against registrationNo. This is a
+  // supporting signal for the admin review queue (PENDING_REVIEW), not an
+  // auto-approval — insurance/PUC still need a human to actually check them.
+  rcAutoVerifiedAt   DateTime?
+  rcNumberMatches    Boolean?
+  rcVerificationData Json?
 
   // Fleet Ops internal asset-record fields (merged in from the standalone Fleet Ops
   // Admin Dashboard — same physical vehicle, since it earns revenue across multiple

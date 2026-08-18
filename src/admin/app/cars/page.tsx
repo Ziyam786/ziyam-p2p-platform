@@ -376,6 +376,12 @@ export default function CarsPage() {
               ))}
             </div>
 
+            {reviewing.rcAutoVerifiedAt && (
+              <div className={`rounded-lg px-4 py-3 text-xs font-semibold ${reviewing.rcNumberMatches ? 'bg-emerald-950 text-emerald-400 border border-emerald-900' : 'bg-red-950 text-red-400 border border-red-900'}`}>
+                🤖 Automated RC check: {reviewing.rcNumberMatches ? '✓ Extracted registration number matches the listing' : "✗ Extracted registration number doesn't match — verify carefully"}
+              </div>
+            )}
+
             <div>
               <p className="text-xs font-semibold text-slate-400 mb-2">Vehicle Photos (Unblurred — Admin Only)</p>
               {reviewing.originalImages && reviewing.originalImages.length > 0 ? (

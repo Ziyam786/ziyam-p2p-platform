@@ -1,10 +1,11 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { config } from '../config';
 import { requireAuth } from '../middleware/auth';
 import { notify } from '../services/notificationService';
 import { sandboxService } from '../services/sandboxService';
 import { digilockerApi, isSetuConfigured } from '../services/setuService';
+import { isKycExtractionConfigured, extractKycDocument } from '../services/aryaVerificationService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -127,6 +128,49 @@ router.get('/kyc/digilocker/status', requireAuth, async (req: Request, res: Resp
       data: { userId: req.user!.userId, method: 'DIGILOCKER', outcome: 'FAILED', detail: err.response?.data?.message ?? err.message },
     });
     res.status(502).json({ error: 'Could not check DigiLocker status right now.' });
+  }
+});
+
+/**
+ * Driving License verification via Arya.ai's KYC document extraction API —
+ * distinct from isKycVerified (Aadhaar-based identity), since holding a
+ * valid license is its own requirement on a self-drive platform. Accepts a
+ * base64-encoded photo/scan directly (not run through the file-upload
+ * pipeline — nothing else needs to reference this image afterward, only
+ * Arya's own extraction result, which we store).
+ */
+router.post('/kyc/driving-license', requireAuth, async (req: Request, res: Response) => {
+  const { docBase64 } = req.body;
+  if (!docBase64 || typeof docBase64 !== 'string') {
+    return res.status(400).json({ error: 'docBase64 is required — a base64-encoded photo/scan of the driving license' });
+  }
+  if (!isKycExtractionConfigured()) {
+    return res.status(503).json({ error: 'Driving license verification is not configured yet (ARYA_KYC_TOKEN)' });
+  }
+
+  try {
+    const result = await extractKycDocument(docBase64, 'image');
+    if (!result.success) {
+      await prisma.kycVerificationLog.create({
+        data: { userId: req.user!.userId, method: 'DRIVING_LICENSE', outcome: 'FAILED', detail: result.error_message ?? 'Extraction failed' },
+      });
+      return res.status(422).json({ error: result.error_message || 'Could not verify the driving license — try a clearer photo.' });
+    }
+
+    const user = await prisma.user.update({
+      where: { id: req.user!.userId },
+      data: { isDrivingLicenseVerified: true, drivingLicenseExtractedData: result as unknown as Prisma.InputJsonValue },
+      select: { id: true, isDrivingLicenseVerified: true },
+    });
+    await prisma.kycVerificationLog.create({
+      data: { userId: user.id, method: 'DRIVING_LICENSE', outcome: 'SUCCESS' },
+    });
+    await notify(user.id, 'KYC_VERIFIED', 'Driving license verified', 'Your driving license has been confirmed.', '/account');
+
+    res.json({ success: true, data: user });
+  } catch (err: any) {
+    console.error('[KYC] Driving license verification failed:', err.response?.data ?? err.message);
+    res.status(502).json({ error: 'Could not verify the driving license right now. Please try again shortly.' });
   }
 });
 

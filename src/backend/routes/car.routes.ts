@@ -7,6 +7,7 @@ import { pickFleetOperator } from '../services/fleetOperatorAssignment';
 import { esignApi, isSetuConfigured } from '../services/setuService';
 import { renderFleetPartnerAgreementPdf } from '../services/fleetPartnerAgreementPdf';
 import { computeYieldSuggestion, applyYieldSuggestion } from '../services/yieldEngine';
+import { isRcVerificationConfigured, extractRcDocument, fetchDocAsBase64 } from '../services/aryaVerificationService';
 import { safeErrorMessage } from '../utils/errorResponse';
 import { config } from '../config';
 
@@ -354,6 +355,49 @@ router.post('/cars/:id/apply-yield-suggestion', requireAuth, async (req: Request
     res.json({ success: true, data: result });
   } catch (error: any) {
     res.status(500).json({ error: safeErrorMessage(error) });
+  }
+});
+
+// Automated cross-check of the uploaded RC document against Arya.ai's RC
+// Verification API — extracts the document's registration number and
+// compares it to what the host entered. A real signal for the admin
+// review queue (PENDING_REVIEW), not an auto-approval: insurance/PUC
+// still need a human to actually check them, and a matching RC number
+// alone doesn't confirm the document is genuine, just that the numbers agree.
+router.post('/cars/:id/verify-rc', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const car = await prisma.car.findUnique({ where: { id } });
+  if (!car) return res.status(404).json({ error: 'Car not found' });
+  if (car.ownerId !== req.user!.userId && req.user!.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Not your listing' });
+  }
+  if (!car.rcDocUrl) return res.status(400).json({ error: 'Upload the RC document before requesting automated verification' });
+  if (!isRcVerificationConfigured()) {
+    return res.status(503).json({ error: 'Automated RC verification is not configured yet (ARYA_RC_TOKEN)' });
+  }
+
+  try {
+    const docBase64 = await fetchDocAsBase64(car.rcDocUrl);
+    const result = await extractRcDocument(docBase64);
+    const extractedRcNo = (result.rc_no ?? '').toString().replace(/\s+/g, '').toUpperCase();
+    const enteredRcNo = car.registrationNo.replace(/\s+/g, '').toUpperCase();
+    const matches = result.success && Boolean(extractedRcNo) && extractedRcNo === enteredRcNo;
+
+    const updated = await prisma.car.update({
+      where: { id },
+      data: {
+        rcAutoVerifiedAt: new Date(),
+        rcNumberMatches: matches,
+        rcVerificationData: result as unknown as Prisma.InputJsonValue,
+      },
+    });
+    res.json({
+      success: true,
+      data: { rcNumberMatches: matches, extractedRcNo: result.rc_no ?? null, verifiedAt: updated.rcAutoVerifiedAt },
+    });
+  } catch (error: any) {
+    console.error('[RC VERIFY] failed:', error.response?.data ?? error.message);
+    res.status(502).json({ error: 'Could not run automated RC verification right now. Please try again shortly.' });
   }
 });
 

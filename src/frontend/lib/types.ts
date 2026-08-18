@@ -25,6 +25,7 @@ export interface PublicUser {
   phoneNumber: string;
   role: Role;
   isKycVerified: boolean;
+  isDrivingLicenseVerified?: boolean;
   isSuspended?: boolean;
   avatarUrl?: string | null;
   bio?: string | null;
@@ -90,6 +91,8 @@ export interface Car {
   rcExpiry?: string | null;
   insuranceExpiry?: string | null;
   pucExpiry?: string | null;
+  rcAutoVerifiedAt?: string | null;
+  rcNumberMatches?: boolean | null;
   onboardingStep: number;
 
   noNightBookings: boolean;
