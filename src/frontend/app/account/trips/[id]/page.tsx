@@ -48,6 +48,8 @@ function TripDetailInner() {
   const [busy, setBusy] = useState(false);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
+  const [startOtp, setStartOtp] = useState<string | null>(null);
+  const [startOtpInput, setStartOtpInput] = useState('');
   const [endOtp, setEndOtp] = useState<string | null>(null);
   const [otpInput, setOtpInput] = useState('');
   const [washRequested, setWashRequested] = useState(false);
@@ -79,21 +81,42 @@ function TripDetailInner() {
   useEffect(() => { loadConditionPhotos(params.id); }, [params.id]);
 
   useEffect(() => {
+    if (trip?.status === 'CONFIRMED' && isHost) {
+      bookingsApi.startOtp(trip.id).then((res) => setStartOtp(res.data.otp)).catch(() => {});
+    }
+  }, [trip?.status, isHost, trip?.id]);
+
+  useEffect(() => {
     if (trip?.status === 'ACTIVE' && isHost) {
       bookingsApi.endOtp(trip.id).then((res) => setEndOtp(res.data.otp)).catch(() => {});
     }
   }, [trip?.status, isHost, trip?.id]);
 
-  async function handleAction(action: 'start' | 'unlock') {
+  async function handleAction(action: 'unlock') {
     if (!trip) return;
     setBusy(true);
     try {
-      if (action === 'start') await bookingsApi.start(trip.id);
-      if (action === 'unlock') await bookingsApi.unlock(trip.id);
-      show(action === 'unlock' ? 'Vehicle unlocked' : 'Trip updated', 'success');
+      await bookingsApi.unlock(trip.id);
+      show('Vehicle unlocked', 'success');
       load();
     } catch (err: any) {
       show(err.message ?? 'Action failed', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleStartTrip(e: React.FormEvent) {
+    e.preventDefault();
+    if (!trip) return;
+    setBusy(true);
+    try {
+      await bookingsApi.start(trip.id, startOtpInput);
+      show('Trip started!', 'success');
+      setStartOtpInput('');
+      load();
+    } catch (err: any) {
+      show(err.message ?? 'Failed to start trip', 'error');
     } finally {
       setBusy(false);
     }
@@ -234,13 +257,13 @@ function TripDetailInner() {
                   Pay Balance{trip.reservationDeadline && ` (by ${new Date(trip.reservationDeadline).toLocaleTimeString()})`}
                 </a>
               )}
-              {trip.status === 'CONFIRMED' && capturingStage !== 'PRE_TRIP' && (
+              {trip.status === 'CONFIRMED' && !isHost && !hasRequiredPhotos('PRE_TRIP') && capturingStage !== 'PRE_TRIP' && (
                 <button
                   disabled={busy}
-                  onClick={() => (hasRequiredPhotos('PRE_TRIP') ? handleAction('start') : setCapturingStage('PRE_TRIP'))}
+                  onClick={() => setCapturingStage('PRE_TRIP')}
                   className="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition disabled:opacity-50"
                 >
-                  {hasRequiredPhotos('PRE_TRIP') ? 'Start Trip (Pickup)' : '📷 Add Pickup Photos to Start'}
+                  📷 Add Pickup Photos to Start
                 </button>
               )}
               {trip.status === 'ACTIVE' && !isHost && (
@@ -278,9 +301,57 @@ function TripDetailInner() {
                   onComplete={() => {
                     setCapturingStage(null);
                     loadConditionPhotos(trip.id);
-                    handleAction('start');
                   }}
                 />
+              </div>
+            )}
+
+            {trip.status === 'CONFIRMED' && !isHost && hasRequiredPhotos('PRE_TRIP') && capturingStage !== 'PRE_TRIP' && (
+              <form onSubmit={handleStartTrip} className="mt-6 bg-gray-50 border border-gray-100 rounded-xl p-5">
+                <p className="text-sm font-bold text-gray-800 mb-1">Picking up the car?</p>
+                <p className="text-xs text-gray-500 mb-3">Ask the host for the 4-digit code shown in their app to start this trip.</p>
+                <div className="flex gap-3">
+                  <input
+                    required
+                    inputMode="numeric"
+                    pattern="[0-9]{4}"
+                    maxLength={4}
+                    value={startOtpInput}
+                    onChange={(e) => setStartOtpInput(e.target.value.replace(/\D/g, ''))}
+                    placeholder="4-digit code"
+                    className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-center tracking-[0.5em] font-bold focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                  <button disabled={busy || startOtpInput.length !== 4} type="submit" className="btn-gradient disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none text-white font-bold px-6 rounded-xl transition text-sm">
+                    Start Trip
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {trip.status === 'CONFIRMED' && isHost && (
+              <div className="mt-6 bg-amber-50 border border-amber-100 rounded-xl p-5 text-center">
+                <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider mb-2">Pickup Handover Code</p>
+                <div className="flex justify-center gap-1.5 mb-3">
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${trip.customer?.isKycVerified ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+                    {trip.customer?.isKycVerified ? '✓ KYC' : '✗ KYC'}
+                  </span>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${trip.customer?.isDrivingLicenseVerified ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+                    {trip.customer?.isDrivingLicenseVerified ? '✓ License' : '✗ License'}
+                  </span>
+                  {trip.customer?.isSelfieVerified && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">✓ Identity Match</span>
+                  )}
+                </div>
+                {startOtp ? (
+                  <div className="flex justify-center gap-2">
+                    {startOtp.split('').map((digit, i) => (
+                      <span key={i} className="w-10 h-12 flex items-center justify-center bg-white border border-amber-200 rounded-lg text-xl font-extrabold text-amber-700">{digit}</span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400">Loading…</p>
+                )}
+                <p className="text-xs text-gray-500 mt-3">Share this code with the guest once they've physically picked up the car — they'll enter it in their app to start the trip.</p>
               </div>
             )}
 

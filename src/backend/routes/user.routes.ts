@@ -223,7 +223,12 @@ router.get('/bookings/:id', requireAuth, async (req: Request, res: Response) => 
     where: { id },
     include: {
       car: { include: { owner: { select: { id: true, fullName: true, email: true, avatarUrl: true, signatureUrl: true } } } },
-      customer: { select: { id: true, fullName: true, email: true, signatureUrl: true } },
+      customer: {
+        select: {
+          id: true, fullName: true, email: true, signatureUrl: true,
+          isKycVerified: true, isDrivingLicenseVerified: true, isSelfieVerified: true,
+        },
+      },
       review: true,
     },
   });

@@ -314,14 +314,31 @@ router.post('/booking/:id/balance-checkout-session', requireAuth, async (req: Re
   }
 });
 
-// Start a confirmed trip (pickup)
+// The host-only pickup handover code (generated at accept time — see
+// hostReview.routes.ts / admin.routes.ts's booking creation).
+router.get('/booking/:id/start-otp', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  if (booking.car.ownerId !== req.user!.userId) return res.status(403).json({ error: 'Only the host can view this code' });
+  if (booking.status !== BookingStatus.CONFIRMED) return res.status(400).json({ error: 'Trip is not confirmed yet' });
+  res.json({ success: true, data: { otp: booking.startOtp } });
+});
+
+// Start a confirmed trip (pickup) — requires both the PRE_TRIP condition
+// photos AND the host-shown handover code, so a trip can't start without
+// the two parties actually meeting (same discipline as /complete below).
 router.post('/booking/:id/start', requireAuth, async (req: Request, res: Response) => {
   const { id } = req.params;
+  const { otp } = req.body;
   const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
   if (!booking) return res.status(404).json({ error: 'Booking not found' });
   if (booking.customerId !== req.user!.userId) return res.status(403).json({ error: 'Not your booking' });
   if (booking.status !== BookingStatus.CONFIRMED) {
     return res.status(400).json({ error: `Cannot start trip from status ${booking.status}` });
+  }
+  if (!booking.startOtp || otp !== booking.startOtp) {
+    return res.status(400).json({ error: 'Incorrect pickup code. Ask the host for the code shown in their app.' });
   }
   if (!(await hasRequiredConditionPhotos(id, TripStage.PRE_TRIP))) {
     return res.status(400).json({ error: 'Upload all 4 required pickup photos (front, rear, left, right) before starting the trip.' });

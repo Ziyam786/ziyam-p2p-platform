@@ -515,6 +515,11 @@ model Booking {
   coDriverLicenseNumber String?
   promoCode             String?
   status                BookingStatus @default(PENDING)
+  // 4-digit code generated the moment a host accepts the booking (well before
+  // pickup); shown only to the host and must be supplied by the guest to
+  // actually start the trip — the pickup-side mirror of endOtp below, same
+  // "proves the handover actually happened in person" purpose.
+  startOtp              String?
   // 4-digit code generated when the trip starts; shown only to the host and
   // must be supplied by whoever completes the trip — proves the handover
   // actually happened in person rather than either side just tapping "done".
