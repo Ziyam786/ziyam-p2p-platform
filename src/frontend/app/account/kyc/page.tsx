@@ -1,7 +1,8 @@
 'use client';
 
 import React, { Suspense, useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
 import ProtectedRoute from '../../../components/ProtectedRoute';
@@ -21,7 +22,16 @@ function fileToBase64(file: File): Promise<string> {
 function KycInner() {
   const { user, refresh } = useAuth();
   const { show } = useToast();
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const nextRaw = searchParams.get('next');
+  const nextPath = nextRaw && nextRaw.startsWith('/') && !nextRaw.startsWith('//') ? nextRaw : null;
+  const [storedNext] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    const stored = sessionStorage.getItem('kycNext');
+    return stored && stored.startsWith('/') && !stored.startsWith('//') ? stored : null;
+  });
+  const afterKyc = nextPath ?? storedNext;
   const [aadhaar, setAadhaar] = useState('');
   const [otp, setOtp] = useState('');
   const [referenceId, setReferenceId] = useState<string | number | undefined>();
@@ -45,6 +55,7 @@ function KycInner() {
         if (res.data.isKycVerified) {
           await refresh();
           show('Verified via DigiLocker!', 'success');
+          if (afterKyc) router.push(afterKyc);
         } else {
           show('DigiLocker verification is still pending — try again in a moment.', 'error');
         }
@@ -57,6 +68,7 @@ function KycInner() {
   async function handleStartDigilocker() {
     setDigilockerLoading(true);
     try {
+      if (nextPath) sessionStorage.setItem('kycNext', nextPath);
       const res = await kycApi.startDigilocker();
       window.location.href = res.data.url;
     } catch (err: any) {
@@ -101,6 +113,7 @@ function KycInner() {
         await kycApi.verifyAadhaarOtp(undefined, undefined);
         await refresh();
         show('KYC verified instantly (Sandbox not configured)', 'success');
+        if (afterKyc) router.push(afterKyc);
       } else {
         setStage('otp');
         show('OTP sent to your Aadhaar-linked mobile number', 'success');
@@ -119,6 +132,7 @@ function KycInner() {
       await kycApi.verifyAadhaarOtp(referenceId, otp);
       await refresh();
       show('KYC verified!', 'success');
+      if (afterKyc) router.push(afterKyc);
     } catch (err: any) {
       show(err.message ?? 'OTP verification failed', 'error');
     } finally {
@@ -143,6 +157,11 @@ function KycInner() {
               <span className="text-4xl block mb-3">✅</span>
               <p className="font-bold text-gray-900">You're verified</p>
               <p className="text-sm text-gray-500 mt-1">Your identity has been confirmed. You're all set to book or list cars.</p>
+              {afterKyc && (
+                <Link href={afterKyc} className="inline-block mt-4 btn-gradient text-white font-bold px-5 py-2.5 rounded-xl text-sm">
+                  Continue onboarding
+                </Link>
+              )}
             </div>
           ) : stage === 'aadhaar' ? (
             <form onSubmit={handleSendOtp} className="space-y-5">
