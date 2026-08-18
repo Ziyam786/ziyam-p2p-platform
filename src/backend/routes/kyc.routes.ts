@@ -77,7 +77,7 @@ router.post('/kyc/identity-document', requireAuth, async (req: Request, res: Res
     return res.status(400).json({ error: 'docBase64 is required — a clear photo of your Aadhaar, PAN, voter ID, or passport' });
   }
   if (!isKycExtractionConfigured()) {
-    return res.status(503).json({ error: 'Identity verification is not configured yet (ARYA_KYC_TOKEN)' });
+    return res.status(503).json({ error: 'Photo ID verification is not available right now. Try Aadhaar OTP or DigiLocker, or come back later.' });
   }
 
   try {
@@ -113,10 +113,10 @@ router.post('/kyc/identity-document', requireAuth, async (req: Request, res: Res
     await prisma.kycVerificationLog.create({
       data: { userId: user.id, method: 'DOC_UPLOAD', outcome: 'SUCCESS', detail: `arya.ai${verifiedName ? `: ${verifiedName}` : ''}` },
     });
-    await notify(user.id, 'KYC_VERIFIED', "You're verified!", 'Your identity has been confirmed via Arya.ai. You can now book or list cars.', '/account');
+    await notify(user.id, 'KYC_VERIFIED', "You're verified!", 'Your identity has been confirmed. You can now book or list cars.', '/account');
     res.json({ success: true, message: 'KYC verified', data: user, selfieCheck: selfieOutcome });
   } catch (err: any) {
-    if (err.status === 422) return res.status(422).json({ error: err.message });
+    if (err.status === 422 || err.status === 400) return res.status(err.status).json({ error: err.message });
     console.error('[KYC] Arya identity verification failed:', err.response?.data ?? err.message);
     res.status(502).json({ error: 'Could not verify your ID right now. Please try again shortly.' });
   }
@@ -134,7 +134,7 @@ router.post('/kyc/aadhaar/otp', requireAuth, async (req: Request, res: Response)
   }
 
   if (!sandboxService.isConfigured()) {
-    return res.status(503).json({ error: 'Aadhaar OTP is not configured yet — use photo ID verification or DigiLocker instead.' });
+    return res.status(503).json({ error: 'Aadhaar OTP is not available right now. Try photo ID or DigiLocker, or come back later.' });
   }
 
   try {
@@ -152,7 +152,7 @@ router.post('/kyc/aadhaar/otp', requireAuth, async (req: Request, res: Response)
  */
 router.post('/kyc/aadhaar/verify', requireAuth, async (req: Request, res: Response) => {
   if (!sandboxService.isConfigured()) {
-    return res.status(503).json({ error: 'Aadhaar OTP is not configured yet — use photo ID verification or DigiLocker instead.' });
+    return res.status(503).json({ error: 'Aadhaar OTP is not available right now. Try photo ID or DigiLocker, or come back later.' });
   }
   const { referenceId, otp } = req.body;
   if (!referenceId || !/^[0-9]{6}$/.test(otp ?? '')) {
@@ -191,7 +191,7 @@ router.post('/kyc/aadhaar/verify', requireAuth, async (req: Request, res: Respon
  * back on /account/kyc afterwards and the frontend polls /status below.
  */
 router.post('/kyc/digilocker/start', requireAuth, async (req: Request, res: Response) => {
-  if (!isSetuConfigured()) return res.status(503).json({ error: 'DigiLocker verification is not configured yet' });
+  if (!isSetuConfigured()) return res.status(503).json({ error: 'DigiLocker is not available right now. Try Aadhaar OTP or a photo of your ID.' });
 
   try {
     const redirectUrl = `${config.clientUrl}/account/kyc?digilocker=1`;
@@ -277,7 +277,7 @@ router.post('/kyc/driving-license', requireAuth, async (req: Request, res: Respo
     return res.status(400).json({ error: 'docBase64 is required — a base64-encoded photo/scan of the driving license' });
   }
   if (hasDoc && !isKycExtractionConfigured()) {
-    return res.status(503).json({ error: 'Driving license verification is not configured yet (ARYA_KYC_TOKEN)' });
+    return res.status(503).json({ error: 'Driving licence verification is not available right now. Please try again later.' });
   }
 
   try {
@@ -320,7 +320,7 @@ router.post('/kyc/driving-license', requireAuth, async (req: Request, res: Respo
 
     res.json({ success: true, data: user, selfieCheck: selfieOutcome });
   } catch (err: any) {
-    if (err.status === 422) return res.status(422).json({ error: err.message });
+    if (err.status === 422 || err.status === 400) return res.status(err.status).json({ error: err.message });
     console.error('[KYC] Driving license verification failed:', err.response?.data ?? err.message);
     res.status(502).json({ error: 'Could not verify the driving license right now. Please try again shortly.' });
   }
@@ -331,7 +331,7 @@ router.post('/kyc/submit', requireAuth, async (req: Request, res: Response) => {
   const { docUrl } = req.body;
   if (!docUrl) return res.status(400).json({ error: 'docUrl is required (Aadhaar / PAN / voter ID / passport image URL)' });
   if (!isKycExtractionConfigured()) {
-    return res.status(503).json({ error: 'Identity verification is not configured yet (ARYA_KYC_TOKEN)' });
+    return res.status(503).json({ error: 'Photo ID verification is not available right now. Try Aadhaar OTP or DigiLocker, or come back later.' });
   }
 
   try {
@@ -358,11 +358,10 @@ router.post('/kyc/submit', requireAuth, async (req: Request, res: Response) => {
     await prisma.kycVerificationLog.create({
       data: { userId: user.id, method: 'DOC_UPLOAD', outcome: 'SUCCESS', detail: `arya.ai via url${verifiedName ? `: ${verifiedName}` : ''}` },
     });
-    await notify(user.id, 'KYC_VERIFIED', "You're verified!", 'Your identity has been confirmed via Arya.ai. You can now book or list cars.', '/account');
+    await notify(user.id, 'KYC_VERIFIED', "You're verified!", 'Your identity has been confirmed. You can now book or list cars.', '/account');
     res.json({ success: true, message: 'KYC verified', data: user });
   } catch (err: any) {
-    if (err.status === 400) return res.status(400).json({ error: err.message });
-    if (err.status === 422) return res.status(422).json({ error: err.message });
+      if (err.status === 422 || err.status === 400) return res.status(err.status).json({ error: err.message });
     console.error('[KYC] Arya submit failed:', err.response?.data ?? err.message);
     res.status(502).json({ error: 'Could not verify that document right now. Please try again shortly.' });
   }

@@ -33,6 +33,7 @@ export async function readSavedUploadBytes(urlOrPath: string): Promise<Buffer> {
     const segments = parsed.pathname.split('/').filter(Boolean);
     const objectName = segments.length === 2 && segments[0] === bucketName ? segments[1] : '';
     if (!OBJECT_NAME.test(objectName)) invalidFile();
+    // Admin SDK download of a verified object name — never axios/HTTP on the caller URL.
     const [buf] = await getStorageBucket().file(objectName).download();
     return buf;
   }
