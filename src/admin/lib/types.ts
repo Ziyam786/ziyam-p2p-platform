@@ -87,7 +87,7 @@ export interface AdminCar {
   currentOdo?: number | null;
   fleetManaged: boolean;
   fleetOnboardingStep: number;
-  verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  verificationStatus: 'PENDING' | 'PENDING_REVIEW' | 'VERIFIED' | 'REJECTED';
   rcDocUrl?: string | null;
   pollutionCertUrl?: string | null;
   insuranceDocUrl?: string | null;

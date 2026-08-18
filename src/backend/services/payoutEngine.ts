@@ -167,8 +167,8 @@ export class PayoutEngine {
 
       for (const payout of maturePayouts) {
         try {
-          if (!payout.host.payoutAccountId) {
-            throw new Error('Host has no linked payout account');
+          if (!payout.host.payoutAccountId || !payout.host.bankAccountVerified) {
+            throw new Error('Host has no linked, Sandbox-verified payout account');
           }
           if (!payout.booking.paymentIntentId) {
             throw new Error('Underlying booking has no PayU transaction id to split from');
@@ -354,7 +354,7 @@ export class PayoutEngine {
     const payout = await prisma.payoutLedger.findUnique({ where: { id: ledgerId }, include: { host: true, booking: true } });
     if (!payout) throw new Error('Payout ledger entry not found');
     if (payout.status !== PayoutStatus.FAILED) throw new Error(`Cannot retry a payout in status ${payout.status}`);
-    if (!payout.host.payoutAccountId) throw new Error('Host has no linked payout account');
+    if (!payout.host.payoutAccountId || !payout.host.bankAccountVerified) throw new Error('Host has no linked, Sandbox-verified payout account');
     if (!payout.booking.paymentIntentId) throw new Error('Underlying booking has no PayU transaction id to split from');
 
     try {

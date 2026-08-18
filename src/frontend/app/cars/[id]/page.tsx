@@ -137,6 +137,9 @@ export default function CarDetailPage() {
   const platformFee = Math.round(preFeeSubtotal * 0.08);
   const securityDeposit = Math.round((car?.securityDeposit ?? 0) * (DEPOSIT_HOLD_FRACTION[plan] ?? 1));
   const total = preFeeSubtotal + platformFee + securityDeposit;
+  const docsExpired = Boolean(
+    [car?.rcExpiry, car?.insuranceExpiry, car?.pucExpiry].some((d) => d && new Date(d) < new Date())
+  );
 
   async function applyPromo() {
     if (!promoInput.trim()) return;
@@ -674,12 +677,14 @@ export default function CarDetailPage() {
               )}
 
               <button
-                disabled={!car.isAvailable || days === 0 || submitting}
+                disabled={!car.isAvailable || docsExpired || days === 0 || submitting}
                 onClick={handleBook}
                 className="w-full btn-gradient active:scale-[0.98] disabled:!bg-none disabled:bg-gray-200 disabled:!shadow-none disabled:text-gray-400 disabled:cursor-not-allowed disabled:active:scale-100 text-white font-bold py-3.5 rounded-xl transition-transform text-base"
               >
                 {submitting
                   ? 'Starting booking…'
+                  : docsExpired
+                  ? 'Unavailable — Documents Expired'
                   : !car.isAvailable
                   ? 'Car Unavailable'
                   : days === 0
@@ -688,6 +693,11 @@ export default function CarDetailPage() {
                   ? 'Proceed to Book'
                   : 'Log In to Book'}
               </button>
+              {docsExpired && (
+                <p className="text-xs text-red-500 text-center">
+                  This car's RC, insurance, or PUC has expired — bookings are paused until the host renews it.
+                </p>
+              )}
 
               <p className="text-xs text-gray-400 text-center">
                 You won't be charged yet. Review before confirming.

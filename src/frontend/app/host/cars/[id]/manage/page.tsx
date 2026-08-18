@@ -128,7 +128,18 @@ function ManageCarInner() {
               sub={car.isAvailable ? 'Hide this car from search temporarily' : 'Make this car bookable again'}
               onClick={toggleAvailability}
             />
-            <ControlRow icon="🪪" title="Documents" sub={car.verificationStatus === 'VERIFIED' ? 'RC, PUC & Insurance on file' : 'Add RC, PUC & Insurance to get verified'} href={`/host/cars/${car.id}/edit`} />
+            <ControlRow
+              icon="🪪"
+              title="Documents"
+              sub={
+                car.verificationStatus === 'VERIFIED'
+                  ? 'RC, PUC & Insurance on file'
+                  : car.verificationStatus === 'PENDING_REVIEW'
+                    ? 'Submitted — awaiting review by our team'
+                    : 'Add RC, PUC & Insurance to get verified'
+              }
+              href={`/host/cars/${car.id}/edit`}
+            />
           </div>
         )}
 

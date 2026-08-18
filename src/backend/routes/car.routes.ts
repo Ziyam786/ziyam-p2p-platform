@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, Prisma } from '@prisma/client';
-import { requireAuth, requireRole } from '../middleware/auth';
+import { requireAuth, requireRole, attachUserIfPresent } from '../middleware/auth';
 import { generateChatReply } from '../services/aiService';
 import { FleetService } from '../services/fleetService';
 import { pickFleetOperator } from '../services/fleetOperatorAssignment';
@@ -97,7 +97,7 @@ router.get('/cars/search', async (req: Request, res: Response) => {
   res.json({ success: true, count: cars.length, data: cars.map(withRatingSummary) });
 });
 
-router.get('/cars/:id', async (req: Request, res: Response) => {
+router.get('/cars/:id', attachUserIfPresent, async (req: Request, res: Response) => {
   const { id } = req.params;
   const car = await prisma.car.findUnique({
     where: { id },
@@ -112,11 +112,27 @@ router.get('/cars/:id', async (req: Request, res: Response) => {
   });
   if (!car) return res.status(404).json({ error: 'Car not found' });
 
-  // originalImages (unblurred plate) is admin-only — never sent to this public detail route.
-  const { reviews, originalImages, ...rest } = car;
+  // originalImages (unblurred plate) is admin-only. rcDocUrl/pollutionCertUrl/
+  // insuranceDocUrl are the actual scanned RC/insurance documents — these
+  // typically carry the owner's name and address, so they're only included
+  // for the car's own owner (editing their listing) or an admin, never for
+  // an anonymous/other visitor. rcExpiry/insuranceExpiry/pucExpiry (just
+  // dates, no personal info) stay public — see docsExpired on the frontend
+  // detail page.
+  const isOwnerOrAdmin = req.user?.userId === car.ownerId || req.user?.role === 'ADMIN';
+  const { reviews, originalImages, rcDocUrl, pollutionCertUrl, insuranceDocUrl, ...rest } = car;
   const reviewCount = reviews.length;
   const rating = reviewCount === 0 ? 0 : Number((reviews.reduce((s, r) => s + r.rating, 0) / reviewCount).toFixed(1));
-  res.json({ success: true, data: { ...rest, rating, reviewCount, reviews } });
+  res.json({
+    success: true,
+    data: {
+      ...rest,
+      ...(isOwnerOrAdmin && { rcDocUrl, pollutionCertUrl, insuranceDocUrl }),
+      rating,
+      reviewCount,
+      reviews,
+    },
+  });
 });
 
 // Public "verified condition" gallery — real drop-off photos from the car's
@@ -174,25 +190,30 @@ router.patch('/cars/:id', requireAuth, async (req: Request, res: Response) => {
     dailyRate, securityDeposit, kmIncludedPerDay, extraKmCharge,
     description, images, originalImages, features, city, address, latitude, longitude, isAvailable, instantBook,
     offersDelivery, deliveryFee, offersPickup, pickupFee,
-    rcDocUrl, pollutionCertUrl, insuranceDocUrl, onboardingStep,
+    rcDocUrl, pollutionCertUrl, insuranceDocUrl, rcExpiry, insuranceExpiry, pucExpiry, onboardingStep,
     noNightBookings, nightBookingStart, nightBookingEnd,
     minInterBookingHours, minBookingHours, maxBookingDays,
     yieldAutoApply,
   } = req.body;
 
-  // Documents are self-attested at this stage (no live DigiLocker/RTO integration yet —
-  // same "stub as instant pass" pattern as kyc.routes.ts). Once all three are on file we
-  // mark the car verified so the host UI can show the green "Verified" badge. Only
-  // recompute this when the host is actually touching a document field, not on every
-  // unrelated edit (price, description, etc.) — otherwise an admin's manual REJECTED
-  // verdict (see PATCH /admin/cars/:id/verification) would silently flip back to
-  // VERIFIED the next time the host changed anything at all, since all three doc URLs
-  // are still on file from before.
-  const docsTouched = rcDocUrl !== undefined || pollutionCertUrl !== undefined || insuranceDocUrl !== undefined;
+  // Documents + their expiry dates are self-supplied here — no live
+  // DigiLocker/RTO/insurer integration confirms them yet. Once all three
+  // docs AND all three expiry dates are on file, the car queues for an
+  // admin to actually open and check each document (PATCH
+  // /admin/cars/:id/verification) rather than auto-verifying — a host
+  // uploading a file is not the same as someone confirming it's valid.
+  // Only recompute this when the host is actually touching a document or
+  // expiry field, not on every unrelated edit (price, description, etc.).
+  const docsTouched =
+    rcDocUrl !== undefined || pollutionCertUrl !== undefined || insuranceDocUrl !== undefined ||
+    rcExpiry !== undefined || insuranceExpiry !== undefined || pucExpiry !== undefined;
   const nextRc = rcDocUrl !== undefined ? rcDocUrl : car.rcDocUrl;
   const nextPollution = pollutionCertUrl !== undefined ? pollutionCertUrl : car.pollutionCertUrl;
   const nextInsurance = insuranceDocUrl !== undefined ? insuranceDocUrl : car.insuranceDocUrl;
-  const docsComplete = Boolean(nextRc && nextPollution && nextInsurance);
+  const nextRcExpiry = rcExpiry !== undefined ? rcExpiry : car.rcExpiry;
+  const nextInsuranceExpiry = insuranceExpiry !== undefined ? insuranceExpiry : car.insuranceExpiry;
+  const nextPucExpiry = pucExpiry !== undefined ? pucExpiry : car.pucExpiry;
+  const docsComplete = Boolean(nextRc && nextPollution && nextInsurance && nextRcExpiry && nextInsuranceExpiry && nextPucExpiry);
 
   const updated = await prisma.car.update({
     where: { id },
@@ -226,7 +247,10 @@ router.patch('/cars/:id', requireAuth, async (req: Request, res: Response) => {
       ...(rcDocUrl !== undefined && { rcDocUrl }),
       ...(pollutionCertUrl !== undefined && { pollutionCertUrl }),
       ...(insuranceDocUrl !== undefined && { insuranceDocUrl }),
-      ...(docsTouched && docsComplete && { verificationStatus: 'VERIFIED' as const }),
+      ...(rcExpiry !== undefined && { rcExpiry: rcExpiry ? new Date(rcExpiry) : null }),
+      ...(insuranceExpiry !== undefined && { insuranceExpiry: insuranceExpiry ? new Date(insuranceExpiry) : null }),
+      ...(pucExpiry !== undefined && { pucExpiry: pucExpiry ? new Date(pucExpiry) : null }),
+      ...(docsTouched && docsComplete && { verificationStatus: 'PENDING_REVIEW' as const }),
       ...(onboardingStep !== undefined && { onboardingStep: Number(onboardingStep) }),
       ...(noNightBookings !== undefined && { noNightBookings }),
       ...(nightBookingStart !== undefined && { nightBookingStart }),

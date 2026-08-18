@@ -125,6 +125,9 @@ enum PayoutStatus {
 
 enum CarVerificationStatus {
   PENDING
+  // All three docs (RC/insurance/PUC) + their expiry dates are on file —
+  // queued for an admin to actually open and check them before VERIFIED.
+  PENDING_REVIEW
   VERIFIED
   REJECTED
 }

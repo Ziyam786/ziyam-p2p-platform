@@ -101,8 +101,21 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
     const car = await prisma.car.findUnique({ where: { id: carId }, include: { owner: true } });
     if (!car) return res.status(404).json({ error: 'Car not found' });
     if (!car.isAvailable) return res.status(409).json({ error: 'Car is no longer available' });
-    if (!car.owner.payoutAccountId) {
+    if (!car.owner.payoutAccountId || !car.owner.bankAccountVerified) {
       return res.status(422).json({ error: 'Host payout account not configured' });
+    }
+    // A car isn't legally roadworthy (or, for insurance, isn't actually
+    // covered) once any of these lapse — block new bookings rather than
+    // silently letting a guest drive an uninsured/unregistered car.
+    const now = new Date();
+    if (car.insuranceExpiry && car.insuranceExpiry < now) {
+      return res.status(422).json({ error: 'This car\'s insurance has expired and is unavailable until the host renews it.' });
+    }
+    if (car.rcExpiry && car.rcExpiry < now) {
+      return res.status(422).json({ error: 'This car\'s registration (RC) has expired and is unavailable until the host renews it.' });
+    }
+    if (car.pucExpiry && car.pucExpiry < now) {
+      return res.status(422).json({ error: 'This car\'s pollution certificate (PUC) has expired and is unavailable until the host renews it.' });
     }
     if (deliveryRequested && !car.offersDelivery) {
       return res.status(400).json({ error: 'This host does not offer delivery' });
@@ -435,9 +448,33 @@ router.post('/bookings/:id/cancel', requireAuth, async (req: Request, res: Respo
   const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
   if (!booking) return res.status(404).json({ error: 'Booking not found' });
   if (booking.customerId !== req.user!.userId) return res.status(403).json({ error: 'Not your booking' });
-  const cancellableStatuses: BookingStatus[] = [BookingStatus.PENDING_HOST_REVIEW, BookingStatus.CONFIRMED];
+  const cancellableStatuses: BookingStatus[] = [BookingStatus.RESERVED, BookingStatus.PENDING_HOST_REVIEW, BookingStatus.CONFIRMED];
   if (!cancellableStatuses.includes(booking.status)) {
     return res.status(400).json({ error: `Cannot cancel a booking with status ${booking.status}` });
+  }
+
+  // A RESERVED booking has only ever collected reservationFeeAmount — the
+  // tiered trip-cost/deposit refund math below assumes the balance was paid
+  // (true from PENDING_HOST_REVIEW onward), so it doesn't apply here.
+  // Cancelling forfeits the reservation fee, same as letting it expire
+  // (see initializeReservationTimeoutCron) — no RefundRequest, by design.
+  if (booking.status === BookingStatus.RESERVED) {
+    const updated = await prisma.booking.update({
+      where: { id },
+      data: {
+        status: BookingStatus.CANCELLED,
+        cancellationReason: reason ? String(reason).trim() : 'Cancelled by guest before balance payment — reservation fee forfeited',
+        cancelledBy: CancelledBy.CUSTOMER,
+      },
+    });
+    await notify(
+      booking.car.ownerId,
+      'GENERIC',
+      'Reservation cancelled',
+      `A guest cancelled their reservation for your ${booking.car.make} ${booking.car.model} before paying the balance.`,
+      '/host/dashboard'
+    );
+    return res.json({ success: true, data: updated, refundAmount: 0, retentionPercent: 1 });
   }
 
   const hoursUntilStart = (booking.startTime.getTime() - Date.now()) / (60 * 60 * 1000);

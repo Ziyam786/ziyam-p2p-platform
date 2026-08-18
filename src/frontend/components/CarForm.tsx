@@ -8,6 +8,7 @@ import FeaturePicker from './FeaturePicker';
 import AddressAutocomplete from './AddressAutocomplete';
 import PlateBlurEditor from './PlateBlurEditor';
 import SmartPriceSlider from './SmartPriceSlider';
+import FileUploadField from './FileUploadField';
 
 const CATEGORIES_FALLBACK = ['Hatchback', 'Sedan', 'SUV', 'Luxury', 'EV', 'MUV'];
 const FUEL_TYPES = ['Petrol', 'Diesel', 'Electric', 'CNG'];
@@ -21,6 +22,8 @@ export interface CarFormValues {
   latitude: number | null; longitude: number | null; description: string;
   images: string[]; originalImages: string[]; features: string; instantBook: boolean; offersDelivery: boolean; deliveryFee: number;
   offersPickup: boolean; pickupFee: number;
+  rcDocUrl: string; pollutionCertUrl: string; insuranceDocUrl: string;
+  rcExpiry: string; insuranceExpiry: string; pucExpiry: string;
 }
 
 const DEFAULTS: CarFormValues = {
@@ -29,7 +32,14 @@ const DEFAULTS: CarFormValues = {
   kmIncludedPerDay: 300, extraKmCharge: 10, city: 'Bengaluru', address: '', latitude: null, longitude: null, description: '',
   images: [], originalImages: [], features: 'Air Conditioning, Bluetooth / Aux, Power Steering', instantBook: true,
   offersDelivery: false, deliveryFee: 0, offersPickup: false, pickupFee: 0,
+  rcDocUrl: '', pollutionCertUrl: '', insuranceDocUrl: '',
+  rcExpiry: '', insuranceExpiry: '', pucExpiry: '',
 };
+
+// Car's date fields come back as full ISO datetime strings — <input type="date"> needs just the YYYY-MM-DD prefix.
+function toDateInputValue(iso?: string | null): string {
+  return iso ? iso.slice(0, 10) : '';
+}
 
 export function carToFormValues(car: Car): CarFormValues {
   return {
@@ -40,6 +50,8 @@ export function carToFormValues(car: Car): CarFormValues {
     description: car.description ?? '', images: car.images, originalImages: car.originalImages ?? [], features: car.features.join(', '),
     instantBook: car.instantBook, offersDelivery: car.offersDelivery, deliveryFee: car.deliveryFee,
     offersPickup: car.offersPickup, pickupFee: car.pickupFee,
+    rcDocUrl: car.rcDocUrl ?? '', pollutionCertUrl: car.pollutionCertUrl ?? '', insuranceDocUrl: car.insuranceDocUrl ?? '',
+    rcExpiry: toDateInputValue(car.rcExpiry), insuranceExpiry: toDateInputValue(car.insuranceExpiry), pucExpiry: toDateInputValue(car.pucExpiry),
   };
 }
 
@@ -55,6 +67,8 @@ export function formValuesToPayload(v: CarFormValues) {
     features: v.features.split(',').map((s) => s.trim()).filter(Boolean),
     instantBook: v.instantBook, offersDelivery: v.offersDelivery, deliveryFee: Number(v.deliveryFee),
     offersPickup: v.offersPickup, pickupFee: Number(v.pickupFee),
+    rcDocUrl: v.rcDocUrl || undefined, pollutionCertUrl: v.pollutionCertUrl || undefined, insuranceDocUrl: v.insuranceDocUrl || undefined,
+    rcExpiry: v.rcExpiry || undefined, insuranceExpiry: v.insuranceExpiry || undefined, pucExpiry: v.pucExpiry || undefined,
   };
 }
 
@@ -177,6 +191,25 @@ export default function CarForm({
       <Field label="Description">
         <textarea value={values.description} onChange={(e) => set('description', e.target.value)} rows={3} className={inputCls} placeholder="A well-maintained car, perfect for city drives..." />
       </Field>
+
+      <div className="space-y-4 border-t border-gray-100 pt-5">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Documents</p>
+        <FileUploadField label="Registration Certificate (RC — front & back)" value={values.rcDocUrl} onChange={(url) => set('rcDocUrl', url)} kind="document" />
+        <Field label="RC Expiry Date">
+          <input type="date" value={values.rcExpiry} onChange={(e) => set('rcExpiry', e.target.value)} className={inputCls} />
+        </Field>
+        <FileUploadField label="Pollution Certificate (PUC)" value={values.pollutionCertUrl} onChange={(url) => set('pollutionCertUrl', url)} kind="document" />
+        <Field label="PUC Expiry Date">
+          <input type="date" value={values.pucExpiry} onChange={(e) => set('pucExpiry', e.target.value)} className={inputCls} />
+        </Field>
+        <FileUploadField label="Comprehensive Insurance Document" value={values.insuranceDocUrl} onChange={(url) => set('insuranceDocUrl', url)} kind="document" />
+        <Field label="Insurance Expiry Date">
+          <input type="date" value={values.insuranceExpiry} onChange={(e) => set('insuranceExpiry', e.target.value)} className={inputCls} />
+        </Field>
+        <p className="text-xs text-gray-400">
+          Renewing a document? Upload the new file and update its expiry date here — re-uploading queues this listing for re-review.
+        </p>
+      </div>
 
       <Field label="Photos">
         <div className="flex flex-wrap gap-3 mb-3">
