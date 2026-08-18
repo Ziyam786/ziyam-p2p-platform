@@ -1,5 +1,5 @@
 import type {
-  AdminStats, AppNotification, Blackout, Booking, BookingConditionPhoto, Car, DamageClaim, DeliveryLocation, EarningsOverview,
+  AdminStats, AppNotification, Blackout, Booking, BookingConditionPhoto, Car, DamageClaim, DeliveryLocation, DisputeSupportRequest, EarningsOverview,
   IncentiveProgress, PhotoAngle, ProtectionPlan, PublicSettings, PublicUser, Review, ServiceCatalogEntry, ServiceRequest, TripStage,
   UtilizationEntry, YieldSuggestion,
 } from './types';
@@ -233,6 +233,13 @@ export const damageClaimApi = {
   submitBill: (id: string, data: { billUrl: string; billAmount: number; photos: string[] }) =>
     patch<{ success: true; data: DamageClaim }>(`/issue-reports/${id}/submit-bill`, data),
   payExcess: (id: string) => post<{ success: true; data: { url: string; fields: Record<string, string> } }>(`/issue-reports/${id}/pay-excess`),
+};
+
+/* ── Dispute-resolution concierge (phone/WhatsApp, Standard/Premium plans only) ── */
+export const disputeSupportApi = {
+  request: (bookingId: string, channel: 'PHONE' | 'WHATSAPP') =>
+    post<{ success: true; data: DisputeSupportRequest }>(`/bookings/${bookingId}/dispute-support`, { channel }),
+  list: (bookingId: string) => get<{ success: true; data: DisputeSupportRequest[] }>(`/bookings/${bookingId}/dispute-support`),
 };
 
 /* ── Itinerary unlocks ────────────────────────────────────────────── */

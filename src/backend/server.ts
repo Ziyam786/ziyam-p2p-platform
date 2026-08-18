@@ -31,6 +31,7 @@ import opsTripRoutes from './routes/opsTrip.routes';
 import financeErpRoutes from './routes/financeErp.routes';
 import itineraryRoutes from './routes/itinerary.routes';
 import damageClaimRoutes from './routes/damageClaim.routes';
+import disputeSupportRoutes from './routes/disputeSupport.routes';
 import refundRequestRoutes from './routes/refundRequest.routes';
 import hostReviewRoutes from './routes/hostReview.routes';
 
@@ -125,6 +126,7 @@ app.use('/api', opsTripRoutes);
 app.use('/api', financeErpRoutes);
 app.use('/api', itineraryRoutes);
 app.use('/api', damageClaimRoutes);
+app.use('/api', disputeSupportRoutes);
 app.use('/api', refundRequestRoutes);
 app.use('/api', hostReviewRoutes);
 
