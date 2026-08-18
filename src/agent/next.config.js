@@ -3,6 +3,7 @@ const path = require('path');
 
 const nextConfig = {
   reactStrictMode: true,
+  productionBrowserSourceMaps: false,
   output: 'standalone',
   // This app's package-lock.json coexists with the root one (backend),
   // frontend's, and admin's — without this, Next.js's build-time
