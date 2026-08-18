@@ -117,7 +117,7 @@ router.post('/kyc/identity-document', requireAuth, async (req: Request, res: Res
     await notify(user.id, 'KYC_VERIFIED', "You're verified!", 'Your identity has been confirmed via Arya.ai. You can now book or list cars.', '/account');
     res.json({ success: true, message: 'KYC verified', data: user, selfieCheck: selfieOutcome });
   } catch (err: any) {
-    if (err.status === 422) return res.status(422).json({ error: err.message });
+    if (err.status === 422 || err.status === 400) return res.status(err.status).json({ error: err.message });
     console.error('[KYC] Arya identity verification failed:', err.response?.data ?? err.message);
     res.status(502).json({ error: 'Could not verify your ID right now. Please try again shortly.' });
   }
@@ -321,7 +321,7 @@ router.post('/kyc/driving-license', requireAuth, async (req: Request, res: Respo
 
     res.json({ success: true, data: user, selfieCheck: selfieOutcome });
   } catch (err: any) {
-    if (err.status === 422) return res.status(422).json({ error: err.message });
+    if (err.status === 422 || err.status === 400) return res.status(err.status).json({ error: err.message });
     console.error('[KYC] Driving license verification failed:', err.response?.data ?? err.message);
     res.status(502).json({ error: 'Could not verify the driving license right now. Please try again shortly.' });
   }
@@ -363,7 +363,7 @@ router.post('/kyc/submit', requireAuth, async (req: Request, res: Response) => {
     await notify(user.id, 'KYC_VERIFIED', "You're verified!", 'Your identity has been confirmed via Arya.ai. You can now book or list cars.', '/account');
     res.json({ success: true, message: 'KYC verified', data: user });
   } catch (err: any) {
-    if (err.status === 422) return res.status(422).json({ error: err.message });
+    if (err.status === 422 || err.status === 400) return res.status(err.status).json({ error: err.message });
     console.error('[KYC] Arya submit failed:', err.response?.data ?? err.message);
     res.status(502).json({ error: 'Could not verify that document right now. Please try again shortly.' });
   }

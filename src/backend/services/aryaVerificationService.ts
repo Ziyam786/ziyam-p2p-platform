@@ -1,4 +1,6 @@
 import axios from 'axios';
+import path from 'path';
+import fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
 
@@ -280,16 +282,34 @@ export async function assertReadableDocument(docBase64: string): Promise<void> {
   }
 }
 
-/** Fetches an already-uploaded file (local disk or an absolute URL, e.g. Firebase Storage) and returns its base64 content. */
+/** Fetches an already-uploaded file (local disk or our Firebase Storage bucket) and returns its base64 content. */
 export async function fetchDocAsBase64(urlOrPath: string): Promise<string> {
   if (/^https?:\/\//i.test(urlOrPath)) {
-    const res = await axios.get(urlOrPath, { responseType: 'arraybuffer' });
+    const bucketName = config.firebase.storageBucket || null;
+    let parsed: URL;
+    try {
+      parsed = new URL(urlOrPath);
+    } catch {
+      const err = new Error('Invalid file URL') as Error & { status?: number };
+      err.status = 400;
+      throw err;
+    }
+    if (!bucketName || parsed.protocol !== 'https:' || parsed.hostname !== 'storage.googleapis.com' || !parsed.pathname.startsWith(`/${bucketName}/`)) {
+      const err = new Error('Invalid file URL') as Error & { status?: number };
+      err.status = 400;
+      throw err;
+    }
+    const safeUrl = `${parsed.protocol}//${parsed.host}${parsed.pathname}${parsed.search}`;
+    const res = await axios.get(safeUrl, { responseType: 'arraybuffer', maxRedirects: 0, timeout: 15_000 });
     return Buffer.from(res.data).toString('base64');
   }
-  const fs = await import('fs/promises');
-  const path = await import('path');
-  const filename = path.basename(urlOrPath);
-  const filePath = path.join(config.uploadDir, filename);
-  const buf = await fs.readFile(filePath);
+  const resolvedUploadDir = path.resolve(config.uploadDir);
+  const absolutePath = path.resolve(resolvedUploadDir, path.basename(urlOrPath));
+  if (absolutePath !== resolvedUploadDir && !absolutePath.startsWith(resolvedUploadDir + path.sep)) {
+    const err = new Error('Invalid file path') as Error & { status?: number };
+    err.status = 400;
+    throw err;
+  }
+  const buf = await fs.readFile(absolutePath);
   return buf.toString('base64');
 }
