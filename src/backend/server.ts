@@ -87,14 +87,15 @@ app.use(cors({
 }));
 
 app.use(express.json());
-app.use(cookieParser());
+// Cookie parsing + CSRF only on /api. CodeQL's missing-token-validation query
+// treats cookieParser() as covering every later handler; applying it globally
+// would flag /health and static /uploads as cookie-auth without CSRF, even
+// though those paths never read the session cookie. PayU is already mounted
+// above, before cookies exist, and carries none.
+app.use('/api', cookieParser());
 // Baseline per-IP limit across the whole API — authRateLimiter (stricter,
 // applied per-route in auth.routes.ts) still layers on top for login/OTP.
 app.use('/api', apiRateLimiter);
-// Double-submit CSRF check for cookie-authenticated mutations. Mounted after
-// cookieParser (needs req.cookies) and after payuCallbackRoutes above (that
-// router is intentionally mounted before cookieParser exists at all — PayU's
-// callback carries no cookies, so it's already outside this gate's reach).
 app.use('/api', requireCsrfToken);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'ZiyamSelfDrive API' }));
