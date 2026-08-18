@@ -361,7 +361,7 @@ router.post('/kyc/submit', requireAuth, async (req: Request, res: Response) => {
     await notify(user.id, 'KYC_VERIFIED', "You're verified!", 'Your identity has been confirmed via Arya.ai. You can now book or list cars.', '/account');
     res.json({ success: true, message: 'KYC verified', data: user });
   } catch (err: any) {
-    if (err.status === 422 || err.status === 400) return res.status(err.status).json({ error: err.message });
+      if (err.status === 422 || err.status === 400) return res.status(err.status).json({ error: err.message });
     console.error('[KYC] Arya submit failed:', err.response?.data ?? err.message);
     res.status(502).json({ error: 'Could not verify that document right now. Please try again shortly.' });
   }
