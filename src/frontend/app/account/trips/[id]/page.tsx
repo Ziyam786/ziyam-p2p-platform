@@ -12,8 +12,8 @@ import { useAuth } from '../../../../lib/auth-context';
 import TripChat from '../../../../components/TripChat';
 import ConditionPhotoCapture from '../../../../components/ConditionPhotoCapture';
 import { HostDeliverySharePanel, GuestDeliveryTracker } from '../../../../components/LiveDeliveryTracker';
-import { bookingsApi, reviewsApi, damageClaimApi } from '../../../../lib/api';
-import type { Booking, BookingConditionPhoto, DamageClaim, PhotoAngle, TripStage } from '../../../../lib/types';
+import { bookingsApi, reviewsApi, damageClaimApi, disputeSupportApi } from '../../../../lib/api';
+import type { Booking, BookingConditionPhoto, DamageClaim, DisputeSupportRequest, PhotoAngle, TripStage } from '../../../../lib/types';
 
 const REQUIRED_PHOTO_ANGLES: PhotoAngle[] = ['FRONT', 'REAR', 'LEFT', 'RIGHT'];
 const ISSUE_TYPE_LABELS: Record<string, string> = { DAMAGE: 'Damage', FUEL: 'Fuel', FASTAG: 'FASTag' };
@@ -64,6 +64,8 @@ function TripDetailInner() {
   const [conditionPhotos, setConditionPhotos] = useState<BookingConditionPhoto[]>([]);
   const [issueReports, setIssueReports] = useState<DamageClaim[]>([]);
   const [payingExcessId, setPayingExcessId] = useState<string | null>(null);
+  const [disputeRequests, setDisputeRequests] = useState<DisputeSupportRequest[]>([]);
+  const [requestingSupport, setRequestingSupport] = useState(false);
   const [excessCheckout, setExcessCheckout] = useState<{ url: string; fields: Record<string, string> } | null>(null);
   const excessFormRef = useRef<HTMLFormElement>(null);
   const [capturingStage, setCapturingStage] = useState<TripStage | null>(null);
@@ -94,6 +96,23 @@ function TripDetailInner() {
   useEffect(() => {
     damageClaimApi.list(params.id).then((res) => setIssueReports(res.data)).catch(() => {});
   }, [params.id]);
+  useEffect(() => {
+    disputeSupportApi.list(params.id).then((res) => setDisputeRequests(res.data)).catch(() => {});
+  }, [params.id]);
+
+  async function handleRequestSupport(channel: 'PHONE' | 'WHATSAPP') {
+    if (!trip) return;
+    setRequestingSupport(true);
+    try {
+      const res = await disputeSupportApi.request(trip.id, channel);
+      setDisputeRequests((prev) => [res.data, ...prev]);
+      show('A Ziyam agent has been notified — they\'ll reach out shortly.', 'success');
+    } catch (err: any) {
+      show(err.message ?? 'Could not request support', 'error');
+    } finally {
+      setRequestingSupport(false);
+    }
+  }
 
   async function handlePayExcess(claimId: string) {
     setPayingExcessId(claimId);
@@ -549,6 +568,35 @@ function TripDetailInner() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {!isHost && trip.protectionPlan !== 'BASIC' && ['ACTIVE', 'COMPLETED'].includes(trip.status) && (
+          <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-6">
+            <h2 className="font-bold text-gray-900 mb-1">Need help with a dispute?</h2>
+            <p className="text-xs text-gray-500 mb-4">
+              Your {trip.protectionPlan === 'PREMIUM' ? 'Premium' : 'Standard'} protection plan includes a Ziyam agent to help
+              resolve issues with your host directly, by phone or WhatsApp.
+            </p>
+            {disputeRequests.length > 0 ? (
+              <div className="space-y-2">
+                {disputeRequests.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between text-xs bg-gray-50 rounded-lg px-3 py-2">
+                    <span className="text-gray-600">{r.channel === 'PHONE' ? '📞 Phone' : '💬 WhatsApp'} support requested</span>
+                    <span className={`font-bold px-2 py-0.5 rounded-full ${r.status === 'RESOLVED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{r.status.replace('_', ' ')}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex gap-3">
+                <button disabled={requestingSupport} onClick={() => handleRequestSupport('PHONE')} className="flex-1 border-2 border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white text-sm font-bold py-2.5 rounded-xl transition disabled:opacity-50">
+                  📞 Request Call
+                </button>
+                <button disabled={requestingSupport} onClick={() => handleRequestSupport('WHATSAPP')} className="flex-1 border-2 border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white text-sm font-bold py-2.5 rounded-xl transition disabled:opacity-50">
+                  💬 Request WhatsApp
+                </button>
+              </div>
+            )}
           </div>
         )}
 

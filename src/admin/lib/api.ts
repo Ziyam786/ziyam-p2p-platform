@@ -1,5 +1,5 @@
 import type {
-  AdminBooking, AdminCar, AdminDamageClaim, AdminPayout, AdminRefundRequest, AdminReview, AdminStats, AdminUser, AuditEntry,
+  AdminBooking, AdminCar, AdminDamageClaim, AdminDisputeSupportRequest, AdminPayout, AdminRefundRequest, AdminReview, AdminStats, AdminUser, AuditEntry,
   BalanceSheetData, BookingConditionPhoto, BookingStatus, ChatConversationSummary, ChatMessageRow, CommandCenterData, CustomRoleRow,
   FleetExpenseRow, FleetSummary, JournalEntryRow, KycVerificationLogRow, MonthlyBalanceRow, OpsInvoiceRow, OpsInvoiceStatus, OpsTripRow,
   OutstandingFrequency, OutstandingRow, OutstandingType, PlatformBookingEntry, PromoCode, SessionUser, SettingRow,
@@ -86,6 +86,9 @@ export const adminApi = {
 
   refundRequests: (status?: string) => get<{ success: true; data: AdminRefundRequest[] }>(`/admin/refund-requests${status ? `?status=${status}` : ''}`),
   completeRefundRequest: (id: string) => patch<{ success: true; data: AdminRefundRequest }>(`/admin/refund-requests/${id}/complete`),
+
+  disputeSupport: (status?: string) => get<{ success: true; data: AdminDisputeSupportRequest[] }>(`/admin/dispute-support${status ? `?status=${status}` : ''}`),
+  resolveDisputeSupport: (id: string) => patch<{ success: true; message: string }>(`/admin/dispute-support/${id}/resolve`),
 
   settings: () => get<{ success: true; data: SettingRow[] }>('/admin/settings'),
   updateSetting: (key: string, value: unknown) => put<{ success: true }>(`/admin/settings/${key}`, { value }),

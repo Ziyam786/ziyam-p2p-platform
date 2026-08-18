@@ -204,6 +204,21 @@ export interface AdminDamageClaim {
   excessChargePaidAt?: string | null;
 }
 
+export interface AdminDisputeSupportRequest {
+  id: string;
+  bookingId: string;
+  booking?: { car: { make: string; model: string }; customer: { fullName: string; email: string; phoneNumber: string } };
+  requestedById: string;
+  channel: 'PHONE' | 'WHATSAPP';
+  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED';
+  assignedAgentId?: string | null;
+  assignedAgent?: { id: string; fullName: string } | null;
+  hostFeeAmount: number;
+  hostFeeCharged: boolean;
+  createdAt: string;
+  resolvedAt?: string | null;
+}
+
 export interface AdminRefundRequest {
   id: string;
   bookingId: string;

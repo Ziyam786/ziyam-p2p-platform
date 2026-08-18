@@ -216,6 +216,19 @@ export interface DamageClaim {
   excessChargePaidAt?: string | null;
 }
 
+export interface DisputeSupportRequest {
+  id: string;
+  bookingId: string;
+  requestedById: string;
+  channel: 'PHONE' | 'WHATSAPP';
+  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED';
+  assignedAgentId?: string | null;
+  hostFeeAmount: number;
+  hostFeeCharged: boolean;
+  createdAt: string;
+  resolvedAt?: string | null;
+}
+
 export interface Review {
   id: string;
   bookingId: string;
