@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, BookingStatus } from '@prisma/client';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { requireAuth } from '../middleware/auth';
 import { notify } from '../services/notificationService';
 
@@ -23,7 +23,7 @@ router.post('/reviews', requireAuth, async (req: Request, res: Response) => {
 
   const review = await prisma.review.create({
     data: {
-      id: uuidv4(),
+      id: randomUUID(),
       bookingId,
       carId: booking.carId,
       authorId: req.user!.userId,

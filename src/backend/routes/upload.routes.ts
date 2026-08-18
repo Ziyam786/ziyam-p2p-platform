@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import axios from 'axios';
 import sharp from 'sharp';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { config } from '../config';
 import { requireAuth } from '../middleware/auth';
 import { isStorageConfigured, getStorageBucket } from '../services/firebaseAdmin';
@@ -65,7 +65,7 @@ async function verifyFileContent(buffer: Buffer, mimetype: string): Promise<bool
  * removed feature, so uploads still work in local dev without Firebase creds.
  */
 export async function saveFile(buffer: Buffer, mimetype: string): Promise<string> {
-  const filename = `${uuidv4()}${MIME_EXTENSION[mimetype] ?? ''}`;
+  const filename = `${randomUUID()}${MIME_EXTENSION[mimetype] ?? ''}`;
   if (isStorageConfigured()) {
     const file = getStorageBucket().file(filename);
     await file.save(buffer, { contentType: mimetype, public: true });

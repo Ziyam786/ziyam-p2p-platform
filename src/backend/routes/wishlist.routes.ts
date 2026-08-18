@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { requireAuth } from '../middleware/auth';
 
 const router = Router();
@@ -37,7 +37,7 @@ router.post('/cars/:id/wishlist', requireAuth, async (req: Request, res: Respons
   const car = await prisma.car.findUnique({ where: { id: carId } });
   if (!car) return res.status(404).json({ error: 'Car not found' });
 
-  await prisma.wishlist.create({ data: { id: uuidv4(), userId, carId } });
+  await prisma.wishlist.create({ data: { id: randomUUID(), userId, carId } });
   res.json({ success: true, wishlisted: true });
 });
 

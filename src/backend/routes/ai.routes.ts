@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, Role } from '@prisma/client';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { requireAuth, requireRole, attachUserIfPresent } from '../middleware/auth';
 import { getSetting } from '../services/settingsService';
 import { generateChatReply, ChatTurn } from '../services/aiService';
@@ -55,11 +55,11 @@ router.post('/ai/chat', attachUserIfPresent, async (req: Request, res: Response)
   const history: ChatTurn[] = priorLogs.map((l) => ({ role: l.role as 'user' | 'assistant', content: l.content }));
   history.push({ role: 'user', content: message });
 
-  await prisma.chatLog.create({ data: { id: uuidv4(), sessionId, userId, role: 'user', content: message } });
+  await prisma.chatLog.create({ data: { id: randomUUID(), sessionId, userId, role: 'user', content: message } });
 
   const reply = await generateChatReply(systemPrompt, history, { userId, enableTools: true });
 
-  await prisma.chatLog.create({ data: { id: uuidv4(), sessionId, userId, role: 'assistant', content: reply } });
+  await prisma.chatLog.create({ data: { id: randomUUID(), sessionId, userId, role: 'assistant', content: reply } });
 
   res.json({ success: true, reply });
 });
