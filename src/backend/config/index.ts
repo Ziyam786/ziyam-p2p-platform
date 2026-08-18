@@ -89,6 +89,18 @@ export const config = {
     },
   },
 
+  // Arya.ai (Aurionpro) — document extraction/verification (see
+  // aryaVerificationService.ts). Three separate products, three separate
+  // tokens: KYC doc extraction (PAN/Aadhaar/Voter ID/Passport/Driving
+  // Licence) used for driving-license verification; RC Verification for
+  // vehicle registration certificates; image-quality-checker to reject
+  // unusable photos before spending a call on the other two.
+  arya: {
+    kycToken: process.env.ARYA_KYC_TOKEN ?? '',
+    rcToken: process.env.ARYA_RC_TOKEN ?? '',
+    imageQualityToken: process.env.ARYA_IMAGE_QUALITY_TOKEN ?? '',
+  },
+
   ai: {
     anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? '',
     model: process.env.AI_MODEL ?? 'claude-haiku-4-5-20251001',

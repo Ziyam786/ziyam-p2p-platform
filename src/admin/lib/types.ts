@@ -94,6 +94,8 @@ export interface AdminCar {
   rcExpiry?: string | null;
   insuranceExpiry?: string | null;
   pucExpiry?: string | null;
+  rcAutoVerifiedAt?: string | null;
+  rcNumberMatches?: boolean | null;
   createdAt: string;
   _count?: { bookings: number; reviews: number };
 }
