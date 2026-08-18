@@ -8,6 +8,7 @@ import { PayoutEngine } from './services/payoutEngine';
 import { initializeYieldAutoApplyCron } from './services/yieldEngine';
 import { initializeDocExpiryCron } from './services/carVerificationService';
 import { apiRateLimiter } from './middleware/rateLimit';
+import { requireCsrfToken } from './middleware/csrf';
 import { safeErrorMessage } from './utils/errorResponse';
 import authRoutes from './routes/auth.routes';
 import carRoutes from './routes/car.routes';
@@ -90,6 +91,11 @@ app.use(cookieParser());
 // Baseline per-IP limit across the whole API — authRateLimiter (stricter,
 // applied per-route in auth.routes.ts) still layers on top for login/OTP.
 app.use('/api', apiRateLimiter);
+// Double-submit CSRF check for cookie-authenticated mutations. Mounted after
+// cookieParser (needs req.cookies) and after payuCallbackRoutes above (that
+// router is intentionally mounted before cookieParser exists at all — PayU's
+// callback carries no cookies, so it's already outside this gate's reach).
+app.use('/api', requireCsrfToken);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'ZiyamSelfDrive API' }));
 

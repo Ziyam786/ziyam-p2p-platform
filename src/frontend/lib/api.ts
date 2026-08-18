@@ -18,12 +18,25 @@ export class ApiError extends Error {
   }
 }
 
+// Reads the double-submit CSRF cookie the backend sets alongside the session
+// cookie (non-httpOnly on purpose — see backend middleware/csrf.ts) and
+// echoes it back as a header on mutating requests, which is the whole
+// mechanism: a cross-origin attacker page can ride the session cookie but
+// can't read this one to forge a matching header.
+function getCsrfToken(): string | undefined {
+  if (typeof document === 'undefined') return undefined;
+  const match = document.cookie.match(/(?:^|;\s*)ziyam_csrf=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : undefined;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const method = options.method ?? 'GET';
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      ...(method !== 'GET' ? { 'X-CSRF-Token': getCsrfToken() ?? '' } : {}),
       ...options.headers,
     },
   });
@@ -52,6 +65,7 @@ export const uploadsApi = {
     const res = await fetch(`${API_URL}/uploads`, {
       method: 'POST',
       credentials: 'include',
+      headers: { 'X-CSRF-Token': getCsrfToken() ?? '' },
       body: formData,
     });
     const isJson = res.headers.get('content-type')?.includes('application/json');

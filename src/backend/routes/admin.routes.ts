@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, Role, BookingStatus, PayoutStatus } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
+import { randomInt } from 'crypto';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { recordAudit } from '../middleware/auditLog';
 import { PayoutEngine } from '../services/payoutEngine';
@@ -148,7 +149,7 @@ router.post('/admin/bookings', async (req: Request, res: Response) => {
         // Same pickup-handover code the guest-facing accept flow generates
         // (hostReview.routes.ts) — an admin-created CONFIRMED booking needs
         // one too, or its host would never see a start-OTP panel at pickup.
-        ...(bookingStatus === BookingStatus.CONFIRMED && { startOtp: String(Math.floor(1000 + Math.random() * 9000)) }),
+        ...(bookingStatus === BookingStatus.CONFIRMED && { startOtp: String(randomInt(1000, 10000)) }),
       },
       include: { car: { select: { make: true, model: true, city: true } }, customer: { select: { fullName: true, email: true } } },
     });
