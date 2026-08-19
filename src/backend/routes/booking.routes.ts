@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient, BookingStatus, RefundRequestType, CancelledBy, TripStage, PhotoAngle } from '@prisma/client';
+import { Prisma, PrismaClient, BookingStatus, RefundRequestType, CancelledBy, TripStage, PhotoAngle } from '@prisma/client';
 import { randomInt, randomUUID } from 'crypto';
 import paymentGateway from '../services/paymentGateway';
 import { PayoutEngine } from '../services/payoutEngine';
@@ -16,6 +16,9 @@ import { isFirebaseConfigured, getFirestoreClient } from '../services/firebaseAd
 // blocks or fails the actual request if Firestore is unconfigured or the
 // write itself fails, since the REST routes already work standalone
 // (the frontend falls back to polling when Firebase isn't configured).
+/** Thrown inside the booking-creation transaction to distinguish an intentional 409 conflict from any other transaction failure. */
+class BookingConflictError extends Error {}
+
 function mirrorToFirestore(collectionPath: string, docId: string, data: Record<string, unknown>): void {
   if (!isFirebaseConfigured()) return;
   getFirestoreClient()
@@ -162,29 +165,6 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'This host does not offer delivery' });
     }
 
-    // Reject overlapping bookings for the same car. PENDING_PAYMENT counts as
-    // holding the slot (prevents a race where two renters both start checkout
-    // for the same dates) — in production these should also auto-expire after
-    // a short window so an abandoned checkout doesn't permanently lock dates.
-    const conflictingBooking = await prisma.booking.findFirst({
-      where: {
-        carId,
-        status: { notIn: [BookingStatus.CANCELLED] },
-        startTime: { lt: end },
-        endTime: { gt: start },
-      },
-    });
-    if (conflictingBooking) {
-      return res.status(409).json({ error: 'This car is already booked for part of the selected dates' });
-    }
-
-    const conflictingBlackout = await prisma.blackout.findFirst({
-      where: { carId, startDate: { lt: end }, endDate: { gt: start } },
-    });
-    if (conflictingBlackout) {
-      return res.status(409).json({ error: 'The host has blocked out part of the selected dates' });
-    }
-
     let normalizedPromo: string | null = null;
     if (promoCode) {
       const promo = await prisma.promoCode.findUnique({ where: { code: String(promoCode).toUpperCase() } });
@@ -211,30 +191,81 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
     // RESERVATION_FEE_MIN/PERCENT. Server-computed, same tamper-proofing as depositAmount.
     const reservationFeeAmount = Math.max(RESERVATION_FEE_MIN, Math.round(totalAmount * RESERVATION_FEE_PERCENT));
 
-    const booking = await prisma.booking.create({
-      data: {
-        id: randomUUID(),
-        carId,
-        customerId,
-        startTime: start,
-        endTime: end,
-        totalAmount,
-        platformFee,
-        hostPayoutAmount: hostPayout,
-        depositAmount,
-        reservationFeeAmount,
-        protectionPlan: resolvedPlan,
-        deliveryRequested: Boolean(deliveryRequested),
-        deliveryFeeAmount,
-        coDriverRequested: Boolean(coDriverRequested),
-        coDriverName: coDriverRequested ? String(coDriverName).trim() : null,
-        coDriverLicenseNumber: coDriverRequested ? String(coDriverLicenseNumber).trim() : null,
-        promoCode: normalizedPromo,
-        status: BookingStatus.PENDING_PAYMENT,
-      },
-    });
+    // The overlap/blackout check and the create must happen as one atomic
+    // unit — a plain findFirst-then-create (the previous shape of this
+    // code) lets two concurrent requests both pass the check before either
+    // commits, double-booking the car. Serializable isolation makes
+    // Postgres detect that write-write conflict and abort the loser with a
+    // P2034 error, which we translate back into the same 409 the
+    // pre-existing (non-atomic) check used to return — see
+    // specs/001-flutter-renter-app/research.md's Principle III fix.
+    let bookingId: string;
+    try {
+      bookingId = await prisma.$transaction(
+        async (tx) => {
+          // PENDING_PAYMENT counts as holding the slot (prevents a race
+          // where two renters both start checkout for the same dates) — in
+          // production these should also auto-expire after a short window
+          // so an abandoned checkout doesn't permanently lock dates.
+          const conflictingBooking = await tx.booking.findFirst({
+            where: {
+              carId,
+              status: { notIn: [BookingStatus.CANCELLED] },
+              startTime: { lt: end },
+              endTime: { gt: start },
+            },
+          });
+          if (conflictingBooking) {
+            throw new BookingConflictError('This car is already booked for part of the selected dates');
+          }
 
-    res.status(201).json({ success: true, bookingId: booking.id });
+          const conflictingBlackout = await tx.blackout.findFirst({
+            where: { carId, startDate: { lt: end }, endDate: { gt: start } },
+          });
+          if (conflictingBlackout) {
+            throw new BookingConflictError('The host has blocked out part of the selected dates');
+          }
+
+          const created = await tx.booking.create({
+            data: {
+              id: randomUUID(),
+              carId,
+              customerId,
+              startTime: start,
+              endTime: end,
+              totalAmount,
+              platformFee,
+              hostPayoutAmount: hostPayout,
+              depositAmount,
+              reservationFeeAmount,
+              protectionPlan: resolvedPlan,
+              deliveryRequested: Boolean(deliveryRequested),
+              deliveryFeeAmount,
+              coDriverRequested: Boolean(coDriverRequested),
+              coDriverName: coDriverRequested ? String(coDriverName).trim() : null,
+              coDriverLicenseNumber: coDriverRequested ? String(coDriverLicenseNumber).trim() : null,
+              promoCode: normalizedPromo,
+              status: BookingStatus.PENDING_PAYMENT,
+            },
+          });
+          return created.id;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error: any) {
+      if (error instanceof BookingConflictError) {
+        return res.status(409).json({ error: error.message });
+      }
+      // P2034: Prisma/Postgres detected the serialization conflict itself —
+      // the losing request's overlap check would have passed, so this IS a
+      // double-booking attempt, not a generic failure.
+      if (error?.code === 'P2034') {
+        return res.status(409).json({ error: 'This car is already booked for part of the selected dates' });
+      }
+      throw error;
+    }
+
+    res.status(201).json({ success: true, bookingId });
   } catch (error: any) {
     console.error('[POST /booking] failed:', error);
     res.status(500).json({ error: `Booking failed: ${safeErrorMessage(error)}` });
