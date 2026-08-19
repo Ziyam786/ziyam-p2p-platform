@@ -143,7 +143,11 @@ router.post('/auth/signup', authRateLimiter, async (req: Request, res: Response)
   const token = signAuthToken({ userId: user.id, role: user.role });
   res.cookie(config.auth.cookieName, token, cookieOptions());
   issueCsrfCookie(res);
-  res.status(201).json({ success: true, data: user });
+  // `token` is additive, alongside the unchanged `data` shape — cookie-based
+  // clients (src/frontend/src/admin/src/agent) ignore it; cookie-less
+  // clients (the Flutter app) store it and replay it as a bearer header.
+  // See specs/001-flutter-renter-app/contracts/rest-api.md.
+  res.status(201).json({ success: true, data: user, token });
 });
 
 router.post('/auth/login', authRateLimiter, async (req: Request, res: Response) => {
@@ -192,7 +196,9 @@ router.post('/auth/login', authRateLimiter, async (req: Request, res: Response) 
   res.cookie(config.auth.cookieName, token, cookieOptions());
   issueCsrfCookie(res);
 
-  res.json({ success: true, data: toPublicUser(user) });
+  // Additive `token` field alongside the unchanged `data` shape — see the
+  // comment on /auth/signup above.
+  res.json({ success: true, data: toPublicUser(user), token });
 });
 
 // Request a login OTP for an existing account (guest or host — login is
@@ -241,7 +247,9 @@ router.post('/auth/otp/verify', authRateLimiter, async (req: Request, res: Respo
   res.cookie(config.auth.cookieName, token, cookieOptions());
   issueCsrfCookie(res);
 
-  res.json({ success: true, data: toPublicUser(user) });
+  // Additive `token` field alongside the unchanged `data` shape — see the
+  // comment on /auth/signup above.
+  res.json({ success: true, data: toPublicUser(user), token });
 });
 
 // Verifies a Supabase session (obtained client-side via
@@ -287,7 +295,9 @@ router.post('/auth/oauth/supabase', authRateLimiter, async (req: Request, res: R
   const token = signAuthToken({ userId: user.id, role: user.role });
   res.cookie(config.auth.cookieName, token, cookieOptions());
   issueCsrfCookie(res);
-  res.json({ success: true, data: toPublicUser(user) });
+  // Additive `token` field alongside the unchanged `data` shape — see the
+  // comment on /auth/signup above.
+  res.json({ success: true, data: toPublicUser(user), token });
 });
 
 // Apple Sign-In via real Firebase Auth (not routed through Supabase, unlike
@@ -328,7 +338,9 @@ router.post('/auth/oauth/firebase', authRateLimiter, async (req: Request, res: R
   const token = signAuthToken({ userId: user.id, role: user.role });
   res.cookie(config.auth.cookieName, token, cookieOptions());
   issueCsrfCookie(res);
-  res.json({ success: true, data: toPublicUser(user) });
+  // Additive `token` field alongside the unchanged `data` shape — see the
+  // comment on /auth/signup above.
+  res.json({ success: true, data: toPublicUser(user), token });
 });
 
 // Mints a Firebase custom token for the current Ziyam session, regardless

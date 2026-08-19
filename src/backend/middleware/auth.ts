@@ -14,8 +14,24 @@ declare global {
   }
 }
 
+// Cookie-less clients (the Flutter app) have nothing to attach a browser
+// cookie jar to, so they carry the same signed JWT as a bearer header
+// instead — see specs/001-flutter-renter-app/contracts/rest-api.md. This is
+// purely additive: the cookie path (browser clients, src/frontend/src/admin/
+// src/agent) is checked first and is completely unchanged; a bearer header
+// is only consulted when no session cookie is present. Because
+// requireCsrfToken (csrf.ts) only activates when the session cookie exists,
+// a bearer-only request never needs a CSRF token in the first place.
+function extractToken(req: Request): string | undefined {
+  const cookieToken = req.cookies?.[config.auth.cookieName];
+  if (cookieToken) return cookieToken;
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) return authHeader.slice('Bearer '.length).trim();
+  return undefined;
+}
+
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const token = req.cookies?.[config.auth.cookieName];
+  const token = extractToken(req);
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
 
   try {
@@ -31,9 +47,9 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 }
 
-/** Attaches req.user if a valid session cookie exists, but does not reject the request otherwise. */
+/** Attaches req.user if a valid session cookie or bearer token exists, but does not reject the request otherwise. */
 export function attachUserIfPresent(req: Request, _res: Response, next: NextFunction) {
-  const token = req.cookies?.[config.auth.cookieName];
+  const token = extractToken(req);
   if (token) {
     try {
       const payload = verifyAuthToken(token);
