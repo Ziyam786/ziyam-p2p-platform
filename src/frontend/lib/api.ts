@@ -279,8 +279,6 @@ export const itinerariesApi = {
   unlock: (data: { destination: ItineraryDestination; customerName: string; customerEmail: string; customerPhone: string }) =>
     post<{ success: true; data: RazorpayCheckoutSession & { id: string } }>('/itineraries/unlock', data),
   get: (id: string) => get<{ success: true; data: ItineraryUnlock }>(`/itineraries/${id}`),
-  saveContent: (id: string, generatedContent: string) =>
-    post<{ success: true; data: ItineraryUnlock }>(`/itineraries/${id}/content`, { generatedContent }),
 };
 
 /* ── Payments ─────────────────────────────────────────────────────── */

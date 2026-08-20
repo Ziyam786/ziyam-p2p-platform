@@ -1,17 +1,15 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
 import { itinerariesApi } from '../../../lib/api';
 import type { ItineraryUnlock } from '../../../lib/api';
-import { generateRoadTripItinerary } from '../../../lib/firebase';
 
-function needsFirebaseFill(unlock: ItineraryUnlock): boolean {
-  if (unlock.status !== 'PAID') return false;
+function hasRealContent(unlock: ItineraryUnlock): boolean {
   const text = unlock.generatedContent?.trim() ?? '';
-  return text.length < 80 || /couldn't generate your itinerary/i.test(text);
+  return text.length >= 80 && !/couldn't generate your itinerary/i.test(text);
 }
 
 export default function ItineraryPage() {
@@ -20,10 +18,11 @@ export default function ItineraryPage() {
   const [unlock, setUnlock] = useState<ItineraryUnlock | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [generateError, setGenerateError] = useState<string | null>(null);
-  const generateStarted = useRef(false);
 
+  // Generation happens server-side (razorpayPaymentHandler.ts, via Claude)
+  // the moment payment is verified — by the time status is PAID the real
+  // content should already be there. This just covers the normally
+  // sub-second gap between the verify call returning and that write landing.
   useEffect(() => {
     let active = true;
     let attempts = 0;
@@ -35,7 +34,8 @@ export default function ItineraryPage() {
         .then((res) => {
           if (!active) return;
           setUnlock(res.data);
-          if (res.data.status === 'PENDING_PAYMENT' && attempts < 8) {
+          const stillWaiting = res.data.status === 'PENDING_PAYMENT' || (res.data.status === 'PAID' && !hasRealContent(res.data));
+          if (stillWaiting && attempts < 8) {
             setTimeout(poll, 1500);
           } else {
             setLoading(false);
@@ -49,31 +49,16 @@ export default function ItineraryPage() {
     };
   }, [params.id]);
 
-  useEffect(() => {
-    if (!unlock || loading || !needsFirebaseFill(unlock) || generateStarted.current) return;
-    generateStarted.current = true;
-    let cancelled = false;
-    setGenerating(true);
-    setGenerateError(null);
-    generateRoadTripItinerary(unlock.destination)
-      .then((text) => itinerariesApi.saveContent(unlock.id, text))
-      .then((res) => {
-        if (!cancelled) setUnlock(res.data);
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setGenerateError(err instanceof Error ? err.message : 'Could not generate the itinerary');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setGenerating(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [unlock, loading]);
-
   const paymentIssue = searchParams.get('payment');
+
+  function checkAgain() {
+    setLoading(true);
+    itinerariesApi
+      .get(params.id)
+      .then((res) => setUnlock(res.data))
+      .catch(() => setNotFound(true))
+      .finally(() => setLoading(false));
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
@@ -104,11 +89,11 @@ export default function ItineraryPage() {
             <p className="text-gray-700 font-semibold mb-2">Still confirming your payment…</p>
             <p className="text-gray-500 text-sm">This page will update automatically — hang tight.</p>
           </div>
-        ) : generating || needsFirebaseFill(unlock) ? (
+        ) : !hasRealContent(unlock) ? (
           <div className="text-center py-20">
-            <p className="text-gray-700 font-semibold mb-2">Writing your itinerary…</p>
-            <p className="text-gray-500 text-sm">Payment is confirmed. Gemini is drafting the day-by-day plan now.</p>
-            {generateError && <p className="text-red-500 text-sm mt-4">{generateError}</p>}
+            <p className="text-gray-700 font-semibold mb-2">Generation is taking longer than expected.</p>
+            <p className="text-gray-500 text-sm mb-4">Payment is confirmed — your itinerary should appear shortly.</p>
+            <button onClick={checkAgain} className="text-amber-500 underline font-semibold text-sm">Check again</button>
           </div>
         ) : (
           <>
