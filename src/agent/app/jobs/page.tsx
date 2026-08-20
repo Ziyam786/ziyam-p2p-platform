@@ -130,7 +130,7 @@ function JobCard({
             type="button"
             disabled={busy}
             onClick={() => onUpdate(job.id, 'CONFIRMED')}
-            className="text-xs font-bold bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg"
+            className="text-xs font-bold bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg"
           >
             Accept
           </button>

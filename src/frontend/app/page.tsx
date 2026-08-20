@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { motion, useScroll, useTransform, useReducedMotion } from 'motion/react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -21,8 +22,9 @@ import MotionButton from '../components/MotionButton';
 import TiltCard from '../components/TiltCard';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
-import { carsApi, settingsApi, itinerariesApi, ApiError } from '../lib/api';
+import { carsApi, settingsApi, itinerariesApi, paymentsApi, ApiError } from '../lib/api';
 import type { ItineraryDestination } from '../lib/api';
+import { openRazorpayCheckout } from '../lib/razorpayCheckout';
 import { COMPANY } from '../lib/companyInfo';
 import { setStickyDates } from '../lib/searchDates';
 import type { Car, CategoryDef, CityDef, Testimonial, TrustBadge } from '../lib/types';
@@ -161,6 +163,7 @@ function toLocalInputValue(d: Date): string {
 }
 
 export default function HomePage() {
+  const router = useRouter();
   const reduceMotion = useReducedMotion();
   const { scrollY } = useScroll();
   const heroGlowY = useTransform(scrollY, [0, 800], [0, 160]);
@@ -191,15 +194,14 @@ export default function HomePage() {
   const [calcDailyRate, setCalcDailyRate] = useState(1800);
   const [calcUtilization, setCalcUtilization] = useState(60);
 
-  // Itinerary unlock (real ₹49 PayU flow + AI-generated content on the callback)
+  // Itinerary unlock — real ₹49 Razorpay flow, AI-generated content lands
+  // server-side on /itineraries/:id once /payments/razorpay/verify confirms.
   const { show: showToast } = useToast();
   const [unlockDestination, setUnlockDestination] = useState<ItineraryDestination | null>(null);
   const [unlockName, setUnlockName] = useState('');
   const [unlockEmail, setUnlockEmail] = useState('');
   const [unlockPhone, setUnlockPhone] = useState('');
   const [unlockSubmitting, setUnlockSubmitting] = useState(false);
-  const [unlockCheckout, setUnlockCheckout] = useState<{ url: string; fields: Record<string, string> } | null>(null);
-  const unlockFormRef = React.useRef<HTMLFormElement>(null);
 
   async function handleUnlockSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -212,10 +214,22 @@ export default function HomePage() {
         customerEmail: unlockEmail.trim(),
         customerPhone: unlockPhone.trim(),
       });
-      setUnlockCheckout({ url: res.data.url, fields: res.data.fields });
-      requestAnimationFrame(() => unlockFormRef.current?.submit());
+      const result = await openRazorpayCheckout(res.data, {
+        name: 'Ziyam SelfDrive',
+        description: `${unlockDestination} road-trip itinerary`,
+        prefillEmail: unlockEmail.trim(),
+        prefillContact: unlockPhone.trim(),
+      });
+      const verified = await paymentsApi.verifyRazorpay({
+        razorpay_order_id: result.orderId,
+        razorpay_payment_id: result.paymentId,
+        razorpay_signature: result.signature,
+      });
+      setUnlockDestination(null);
+      router.push(`/itineraries/${verified.entityId}`);
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : 'Could not start payment', 'error');
+      showToast(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Could not start payment', 'error');
+    } finally {
       setUnlockSubmitting(false);
     }
   }
@@ -361,7 +375,7 @@ export default function HomePage() {
                   Browse the Fleet <ArrowRight className="w-4 h-4" />
                 </MotionButton>
                 <MotionButton
-                  href="/host/onboarding"
+                  href="/host"
                   className="border border-slate-700 hover:border-amber-400/60 bg-white/5 backdrop-blur-sm text-white font-semibold px-7 py-3.5 rounded-xl inline-flex items-center gap-2 text-sm transition-colors"
                 >
                   Become a Host <ArrowUpRight className="w-4 h-4" />
@@ -475,7 +489,7 @@ export default function HomePage() {
                 <Route className="w-5 h-5 text-amber-400 shrink-0" />
                 <div>
                   <p className="text-white text-xs font-bold leading-tight">₹49 Smart Itineraries</p>
-                  <p className="text-amber-400/80 text-[10px] leading-tight font-semibold">Coming Soon</p>
+                  <p className="text-amber-400/80 text-[10px] leading-tight font-semibold">AI-Generated Instantly</p>
                 </div>
               </motion.div>
 
@@ -488,7 +502,7 @@ export default function HomePage() {
                   <Wallet className="w-3.5 h-3.5 text-emerald-400" /> N+1 Day Settlements
                 </span>
                 <span className="inline-flex items-center gap-1.5 bg-slate-900/70 border border-slate-700/80 rounded-full px-3 py-1.5 text-[11px] font-semibold text-white">
-                  <Route className="w-3.5 h-3.5 text-amber-400" /> ₹49 Itineraries · Soon
+                  <Route className="w-3.5 h-3.5 text-amber-400" /> ₹49 AI Itineraries
                 </span>
               </div>
             </motion.div>
@@ -809,7 +823,7 @@ export default function HomePage() {
                     <Route className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                     <div>
                       <p className="text-white font-semibold text-sm">
-                        ₹49 road-trip itineraries <span className="text-amber-400 text-[10px] font-bold uppercase tracking-wider ml-1">Coming Soon</span>
+                        ₹49 road-trip itineraries
                       </p>
                       <p className="text-slate-400 text-xs mt-0.5">Curated day-trip routes out of Bengaluru, unlocked for a flat ₹49.</p>
                     </div>
@@ -1007,7 +1021,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <Modal open={Boolean(unlockDestination)} onClose={() => { if (!unlockSubmitting) { setUnlockDestination(null); setUnlockCheckout(null); } }} title={`Unlock: Bengaluru → ${unlockDestination}`}>
+      <Modal open={Boolean(unlockDestination)} onClose={() => { if (!unlockSubmitting) setUnlockDestination(null); }} title={`Unlock: Bengaluru → ${unlockDestination}`}>
         <form onSubmit={handleUnlockSubmit} className="space-y-4">
           <p className="text-sm text-gray-500">
             ₹49 unlocks an AI-generated day-by-day itinerary for this route — stops, timing, attractions, and self-drive tips, ready right after payment.
@@ -1030,18 +1044,9 @@ export default function HomePage() {
             disabled={unlockSubmitting}
             className="w-full btn-gradient text-white font-bold py-3 rounded-xl transition disabled:opacity-60"
           >
-            {unlockSubmitting ? 'Redirecting to PayU…' : 'Pay ₹49 & Unlock'}
+            {unlockSubmitting ? 'Processing…' : 'Pay ₹49 & Unlock'}
           </button>
-          <p className="text-[11px] text-gray-400 text-center">🔒 Secure checkout via PayU. No account needed.</p>
-        </form>
-
-        {/* Hidden auto-submitting form to PayU's hosted checkout — a sibling of
-            the form above, never nested inside it (nested <form> is invalid
-            HTML and browsers will hoist/break it unpredictably). */}
-        <form ref={unlockFormRef} action={unlockCheckout?.url} method="POST" className="hidden">
-          {unlockCheckout && Object.entries(unlockCheckout.fields).map(([name, value]) => (
-            <input key={name} type="hidden" name={name} value={value} />
-          ))}
+          <p className="text-[11px] text-gray-400 text-center">🔒 Secure checkout via Razorpay. No account needed.</p>
         </form>
       </Modal>
 

@@ -318,7 +318,7 @@ function DashboardInner() {
                     </label>
                     <button
                       type="submit" disabled={verifyingBank}
-                      className="sm:col-span-2 btn-gradient text-black font-semibold py-2.5 rounded-lg transition disabled:opacity-60"
+                      className="sm:col-span-2 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold py-2.5 rounded-lg transition disabled:opacity-60"
                     >
                       {verifyingBank ? 'Verifying…' : 'Verify Bank Account'}
                     </button>
@@ -347,7 +347,7 @@ function DashboardInner() {
 function Policy({ title, body }: { title: string; body: string }) {
   return (
     <div className="p-4 bg-gray-950 rounded-lg border border-gray-800">
-      <span className="font-semibold text-amber-400">{title}</span>
+      <span className="font-semibold text-emerald-400">{title}</span>
       <p className="text-xs text-gray-400 mt-1">{body}</p>
     </div>
   );

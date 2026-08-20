@@ -1,24 +1,25 @@
 'use client';
 
-import React, { Suspense, useEffect, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import Image from 'next/image';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
 import ProtectedRoute from '../../../components/ProtectedRoute';
 import { useToast } from '../../../components/Toast';
-import { bookingsApi } from '../../../lib/api';
+import { useAuth } from '../../../lib/auth-context';
+import { bookingsApi, paymentsApi } from '../../../lib/api';
+import { openRazorpayCheckout } from '../../../lib/razorpayCheckout';
 import type { Booking } from '../../../lib/types';
 
 function CheckoutInner() {
   const params = useParams<{ bookingId: string }>();
-  const searchParams = useSearchParams();
+  const router = useRouter();
   const { show } = useToast();
-  const formRef = useRef<HTMLFormElement>(null);
+  const { user } = useAuth();
 
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
-  const [checkout, setCheckout] = useState<{ url: string; fields: Record<string, string> } | null>(null);
   const [paying, setPaying] = useState(false);
 
   useEffect(() => {
@@ -29,22 +30,25 @@ function CheckoutInner() {
       .finally(() => setLoading(false));
   }, [params.bookingId, show]);
 
-  useEffect(() => {
-    const paymentIssue = searchParams.get('payment');
-    if (paymentIssue === 'failed') show('Payment did not go through. Please try again.', 'error');
-    if (paymentIssue === 'unverified') show('We could not verify that payment. Please try again or contact support.', 'error');
-  }, [searchParams, show]);
-
   async function handlePay() {
     if (!booking) return;
     setPaying(true);
     try {
       const res = booking.status === 'RESERVED' ? await bookingsApi.balanceCheckoutSession(booking.id) : await bookingsApi.createCheckoutSession(booking.id);
-      setCheckout(res.data);
-      // Wait a tick for the hidden form's inputs to render with the new fields, then submit.
-      requestAnimationFrame(() => formRef.current?.submit());
+      const result = await openRazorpayCheckout(res.data, {
+        name: 'Ziyam SelfDrive',
+        description: booking.status === 'RESERVED' ? 'Balance payment' : 'Booking reservation',
+        prefillEmail: user?.email,
+        prefillContact: user?.phoneNumber,
+      });
+      const verified = await paymentsApi.verifyRazorpay({
+        razorpay_order_id: result.orderId,
+        razorpay_payment_id: result.paymentId,
+        razorpay_signature: result.signature,
+      });
+      router.push(`/bookings/${verified.entityId}/confirmation`);
     } catch (err: any) {
-      show(err.message ?? 'Could not start payment', 'error');
+      show(err.message ?? 'Payment did not go through. Please try again.', 'error');
       setPaying(false);
     }
   }
@@ -147,22 +151,15 @@ function CheckoutInner() {
           )}
 
           <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-xs text-amber-700">
-            🔒 You'll be redirected to PayU's secure checkout to complete payment.
+            🔒 Secure checkout via Razorpay — cards, UPI, netbanking, and wallets.
           </div>
-
-          {/* Hidden auto-submitting form to PayU's hosted checkout — filled in once a session is started. */}
-          <form ref={formRef} action={checkout?.url} method="POST" className="hidden">
-            {checkout && Object.entries(checkout.fields).map(([name, value]) => (
-              <input key={name} type="hidden" name={name} value={value} />
-            ))}
-          </form>
 
           <button
             onClick={handlePay}
             disabled={paying}
             className="w-full btn-gradient active:scale-[0.98] disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none disabled:active:scale-100 text-white font-bold py-3.5 rounded-xl transition-transform"
           >
-            {paying ? 'Redirecting to PayU…' : `Pay ₹${amountToPayNow.toLocaleString()}`}
+            {paying ? 'Processing…' : `Pay ₹${amountToPayNow.toLocaleString()}`}
           </button>
         </div>
       </div>

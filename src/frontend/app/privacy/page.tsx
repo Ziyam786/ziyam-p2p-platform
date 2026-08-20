@@ -7,6 +7,22 @@ export default function PrivacyPage() {
     <LegalPage
       title="Privacy Policy"
       updated="18 August 2026"
+      detailsAnchor="policy"
+      detailsLabel="Full Privacy Policy"
+      summary={[
+        { icon: '📋', title: 'What we collect', body: 'Account, KYC, booking, payment, device, and communication data — see the full policy for the exact list.' },
+        { icon: '🎯', title: 'How we use it', body: 'Delivering the service, verifying identity, preventing fraud, legal compliance, and — with consent — marketing.' },
+        { icon: '📍', title: 'Location & telematics', body: 'Only vehicles fitted with our IoT hardware can be located or remotely locked/unlocked — not every listing.' },
+        { icon: '⚖️', title: 'Your rights', body: 'Access, correct, delete your data, withdraw consent, or lodge a complaint with the Data Protection Board of India.' },
+        { icon: '🔒', title: 'Security & retention', body: 'Encryption and access controls; data kept only as long as needed, then deleted or anonymized.' },
+        { icon: '✉️', title: 'Grievance officer', body: 'Complaints acknowledged within 48 hours, resolved within 30 days wherever possible.' },
+      ]}
+      contact={{
+        body: [
+          `${COMPANY.team[0].name}  ·  ${COMPANY.email}  ·  ${COMPANY.phone}`,
+          'Complaints are acknowledged within 48 hours and, wherever possible, resolved within 30 days, in accordance with applicable law.',
+        ],
+      }}
       sections={[
         {
           heading: '1. Overview',
@@ -110,14 +126,7 @@ export default function PrivacyPage() {
           body: ['We may amend this Privacy Policy at any time. Updated versions take effect upon publication on the platform.'],
         },
         {
-          heading: '17. Grievance Officer',
-          body: [
-            `${COMPANY.team[0].name}  ·  ${COMPANY.email}  ·  ${COMPANY.phone}`,
-            'Complaints are acknowledged within 48 hours and, wherever possible, resolved within 30 days, in accordance with applicable law.',
-          ],
-        },
-        {
-          heading: '18. Governing Law & Jurisdiction',
+          heading: '17. Governing Law & Jurisdiction',
           body: [`This Privacy Policy is governed by Indian law. Disputes arising from or relating to it are subject to the exclusive jurisdiction of the ${COMPANY.jurisdiction}.`],
         },
       ]}

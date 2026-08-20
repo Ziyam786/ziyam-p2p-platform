@@ -7,6 +7,23 @@ export default function RefundPolicyPage() {
     <LegalPage
       title="Refund & Cancellation Policy"
       updated="4 June 2026"
+      detailsAnchor="policy"
+      detailsLabel="Full Refund & Cancellation Policy"
+      summary={[
+        { icon: '🕐', title: 'Cancellation timeline', body: '>24h: full refund minus fees · 6–24h: up to 25% retained · <6h: up to 50% retained · after start: no refund.' },
+        { icon: '🚫', title: 'No-shows', body: 'Miss pickup, documents, or verification and the booking is cancelled with no refund.' },
+        { icon: '🏢', title: 'Our cancellations', body: 'If we cancel for a reason solely on us, you get a full refund with no cancellation fee.' },
+        { icon: '💰', title: 'Security deposit', body: 'Refunded within 7–21 business days after inspection, minus any verified deductions.' },
+        { icon: '⏱️', title: 'Refund timelines', body: 'UPI/wallets 3–10 days · cards/net banking 5–15 days, back to your original payment method.' },
+        { icon: '⚖️', title: 'Consumer rights', body: 'Nothing here limits your rights under the Consumer Protection Act 2019.' },
+      ]}
+      contact={{
+        body: [
+          `${COMPANY.legalName}  ·  ${COMPANY.address}`,
+          `Email: ${COMPANY.email}  ·  Phone: ${COMPANY.phone}`,
+          'Grievances are acknowledged within 48 hours and resolved within legally prescribed timelines.',
+        ],
+      }}
       sections={[
         {
           heading: '1. Introduction',
@@ -101,19 +118,11 @@ export default function RefundPolicyPage() {
           body: ['Nothing in this Policy restricts, waives, or limits any rights available to consumers under the Consumer Protection Act 2019, the Consumer Protection (E-Commerce) Rules 2020, or other applicable law.'],
         },
         {
-          heading: '17. Grievance Redressal',
-          body: [
-            `${COMPANY.legalName}  ·  ${COMPANY.address}`,
-            `Email: ${COMPANY.email}  ·  Phone: ${COMPANY.phone}`,
-            'Grievances are acknowledged within 48 hours and resolved within legally prescribed timelines.',
-          ],
-        },
-        {
-          heading: '18. Amendments to This Policy',
+          heading: '17. Amendments to This Policy',
           body: ['We may modify, amend, or replace this Policy at any time. Updated versions take effect upon publication on the platform.'],
         },
         {
-          heading: '19. Governing Law & Jurisdiction',
+          heading: '18. Governing Law & Jurisdiction',
           body: [`This Policy is governed by Indian law. Subject to applicable consumer-protection provisions, the ${COMPANY.jurisdiction} have exclusive jurisdiction over disputes arising from or relating to this Policy.`],
         },
       ]}
