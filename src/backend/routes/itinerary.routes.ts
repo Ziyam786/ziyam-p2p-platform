@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import paymentGateway from '../services/paymentGateway';
 import { safeErrorMessage } from '../utils/errorResponse';
+import { geocodeDestination } from '../services/googleMapsService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -19,8 +20,12 @@ const ITINERARY_PRICE = 49;
 
 router.post('/itineraries/unlock', async (req: Request, res: Response) => {
   const { destination, customerName, customerEmail, customerPhone } = req.body;
-  if (!destination || !ITINERARY_DESTINATIONS[destination]) {
-    return res.status(400).json({ error: `destination must be one of ${Object.keys(ITINERARY_DESTINATIONS).join(', ')}` });
+  if (!destination?.trim()) {
+    return res.status(400).json({ error: 'destination is required' });
+  }
+  const place = await geocodeDestination(destination.trim());
+  if (!place) {
+    return res.status(400).json({ error: "Couldn't find that destination — check the spelling and try again." });
   }
   if (!customerName?.trim() || !customerEmail?.trim() || !customerPhone?.trim()) {
     return res.status(400).json({ error: 'customerName, customerEmail, and customerPhone are required' });
