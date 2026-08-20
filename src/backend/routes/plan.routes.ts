@@ -57,4 +57,14 @@ router.get('/plan/suggest-car', async (req: Request, res: Response) => {
   res.json({ success: true, data: { car, exactMatch } });
 });
 
+router.get('/plan/hotels', async (req: Request, res: Response) => {
+  const lat = Number(req.query.lat);
+  const lng = Number(req.query.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return res.status(400).json({ error: 'lat and lng are required numbers' });
+  }
+  const hotels = await findNearbyHotels(lat, lng);
+  res.json({ success: true, data: hotels });
+});
+
 export default router;

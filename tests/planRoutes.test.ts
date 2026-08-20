@@ -25,7 +25,7 @@ const prismaMock = vi.hoisted(() => ({ car: { findFirst: vi.fn() } }));
 // used for the same mock in tests/payoutSplit.test.ts.
 vi.mock('@prisma/client', () => ({ PrismaClient: vi.fn(function () { return prismaMock; }) }));
 
-import { geocodeDestination } from '../src/backend/services/googleMapsService';
+import { geocodeDestination, findNearbyHotels } from '../src/backend/services/googleMapsService';
 import planRoutes from '../src/backend/routes/plan.routes';
 
 const app = express();
@@ -95,5 +95,21 @@ describe('GET /plan/suggest-car', () => {
     prismaMock.car.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
     const res = await request(app).get('/api/plan/suggest-car?distanceKm=100&city=Bengaluru');
     expect(res.body.data.car).toBeNull();
+  });
+});
+
+describe('GET /plan/hotels', () => {
+  it('rejects missing lat/lng', async () => {
+    const res = await request(app).get('/api/plan/hotels');
+    expect(res.status).toBe(400);
+  });
+
+  it('returns hotels for valid coordinates', async () => {
+    vi.mocked(findNearbyHotels).mockResolvedValueOnce([
+      { name: 'Hotel A', rating: 4.2, priceLevel: 2, address: 'Main Road' },
+    ]);
+    const res = await request(app).get('/api/plan/hotels?lat=11.4&lng=76.7');
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].name).toBe('Hotel A');
   });
 });
