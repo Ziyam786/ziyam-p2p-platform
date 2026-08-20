@@ -88,7 +88,7 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
       {
         name: 'Syed Fardeen',
         role: 'Founder, CEO & Director',
-        bio: 'Sets group strategy and capital allocation across Ziyam Self Drive, Mechanix Pro and Marc8. Owns fleet expansion, brand and long-term partnerships.',
+        bio: 'Sets group strategy and capital allocation across Ziyam Self Drive, Mechanix Pro and Marc8. Co-builds the in-house technology stack with Saqlain — booking flow, digital KYC and fleet systems — alongside brand and long-term partnerships.',
       },
       {
         name: 'Mohammed Azam A',
@@ -108,7 +108,7 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
       {
         name: 'Numer Saqlain M',
         role: 'Co-Founder & Chief Financial Officer',
-        bio: 'Owns finance across EFPL: host settlements and payout cycles, unit economics, GST and statutory compliance, and capital planning.',
+        bio: 'Owns finance across EFPL: host settlements and payout cycles, unit economics, GST and statutory compliance, and capital planning. Co-builds the in-house technology stack with Fardeen.',
       },
     ],
   },
