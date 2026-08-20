@@ -40,6 +40,7 @@ function mirrorBookingParticipants(bookingId: string, customerId: string, hostId
 
 const WASH_SERVICE_PRICE = 349;
 
+import { isBookingOverlapViolation, BOOKING_OVERLAP_MESSAGE } from '../utils/bookingOverlap';
 const router = Router();
 const prisma = new PrismaClient();
 
@@ -101,7 +102,7 @@ async function creditReferralRewardIfFirstTrip(customerId: string) {
   );
 }
 
-// Create a booking (no payment yet — the checkout page starts a PayU session separately)
+// Create a booking (no payment yet — the checkout page opens a Razorpay Order separately)
 router.post('/booking', requireAuth, async (req: Request, res: Response) => {
   const { carId, startTime, endTime, totalAmount, protectionPlan, deliveryRequested, promoCode, coDriverRequested, coDriverName, coDriverLicenseNumber } = req.body;
   const customerId = req.user!.userId;
@@ -182,7 +183,7 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
 
     // Server-computed, not client-supplied — the deposit fraction can't be
     // tampered with by sending a lower totalAmount. Charged alongside
-    // totalAmount at the PayU checkout-session step (not folded into
+    // totalAmount at the Razorpay checkout-session step (not folded into
     // totalAmount itself, since totalAmount also drives PayoutEngine.splitAmount
     // at trip completion and the deposit isn't host revenue to split).
     const resolvedPlan = VALID_PLANS.includes(protectionPlan) ? protectionPlan : 'BASIC';
@@ -260,7 +261,14 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
       // the losing request's overlap check would have passed, so this IS a
       // double-booking attempt, not a generic failure.
       if (error?.code === 'P2034') {
-        return res.status(409).json({ error: 'This car is already booked for part of the selected dates' });
+        return res.status(409).json({ error: BOOKING_OVERLAP_MESSAGE });
+      }
+      // Belt and braces: the serializable transaction above should already
+      // have caught any real race as P2034, but the database's exclusion
+      // constraint is the backstop that holds even if this path is ever
+      // refactored to a weaker isolation level.
+      if (isBookingOverlapViolation(error)) {
+        return res.status(409).json({ error: BOOKING_OVERLAP_MESSAGE });
       }
       throw error;
     }
@@ -521,7 +529,7 @@ router.post('/booking/:id/wash-service', requireAuth, async (req: Request, res: 
 // the tiered refund from the published Refund & Cancellation Policy §3 —
 // platform fee is never refunded (§3's "minus... platform fees"); the
 // security deposit is always refunded in full since a cancelled trip never
-// happened, so there's nothing for it to cover (§8). No live PayU refund
+// happened, so there's nothing for it to cover (§8). No live Razorpay refund
 // call — creates a RefundRequest for the same manual admin queue the
 // deposit-release/damage-claim flows already use.
 router.post('/bookings/:id/cancel', requireAuth, async (req: Request, res: Response) => {
@@ -715,6 +723,69 @@ router.get('/bookings/:id/delivery-location', requireAuth, async (req: Request, 
   res.json({
     success: true,
     data: { latitude: booking.deliveryLatitude, longitude: booking.deliveryLongitude, updatedAt: booking.deliveryLocationUpdatedAt, source: 'HOST_APP' },
+  });
+});
+
+// Live in-trip tracking — same mechanism as delivery-location above (host's
+// device reports GPS, guest watches it move), but scoped to ACTIVE bookings
+// instead of pre-pickup CONFIRMED+deliveryRequested ones. Not gated on
+// deliveryRequested: every trip can be tracked once it's underway, not just
+// ones that opted into doorstep delivery.
+router.post('/bookings/:id/live-location', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { latitude, longitude } = req.body;
+  if (typeof latitude !== 'number' || typeof longitude !== 'number' || Number.isNaN(latitude) || Number.isNaN(longitude)) {
+    return res.status(400).json({ error: 'latitude and longitude must be numbers' });
+  }
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return res.status(400).json({ error: 'latitude/longitude out of range' });
+  }
+
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  if (booking.car.ownerId !== req.user!.userId) return res.status(403).json({ error: 'Only the host can share this trip\'s location' });
+  if (booking.status !== BookingStatus.ACTIVE) {
+    return res.status(400).json({ error: `Cannot share live location for a booking with status ${booking.status}` });
+  }
+
+  const updated = await prisma.booking.update({
+    where: { id },
+    data: { liveLatitude: latitude, liveLongitude: longitude, liveLocationUpdatedAt: new Date() },
+    select: { liveLatitude: true, liveLongitude: true, liveLocationUpdatedAt: true },
+  });
+  mirrorBookingParticipants(id, booking.customerId, booking.car.ownerId);
+  mirrorToFirestore('tripTracking', id, {
+    latitude: updated.liveLatitude,
+    longitude: updated.liveLongitude,
+    updatedAt: updated.liveLocationUpdatedAt?.toISOString(),
+    source: 'HOST_APP',
+  });
+  res.json({ success: true, data: updated });
+});
+
+router.get('/bookings/:id/live-location', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  const isCustomer = booking.customerId === req.user!.userId;
+  const isHost = booking.car.ownerId === req.user!.userId;
+  if (!isCustomer && !isHost) return res.status(403).json({ error: 'Not part of this booking' });
+
+  if (booking.car.telematicsImei) {
+    try {
+      const state = await TelematicsService.getVehicleState(booking.car.telematicsImei);
+      return res.json({ success: true, data: { latitude: state.latitude, longitude: state.longitude, updatedAt: new Date(), source: 'TELEMATICS' } });
+    } catch {
+      // Fall through to the host-reported position below.
+    }
+  }
+
+  if (booking.liveLatitude == null || booking.liveLongitude == null) {
+    return res.json({ success: true, data: null });
+  }
+  res.json({
+    success: true,
+    data: { latitude: booking.liveLatitude, longitude: booking.liveLongitude, updatedAt: booking.liveLocationUpdatedAt, source: 'HOST_APP' },
   });
 });
 

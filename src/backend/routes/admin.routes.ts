@@ -8,6 +8,7 @@ import { hashPassword } from '../utils/password';
 import { notify } from '../services/notificationService';
 import { safeErrorMessage } from '../utils/errorResponse';
 
+import { isBookingOverlapViolation, BOOKING_OVERLAP_MESSAGE } from '../utils/bookingOverlap';
 const router = Router();
 const prisma = new PrismaClient();
 
@@ -157,6 +158,14 @@ router.post('/admin/bookings', async (req: Request, res: Response) => {
   } catch (err: any) {
     if (err.code === 'P2002') {
       return res.status(409).json({ error: `That ${err.meta?.target?.[0] ?? 'value'} is already in use by another account.` });
+    }
+    // The overlap check above is a plain read followed by a separate write, so
+    // two concurrent admin bookings (or an admin booking racing a guest
+    // checkout) can both pass it. The database's exclusion constraint is what
+    // actually stops that; this turns its violation into the same clean 409
+    // the check itself would have produced, instead of a confusing 500.
+    if (isBookingOverlapViolation(err)) {
+      return res.status(409).json({ error: BOOKING_OVERLAP_MESSAGE });
     }
     console.error('[ADMIN] Create booking failed:', err);
     res.status(500).json({ error: 'Could not create the booking. Please try again.' });

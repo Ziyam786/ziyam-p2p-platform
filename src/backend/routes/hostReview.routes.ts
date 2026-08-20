@@ -16,7 +16,7 @@ const PAUSE_SUGGESTING_REASONS = ['VEHICLE_NOT_AVAILABLE', 'VEHICLE_UNDER_SERVIC
 
 // A paid booking sits here until the host verifies the car is actually
 // available. Accept confirms the trip and kicks off the lease eSign (moved
-// here from payuCallback.routes.ts — no point signing a lease for a booking
+// here from the Razorpay confirmation path — no point signing a lease for a booking
 // that might still be declined). Reject always fully refunds the guest,
 // per the published Refund & Cancellation Policy §5 ("Company-initiated
 // cancellations... full refund... no cancellation fee").

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { config } from '../config';
 import { requireAuth } from '../middleware/auth';
+import { kycRateLimiter } from '../middleware/rateLimit';
 import { notify } from '../services/notificationService';
 import { sandboxService } from '../services/sandboxService';
 import { digilockerApi, isSetuConfigured } from '../services/setuService';
@@ -71,7 +72,7 @@ async function maybePersistMaskedAadhaar(docBase64: string, result: AryaKycResul
  * copy may be kept for review. Optional selfie runs liveness + deepfake +
  * face-match against the ID photo.
  */
-router.post('/kyc/identity-document', requireAuth, async (req: Request, res: Response) => {
+router.post('/kyc/identity-document', requireAuth, kycRateLimiter, async (req: Request, res: Response) => {
   const { docBase64, selfieBase64 } = req.body;
   if (typeof docBase64 !== 'string' || docBase64.length === 0) {
     return res.status(400).json({ error: 'docBase64 is required — a clear photo of your Aadhaar, PAN, voter ID, or passport' });
@@ -127,7 +128,7 @@ router.post('/kyc/identity-document', requireAuth, async (req: Request, res: Res
  * alongside Arya photo KYC. Never stubs an instant pass — if Sandbox is
  * unconfigured, users should use photo ID or DigiLocker instead.
  */
-router.post('/kyc/aadhaar/otp', requireAuth, async (req: Request, res: Response) => {
+router.post('/kyc/aadhaar/otp', requireAuth, kycRateLimiter, async (req: Request, res: Response) => {
   const { aadhaarNumber } = req.body;
   if (!/^[0-9]{12}$/.test(aadhaarNumber ?? '')) {
     return res.status(400).json({ error: 'aadhaarNumber must be exactly 12 digits' });
@@ -150,7 +151,7 @@ router.post('/kyc/aadhaar/otp', requireAuth, async (req: Request, res: Response)
  * Step 2: verify the Sandbox Aadhaar OTP. Instant-pass without a provider is
  * not allowed.
  */
-router.post('/kyc/aadhaar/verify', requireAuth, async (req: Request, res: Response) => {
+router.post('/kyc/aadhaar/verify', requireAuth, kycRateLimiter, async (req: Request, res: Response) => {
   if (!sandboxService.isConfigured()) {
     return res.status(503).json({ error: 'Aadhaar OTP is not available right now. Try photo ID or DigiLocker, or come back later.' });
   }
@@ -190,7 +191,7 @@ router.post('/kyc/aadhaar/verify', requireAuth, async (req: Request, res: Respon
  * redirect the user to DigiLocker's own sign-in/consent screen; they land
  * back on /account/kyc afterwards and the frontend polls /status below.
  */
-router.post('/kyc/digilocker/start', requireAuth, async (req: Request, res: Response) => {
+router.post('/kyc/digilocker/start', requireAuth, kycRateLimiter, async (req: Request, res: Response) => {
   if (!isSetuConfigured()) return res.status(503).json({ error: 'DigiLocker is not available right now. Try Aadhaar OTP or a photo of your ID.' });
 
   try {
@@ -208,7 +209,7 @@ router.post('/kyc/digilocker/start', requireAuth, async (req: Request, res: Resp
 });
 
 /** Polled by the frontend after the user returns from DigiLocker's consent screen. */
-router.get('/kyc/digilocker/status', requireAuth, async (req: Request, res: Response) => {
+router.get('/kyc/digilocker/status', requireAuth, kycRateLimiter, async (req: Request, res: Response) => {
   const user = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { digilockerRequestId: true, isKycVerified: true } });
   if (!user?.digilockerRequestId) return res.status(400).json({ error: 'No DigiLocker verification in progress' });
   if (user.isKycVerified) return res.json({ success: true, data: { status: 'authenticated', isKycVerified: true } });
@@ -264,7 +265,7 @@ router.get('/kyc/digilocker/status', requireAuth, async (req: Request, res: Resp
  * liveness + deepfake only in that case; face-match needs both images in
  * the same request, so it's skipped when there's no fresh license photo).
  */
-router.post('/kyc/driving-license', requireAuth, async (req: Request, res: Response) => {
+router.post('/kyc/driving-license', requireAuth, kycRateLimiter, async (req: Request, res: Response) => {
   const { docBase64, selfieBase64 } = req.body;
   const hasDoc = typeof docBase64 === 'string' && docBase64.length > 0;
   const hasSelfie = typeof selfieBase64 === 'string' && selfieBase64.length > 0;
@@ -327,7 +328,7 @@ router.post('/kyc/driving-license', requireAuth, async (req: Request, res: Respo
 });
 
 /** Legacy URL submit — runs the file through Arya.ai instead of an instant pass. */
-router.post('/kyc/submit', requireAuth, async (req: Request, res: Response) => {
+router.post('/kyc/submit', requireAuth, kycRateLimiter, async (req: Request, res: Response) => {
   const { docUrl } = req.body;
   if (!docUrl) return res.status(400).json({ error: 'docUrl is required (Aadhaar / PAN / voter ID / passport image URL)' });
   if (!isKycExtractionConfigured()) {

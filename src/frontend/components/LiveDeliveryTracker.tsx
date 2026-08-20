@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { bookingsApi } from '../lib/api';
 import { useGoogleMaps } from '../lib/useGoogleMaps';
 import { useToast } from './Toast';
-import { subscribeToDeliveryLocation } from '../lib/firebase';
+import { subscribeToDeliveryLocation, subscribeToTripLocation } from '../lib/firebase';
 import type { DeliveryLocation } from '../lib/types';
 
 const HOST_UPDATE_INTERVAL_MS = 15000;
@@ -15,6 +15,44 @@ const GUEST_POLL_INTERVAL_MS = 8000;
 // Zepto/Zomato use, not vehicle hardware (most self-hosted cars don't have
 // telematics installed; the backend prefers it when a car does).
 export function HostDeliverySharePanel({ bookingId }: { bookingId: string }) {
+  return (
+    <SharePanel
+      bookingId={bookingId}
+      share={bookingsApi.shareDeliveryLocation}
+      title="Doorstep delivery — live location"
+      sharingCopy="The guest can see your live location while you drive over."
+      idleCopy="Share your live location so the guest can track you, like a delivery rider."
+    />
+  );
+}
+
+// Host side, in-trip variant: same mechanism, active for the whole trip
+// instead of just the pre-pickup delivery drive.
+export function HostTripSharePanel({ bookingId }: { bookingId: string }) {
+  return (
+    <SharePanel
+      bookingId={bookingId}
+      share={bookingsApi.shareLiveLocation}
+      title="Live trip tracking"
+      sharingCopy="The guest can see the car's live location for the rest of the trip."
+      idleCopy="Share your live location so the guest can see where the car is during the trip."
+    />
+  );
+}
+
+function SharePanel({
+  bookingId,
+  share,
+  title,
+  sharingCopy,
+  idleCopy,
+}: {
+  bookingId: string;
+  share: (bookingId: string, latitude: number, longitude: number) => Promise<unknown>;
+  title: string;
+  sharingCopy: string;
+  idleCopy: string;
+}) {
   const { show } = useToast();
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +65,7 @@ export function HostDeliverySharePanel({ bookingId }: { bookingId: string }) {
     const pos = latestPositionRef.current;
     if (!pos) return;
     try {
-      await bookingsApi.shareDeliveryLocation(bookingId, pos.coords.latitude, pos.coords.longitude);
+      await share(bookingId, pos.coords.latitude, pos.coords.longitude);
       setLastShared(new Date());
     } catch (err: any) {
       show(err.message ?? 'Failed to share location', 'error');
@@ -67,12 +105,8 @@ export function HostDeliverySharePanel({ bookingId }: { bookingId: string }) {
     <div className="mt-6 border border-blue-200 bg-blue-50 rounded-xl p-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <p className="font-bold text-gray-900">Doorstep delivery — live location</p>
-          <p className="text-xs text-gray-600 mt-1">
-            {sharing
-              ? 'The guest can see your live location while you drive over.'
-              : 'Share your live location so the guest can track you, like a delivery rider.'}
-          </p>
+          <p className="font-bold text-gray-900">{title}</p>
+          <p className="text-xs text-gray-600 mt-1">{sharing ? sharingCopy : idleCopy}</p>
           {lastShared && <p className="text-[11px] text-gray-500 mt-1">Last shared {lastShared.toLocaleTimeString()}</p>}
           {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
         </div>
@@ -94,6 +128,56 @@ export function HostDeliverySharePanel({ bookingId }: { bookingId: string }) {
 // CarLocationMap's recreate-on-change pattern, since that would flicker on
 // every poll tick here.
 export function GuestDeliveryTracker({ bookingId, hostName, hostAvatarUrl }: { bookingId: string; hostName?: string; hostAvatarUrl?: string | null }) {
+  return (
+    <GuestTracker
+      bookingId={bookingId}
+      hostName={hostName}
+      hostAvatarUrl={hostAvatarUrl}
+      fetchLocation={bookingsApi.deliveryLocation}
+      subscribe={subscribeToDeliveryLocation}
+      heading="Track Your Delivery"
+      emptyCopy="Your host hasn't started sharing their location yet — check back shortly."
+      movingLabel="is on the way"
+    />
+  );
+}
+
+// Guest side, in-trip variant: watches the car's live position for the
+// remainder of an ACTIVE trip instead of just the pre-pickup delivery drive.
+export function GuestTripTracker({ bookingId, hostName, hostAvatarUrl }: { bookingId: string; hostName?: string; hostAvatarUrl?: string | null }) {
+  return (
+    <GuestTracker
+      bookingId={bookingId}
+      hostName={hostName}
+      hostAvatarUrl={hostAvatarUrl}
+      fetchLocation={bookingsApi.liveLocation}
+      subscribe={subscribeToTripLocation}
+      heading="Live Trip Location"
+      emptyCopy="Live location hasn't been shared for this trip yet — check back shortly."
+      movingLabel="'s car"
+    />
+  );
+}
+
+function GuestTracker({
+  bookingId,
+  hostName,
+  hostAvatarUrl,
+  fetchLocation,
+  subscribe,
+  heading,
+  emptyCopy,
+  movingLabel,
+}: {
+  bookingId: string;
+  hostName?: string;
+  hostAvatarUrl?: string | null;
+  fetchLocation: (bookingId: string) => Promise<{ data: DeliveryLocation | null }>;
+  subscribe: (bookingId: string, callback: (update: DeliveryLocation | null) => void) => Promise<(() => void) | null>;
+  heading: string;
+  emptyCopy: string;
+  movingLabel: string;
+}) {
   const { loaded, configured } = useGoogleMaps();
   const [location, setLocation] = useState<DeliveryLocation | null>(null);
   const [checked, setChecked] = useState(false);
@@ -106,24 +190,23 @@ export function GuestDeliveryTracker({ bookingId, hostName, hostAvatarUrl }: { b
   // just to show whatever the last known position was.
   useEffect(() => {
     let active = true;
-    bookingsApi
-      .deliveryLocation(bookingId)
+    fetchLocation(bookingId)
       .then((res) => active && setLocation(res.data))
       .finally(() => active && setChecked(true));
     return () => {
       active = false;
     };
-  }, [bookingId]);
+  }, [bookingId, fetchLocation]);
 
-  // Real-time first (subscribeToDeliveryLocation resolves to null if
-  // Firebase isn't configured for this deployment); polling is the
-  // fallback, not the default, so a configured deployment never double-fetches.
+  // Real-time first (subscribe resolves to null if Firebase isn't
+  // configured for this deployment); polling is the fallback, not the
+  // default, so a configured deployment never double-fetches.
   useEffect(() => {
     let active = true;
     let unsubscribe: (() => void) | null = null;
     let interval: ReturnType<typeof setInterval> | null = null;
 
-    subscribeToDeliveryLocation(bookingId, (update) => {
+    subscribe(bookingId, (update) => {
       if (active) setLocation(update);
     }).then((unsub) => {
       if (!active) {
@@ -133,7 +216,7 @@ export function GuestDeliveryTracker({ bookingId, hostName, hostAvatarUrl }: { b
       if (unsub) {
         unsubscribe = unsub;
       } else {
-        const poll = () => bookingsApi.deliveryLocation(bookingId).then((res) => active && setLocation(res.data)).catch(() => {});
+        const poll = () => fetchLocation(bookingId).then((res) => active && setLocation(res.data)).catch(() => {});
         interval = setInterval(poll, GUEST_POLL_INTERVAL_MS);
       }
     });
@@ -143,7 +226,7 @@ export function GuestDeliveryTracker({ bookingId, hostName, hostAvatarUrl }: { b
       unsubscribe?.();
       if (interval) clearInterval(interval);
     };
-  }, [bookingId]);
+  }, [bookingId, subscribe, fetchLocation]);
 
   useEffect(() => {
     if (!loaded || !location || !mapRef.current) return;
@@ -163,8 +246,8 @@ export function GuestDeliveryTracker({ bookingId, hostName, hostAvatarUrl }: { b
   return (
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
       <div className="p-6 pb-4">
-        <h2 className="font-bold text-gray-900 mb-1">Track Your Delivery</h2>
-        {!location && <p className="text-sm text-gray-500">Your host hasn't started sharing their location yet — check back shortly.</p>}
+        <h2 className="font-bold text-gray-900 mb-1">{heading}</h2>
+        {!location && <p className="text-sm text-gray-500">{emptyCopy}</p>}
         {location && !configured && <p className="text-sm text-gray-500">Live tracking is unavailable right now.</p>}
       </div>
 
@@ -181,7 +264,7 @@ export function GuestDeliveryTracker({ bookingId, hostName, hostAvatarUrl }: { b
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="font-bold text-gray-900 text-sm truncate">{hostName ?? 'Your host'} is on the way</p>
+              <p className="font-bold text-gray-900 text-sm truncate">{hostName ?? 'Your host'} {movingLabel}</p>
               <p className="text-xs text-gray-400">
                 {location.source === 'TELEMATICS' ? 'Live vehicle GPS' : "Live location"} · updated {new Date(location.updatedAt).toLocaleTimeString()}
               </p>

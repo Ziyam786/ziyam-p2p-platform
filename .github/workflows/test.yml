@@ -1,0 +1,115 @@
+# Money-path regression gate.
+#
+# These tests exist because this repo moves real money — Razorpay signature
+# verification, host commission splits, GST place-of-supply, and deposit
+# deductions — and until now had no automated coverage at all. Anything that
+# breaks one of those silently mis-pays a host, mis-bills a guest, or files
+# the wrong tax. This job must stay green on every PR.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      # The tests mock @prisma/client where they touch it, but tsc needs the
+      # generated types for the typecheck step below.
+      - run: npx prisma generate
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Money-path tests
+        run: npm test
+
+  # Proves the double-booking exclusion constraint behaves against a real
+  # Postgres, not just in theory: back-to-back bookings allowed, overlaps
+  # rejected, cancelled bookings free their dates.
+  migration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+        ports: ['5432:5432']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Apply migrations to a clean database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+        run: npx prisma migrate deploy
+      - name: Assert the exclusion constraint exists on Booking
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 -t -c "
+            SELECT 1 FROM pg_constraint
+             WHERE conname = 'booking_no_overlapping_active_dates'
+               AND conrelid = '\"Booking\"'::regclass;
+          " | grep -q 1 \
+            || { echo "::error::booking_no_overlapping_active_dates is missing from Booking — the migration did not apply"; exit 1; }
+          echo "Constraint present on Booking."
+
+      # Behaviour is asserted on a scratch table carrying the identical
+      # constraint definition. Seeding a real Booking would need a valid
+      # User + Car graph, which makes the test brittle for no extra signal —
+      # the check above already proves the real table is protected, and this
+      # proves the semantics (half-open ranges, CANCELLED exemption) are right.
+      - name: Assert the constraint semantics
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 <<'SQL'
+          -- timestamp (no tz), matching Booking.startTime/endTime's real
+          -- Postgres type (Prisma's default mapping for `DateTime`).
+          CREATE TEMP TABLE b (
+            id text PRIMARY KEY, "carId" text NOT NULL,
+            "startTime" timestamp NOT NULL, "endTime" timestamp NOT NULL,
+            status text NOT NULL
+          );
+          ALTER TABLE b ADD CONSTRAINT b_no_overlap
+            EXCLUDE USING gist ("carId" WITH =, tsrange("startTime","endTime",'[)') WITH &&)
+            WHERE (status <> 'CANCELLED');
+
+          INSERT INTO b VALUES ('a','car','2030-01-01','2030-01-03','CONFIRMED');
+          -- back-to-back must be allowed
+          INSERT INTO b VALUES ('b','car','2030-01-03','2030-01-05','CONFIRMED');
+          -- a different car must be allowed
+          INSERT INTO b VALUES ('c','other','2030-01-01','2030-01-03','CONFIRMED');
+          -- a cancelled booking may overlap freely
+          INSERT INTO b VALUES ('d','car','2030-01-01','2030-01-02','CANCELLED');
+
+          -- and a genuine overlap must be rejected
+          DO $$
+          BEGIN
+            INSERT INTO b VALUES ('e','car','2030-01-02','2030-01-04','CONFIRMED');
+            RAISE EXCEPTION 'FAIL: overlapping booking was accepted';
+          EXCEPTION WHEN exclusion_violation THEN
+            RAISE NOTICE 'PASS: overlap correctly rejected';
+          END $$;
+          SQL

@@ -10,7 +10,7 @@ const router = Router();
  * `razorpay_signature` — gives the UI instant feedback instead of waiting on
  * the webhook. Not authenticated by session (matches the itinerary-unlock
  * flow, which has never required login) — trust here comes entirely from
- * the signature check, exactly like the PayU callbacks this replaces never
+ * the signature check, exactly like the gateway callbacks this replaces never
  * trusted a client claim without a verified hash either. The webhook (see
  * razorpayWebhook.routes.ts) is the authoritative backstop if this call
  * never happens (e.g. the guest closes the tab right after paying).

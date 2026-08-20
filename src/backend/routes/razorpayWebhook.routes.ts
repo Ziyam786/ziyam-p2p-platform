@@ -14,7 +14,7 @@ router.use(razorpayWebhookRateLimiter);
  * if the guest closes the tab right after paying, so it's what
  * processCapturedPayment must be trusted to run from without any other
  * signal. Mounted on `app` ahead of the CORS/cookie/JSON-body middleware in
- * server.ts, same reasoning payuCallback.routes.ts used to: an unrecognized
+ * server.ts, for two reasons: an unrecognized
  * Origin on this server-to-server POST must never hit our strict CORS
  * check, and we need the RAW body for signature verification, not the
  * already-parsed one `express.json()` would produce.

@@ -94,7 +94,7 @@ router.patch('/users/me', requireAuth, async (req: Request, res: Response) => {
 });
 
 // Verify a host's payout bank account via Sandbox's penny-drop API before they
-// can be onboarded as a PayU child merchant (see PayoutEngine / README §2).
+// can be onboarded as a Razorpay linked account (see PayoutEngine / README §2).
 router.post('/users/me/bank/verify', requireAuth, async (req: Request, res: Response) => {
   const { ifsc, accountNumber } = req.body;
   if (!/^[A-Za-z]{4}0[A-Z0-9]{6}$/.test(ifsc ?? '')) return res.status(400).json({ error: 'Invalid IFSC code' });
@@ -117,8 +117,8 @@ router.post('/users/me/bank/verify', requireAuth, async (req: Request, res: Resp
         bankIfsc: ifsc,
         bankNameAtBank: result.nameAtBank,
         bankAccountVerified: true,
-        // There's no real PayU sub-merchant/marketplace onboarding integration
-        // built yet (that's a separate, heavier KYC flow with PayU directly) —
+        // There's no real Razorpay linked-account/marketplace onboarding integration
+        // built yet (that's a separate, heavier KYC flow with Razorpay directly) —
         // a verified bank account is the real, honest signal we have today
         // that a host is ready to receive payouts, so it's what unblocks
         // bookings on their cars (see the payoutAccountId check in
@@ -247,7 +247,7 @@ router.get('/bookings/:id', requireAuth, async (req: Request, res: Response) => 
 // renders the same content as /bookings/:id/agreement into a PDF, uploads it,
 // and creates a two-signer (host + guest) signature request. This is also
 // triggered automatically right after payment confirms (see
-// payuCallback.routes.ts) — this manual route is the fallback for when that
+// razorpayWebhook.routes.ts) — this manual route is the fallback for when that
 // best-effort auto-trigger didn't run (e.g. Setu was briefly unreachable).
 router.post('/bookings/:id/esign/start', requireAuth, async (req: Request, res: Response) => {
   const { id } = req.params;

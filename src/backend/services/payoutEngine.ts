@@ -53,7 +53,28 @@ export class PayoutEngine {
   static async splitAmount(totalAmount: number, passthroughAmount = 0) {
     const commissionable = Math.max(0, totalAmount - passthroughAmount);
     const commission = await getSetting<number>('commission_percentage', config.payout.platformCommission);
-    const hostShare = await getSetting<number>('host_share_percentage', config.payout.hostShare);
+    let hostShare = await getSetting<number>('host_share_percentage', config.payout.hostShare);
+
+    // commission_percentage and host_share_percentage are two INDEPENDENT
+    // admin-editable settings, so nothing structurally stops them summing to
+    // something other than 1. If they sum above 1 we would pay out more than
+    // we ever collected, silently, on every booking until someone noticed it
+    // in the bank balance — so clamp the host's share to whatever is actually
+    // left after commission and make the misconfiguration loud.
+    //
+    // Clamping (rather than throwing) is deliberate: a bad setting must not
+    // take the whole payout run down, and under-paying a host is recoverable
+    // by a corrective transfer where over-paying largely is not.
+    if (commission + hostShare > 1) {
+      const corrected = Math.max(0, 1 - commission);
+      console.error(
+        '[PAYOUT] MISCONFIGURED SPLIT: commission_percentage (%s) + host_share_percentage (%s) = %s > 1. ' +
+          'Clamping host share to %s for this payout. Fix these settings in admin > settings immediately.',
+        commission, hostShare, commission + hostShare, corrected
+      );
+      hostShare = corrected;
+    }
+
     const platformFee = Number((commissionable * commission).toFixed(2));
     const hostPayout = Number((commissionable * hostShare).toFixed(2)) + passthroughAmount;
     return { platformFee, hostPayout };
@@ -220,7 +241,7 @@ export class PayoutEngine {
   /**
    * Runs hourly alongside initializePayoutCron — releases a booking's security
    * deposit (creates a RefundRequest for an admin to action manually, per the
-   * "manual admin queue over live PayU refunds" decision) once the damage-claim
+   * "manual admin queue over live gateway refunds" decision) once the damage-claim
    * report window has passed with no claim filed. Bookings where a DamageClaim
    * exists are skipped entirely — that claim's own resolution (see
    * damageClaim.routes.ts) is what moves depositStatus forward instead.
@@ -491,7 +512,7 @@ export class PayoutEngine {
    *
    * We only request the host's own line item here — Razorpay leaves
    * whatever isn't transferred on the aggregator (platform) account, same
-   * "remainder implicitly stays with us" behavior the old PayU integration
+   * "remainder implicitly stays with us" behavior the old gateway integration
    * relied on, so no second transfer entry for our own cut is needed.
    */
   private static async executeBankTransfer(

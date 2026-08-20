@@ -168,6 +168,9 @@ export interface Booking {
   deliveryLatitude?: number | null;
   deliveryLongitude?: number | null;
   deliveryLocationUpdatedAt?: string | null;
+  liveLatitude?: number | null;
+  liveLongitude?: number | null;
+  liveLocationUpdatedAt?: string | null;
   lateFeeAmount: number;
   lateFeeHours: number;
   reservationFeeAmount: number;
@@ -182,6 +185,8 @@ export interface DeliveryLocation {
   updatedAt: string;
   source: 'TELEMATICS' | 'HOST_APP';
 }
+
+export type LiveLocation = DeliveryLocation;
 
 export interface BookingConditionPhoto {
   id: string;

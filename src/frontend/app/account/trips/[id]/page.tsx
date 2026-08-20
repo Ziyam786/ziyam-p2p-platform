@@ -11,7 +11,9 @@ import { useToast } from '../../../../components/Toast';
 import { useAuth } from '../../../../lib/auth-context';
 import TripChat from '../../../../components/TripChat';
 import ConditionPhotoCapture from '../../../../components/ConditionPhotoCapture';
-import { HostDeliverySharePanel, GuestDeliveryTracker } from '../../../../components/LiveDeliveryTracker';
+import { HostDeliverySharePanel, GuestDeliveryTracker, HostTripSharePanel, GuestTripTracker } from '../../../../components/LiveDeliveryTracker';
+import TripCountdownCard from '../../../../components/TripCountdownCard';
+import HandoverChecklistCard from '../../../../components/HandoverChecklistCard';
 import { bookingsApi, reviewsApi, damageClaimApi, disputeSupportApi, paymentsApi } from '../../../../lib/api';
 import { openRazorpayCheckout } from '../../../../lib/razorpayCheckout';
 import type { Booking, BookingConditionPhoto, DamageClaim, DisputeSupportRequest, PhotoAngle, TripStage } from '../../../../lib/types';
@@ -462,6 +464,21 @@ function TripDetailInner() {
             )}
 
             {trip.status === 'CONFIRMED' && trip.deliveryRequested && isHost && <HostDeliverySharePanel bookingId={trip.id} />}
+
+            {trip.status === 'ACTIVE' && (
+              <>
+                <TripCountdownCard endTime={trip.endTime} />
+                <HandoverChecklistCard
+                  items={[
+                    { label: 'Pickup condition photos', done: hasRequiredPhotos('PRE_TRIP') },
+                    { label: 'Return condition photos', done: hasRequiredPhotos('POST_TRIP') },
+                  ]}
+                />
+                {isHost ? <HostTripSharePanel bookingId={trip.id} /> : (
+                  <GuestTripTracker bookingId={trip.id} hostName={trip.car?.owner?.fullName} hostAvatarUrl={trip.car?.owner?.avatarUrl} />
+                )}
+              </>
+            )}
 
             {trip.status === 'ACTIVE' && isHost && (
               <div className="mt-6 bg-amber-50 border border-amber-100 rounded-xl p-5 text-center">

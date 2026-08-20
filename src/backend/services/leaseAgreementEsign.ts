@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
  * Renders the lease agreement, uploads it to Setu, and opens a two-signer
  * (host + guest) signature request. Shared by the manual "Start eSign"
  * button on /bookings/:id/agreement and the automatic trigger fired right
- * after PayU confirms payment (see payuCallback.routes.ts) — both need the
+ * after Razorpay confirms payment (see razorpayWebhook.routes.ts) — both need the
  * exact same orchestration, just from different call sites with different
  * error-handling needs (one surfaces an HTTP error to the user, the other
  * is best-effort and falls back to the manual button on failure).
@@ -40,7 +40,7 @@ export async function startLeaseAgreementEsign(bookingId: string): Promise<{ esi
     totalAmount: booking.totalAmount,
     // The actual amount held, not car.securityDeposit's raw figure — reduced
     // per protectionPlan (see DEPOSIT_HOLD_FRACTION in booking.routes.ts) and
-    // genuinely charged via PayU, unlike the un-adjusted car-level number.
+    // genuinely charged via Razorpay, unlike the un-adjusted car-level number.
     securityDeposit: booking.depositAmount,
   });
   const { documentId } = await esignApi.uploadDocument(pdf, `lease-agreement-${booking.id.slice(0, 8)}`);

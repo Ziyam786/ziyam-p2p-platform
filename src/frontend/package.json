@@ -11,6 +11,7 @@
   "dependencies": {
     "@googlemaps/extended-component-library": "^0.6.15",
     "@supabase/supabase-js": "^2.112.3",
+    "buffer": "^6.0.3",
     "firebase": "^12.17.1",
     "lucide-react": "^0.474.0",
     "mixpanel-browser": "^2.82.0",

@@ -165,6 +165,33 @@ export async function subscribeToDeliveryLocation(
   }
 }
 
+export type TripLocationUpdate = DeliveryLocationUpdate;
+
+/**
+ * Real-time in-trip-location listener — same mechanism as
+ * subscribeToDeliveryLocation, watching `tripTracking/{bookingId}` instead
+ * of `deliveryTracking/{bookingId}`. Falls back to null (caller should keep
+ * polling) if Firebase isn't configured.
+ */
+export async function subscribeToTripLocation(
+  bookingId: string,
+  callback: (update: TripLocationUpdate | null) => void
+): Promise<(() => void) | null> {
+  if (!isFirebaseAuthConfigured()) return null;
+  try {
+    const [{ getFirestore, doc, onSnapshot }, app] = await Promise.all([import('firebase/firestore'), getFirebaseApp()]);
+    const ref = doc(getFirestore(app), 'tripTracking', bookingId);
+    return onSnapshot(
+      ref,
+      (snap) => callback(snap.exists() ? (snap.data() as TripLocationUpdate) : null),
+      (err) => console.error('[FIRESTORE] trip-location listener failed:', err)
+    );
+  } catch (err) {
+    console.error('[FIRESTORE] subscribeToTripLocation setup failed:', err);
+    return null;
+  }
+}
+
 export interface TripChatMessageUpdate {
   id: string;
   body: string;

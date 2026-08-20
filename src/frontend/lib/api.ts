@@ -1,6 +1,6 @@
 import type {
   AdminStats, AppNotification, Blackout, Booking, BookingConditionPhoto, Car, DamageClaim, DeliveryLocation, DisputeSupportRequest, EarningsOverview,
-  IncentiveProgress, PhotoAngle, ProtectionPlan, PublicSettings, PublicUser, Review, ServiceCatalogEntry, ServiceRequest, TripStage,
+  IncentiveProgress, LiveLocation, PhotoAngle, ProtectionPlan, PublicSettings, PublicUser, Review, ServiceCatalogEntry, ServiceRequest, TripStage,
   UtilizationEntry, YieldSuggestion,
 } from './types';
 
@@ -234,6 +234,9 @@ export const bookingsApi = {
   shareDeliveryLocation: (id: string, latitude: number, longitude: number) =>
     post<{ success: true }>(`/bookings/${id}/delivery-location`, { latitude, longitude }),
   deliveryLocation: (id: string) => get<{ success: true; data: DeliveryLocation | null }>(`/bookings/${id}/delivery-location`),
+  shareLiveLocation: (id: string, latitude: number, longitude: number) =>
+    post<{ success: true }>(`/bookings/${id}/live-location`, { latitude, longitude }),
+  liveLocation: (id: string) => get<{ success: true; data: LiveLocation | null }>(`/bookings/${id}/live-location`),
 };
 
 /* ── Host booking review (accept/reject a paid, pending-review booking) ── */
