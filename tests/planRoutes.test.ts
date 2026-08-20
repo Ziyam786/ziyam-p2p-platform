@@ -18,6 +18,13 @@ vi.mock('../src/backend/services/googleMapsService', () => ({
   },
 }));
 
+const prismaMock = vi.hoisted(() => ({ car: { findFirst: vi.fn() } }));
+// Arrow-function implementations can't be invoked as constructors (Vitest 4
+// throws "is not a constructor" when the route does `new PrismaClient()`),
+// so this uses a plain function — matching the class-based pattern already
+// used for the same mock in tests/payoutSplit.test.ts.
+vi.mock('@prisma/client', () => ({ PrismaClient: vi.fn(function () { return prismaMock; }) }));
+
 import { geocodeDestination } from '../src/backend/services/googleMapsService';
 import planRoutes from '../src/backend/routes/plan.routes';
 
@@ -60,5 +67,33 @@ describe('GET /plan/destination-check', () => {
     // discrepancy noted against the same city pair).
     expect(res.body.data.distanceKm).toBeGreaterThan(180);
     expect(res.body.data.distanceKm).toBeLessThan(220);
+  });
+});
+
+describe('GET /plan/suggest-car', () => {
+  it('returns the best-rated matching car with exactMatch:true', async () => {
+    prismaMock.car.findFirst.mockResolvedValueOnce({
+      id: 'car1', make: 'Mahindra', model: 'Thar', city: 'Bengaluru', category: 'SUV',
+      dailyRate: 2499, seats: 4, transmission: 'MANUAL', fuelType: 'PETROL',
+    });
+    const res = await request(app).get('/api/plan/suggest-car?distanceKm=480&city=Bengaluru');
+    expect(res.body.data.exactMatch).toBe(true);
+    expect(res.body.data.car.make).toBe('Mahindra');
+  });
+
+  it('falls back to any available car with exactMatch:false when no category match exists', async () => {
+    prismaMock.car.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      id: 'car2', make: 'Maruti', model: 'Swift', city: 'Bengaluru', category: 'Hatchback',
+      dailyRate: 1499, seats: 5, transmission: 'MANUAL', fuelType: 'PETROL',
+    });
+    const res = await request(app).get('/api/plan/suggest-car?distanceKm=480&city=Bengaluru');
+    expect(res.body.data.exactMatch).toBe(false);
+    expect(res.body.data.car.make).toBe('Maruti');
+  });
+
+  it('returns car:null when nothing is available at all', async () => {
+    prismaMock.car.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    const res = await request(app).get('/api/plan/suggest-car?distanceKm=100&city=Bengaluru');
+    expect(res.body.data.car).toBeNull();
   });
 });
