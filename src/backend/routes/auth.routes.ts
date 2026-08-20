@@ -34,6 +34,8 @@ const PUBLIC_USER_SELECT = {
   phoneNumber: true,
   role: true,
   isKycVerified: true,
+  isDrivingLicenseVerified: true,
+  isSelfieVerified: true,
   isSuspended: true,
   avatarUrl: true,
   bio: true,
