@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
@@ -24,6 +24,15 @@ export default function PlanPage() {
   const [hotelPriceLevel, setHotelPriceLevel] = useState<number | null>(null);
   const [days, setDays] = useState(2);
   const [unlockDestination, setUnlockDestination] = useState<string | null>(null);
+
+  // Reset the stale car/hotel suggestions whenever the resolved destination
+  // changes (including becoming null while the user edits the input). Without
+  // this, a suggestion from the previous destination can briefly linger while
+  // the newly-mounted child components fetch fresh data for the new one.
+  useEffect(() => {
+    setSuggestedCar(null);
+    setHotelPriceLevel(null);
+  }, [destination?.placeName]);
 
   function handleBookNow() {
     if (!suggestedCar) return;
