@@ -325,6 +325,7 @@ export interface PublicSettings {
   company_info: CompanyInfo;
   smart_pricing: SmartPricing;
   demand_pricing: DemandPricing;
+  fuel_price_per_litre: number;
 }
 
 export interface PromoCode {

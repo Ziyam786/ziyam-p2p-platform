@@ -17,6 +17,7 @@ const PUBLIC_KEYS = [
   'company_info',
   'smart_pricing',
   'demand_pricing',
+  'fuel_price_per_litre',
 ] as const;
 
 export const DEFAULT_SETTINGS: Record<string, unknown> = {
@@ -149,6 +150,11 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
       '2026-10-02', '2026-10-20', '2026-11-08', '2026-12-25',
     ],
   },
+
+  // Road-trip planner's fuel-cost estimate (src/backend/routes/plan.routes.ts
+  // consumers on the frontend). A rough, admin-tunable average pump price —
+  // not tied to any real-time fuel-price feed.
+  fuel_price_per_litre: 105,
 
   // GST invoicing. GSTIN is real, confirmed against the actual GST REG-06
   // registration certificate (Form GST REG-06, effective 27/06/2026,
