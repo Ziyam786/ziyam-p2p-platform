@@ -38,7 +38,10 @@ export async function geocodeDestination(query: string): Promise<{ placeName: st
     const top = res.data.results[0];
     return { placeName: top.formatted_address, lat: top.geometry.location.lat, lng: top.geometry.location.lng };
   } catch (error) {
-    console.error('[googleMapsService] geocodeDestination failed:', error);
+    // Log only the message — the raw AxiosError carries error.config.params.key
+    // (the live Google Maps server API key used in the request query string),
+    // and logging the whole object would write that key into application logs.
+    console.error('[googleMapsService] geocodeDestination failed:', error instanceof Error ? error.message : error);
     return null;
   }
 }
@@ -63,7 +66,9 @@ export async function findNearbyHotels(lat: number, lng: number): Promise<HotelS
       address: r.vicinity ?? '',
     }));
   } catch (error) {
-    console.error('[googleMapsService] findNearbyHotels failed:', error);
+    // Log only the message — see note in geocodeDestination's catch block:
+    // the raw AxiosError carries the live API key in error.config.params.key.
+    console.error('[googleMapsService] findNearbyHotels failed:', error instanceof Error ? error.message : error);
     return [];
   }
 }
