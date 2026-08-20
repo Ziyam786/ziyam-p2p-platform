@@ -49,7 +49,7 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-700">
           <a href="/cars" className="hover:text-amber-500 transition">Browse Cars</a>
           <a href="/how-it-works" className="hover:text-amber-500 transition">How It Works</a>
-          <a href="/host/onboarding" className="hover:text-amber-500 transition">List Your Car</a>
+          <a href="/host" className="hover:text-amber-500 transition">List Your Car</a>
           <a href="/support" className="hover:text-amber-500 transition">Support</a>
         </div>
 
@@ -120,7 +120,7 @@ export default function Navbar() {
         <div className="md:hidden bg-white border-t border-gray-100 px-4 py-4 flex flex-col gap-4 text-sm font-medium text-gray-700">
           <a href="/cars" className="hover:text-amber-500 transition">Browse Cars</a>
           <a href="/how-it-works" className="hover:text-amber-500 transition">How It Works</a>
-          <a href="/host/onboarding" className="hover:text-amber-500 transition">List Your Car</a>
+          <a href="/host" className="hover:text-amber-500 transition">List Your Car</a>
           <a href="/support" className="hover:text-amber-500 transition">Support</a>
           <hr className="border-gray-100" />
           {user ? (

@@ -258,7 +258,7 @@ function AgentPortalInner() {
                         <button
                           disabled={busyId === job.id}
                           onClick={() => updateStatus(job.id, 'CONFIRMED')}
-                          className="text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition disabled:opacity-50"
+                          className="text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg transition disabled:opacity-50"
                         >
                           Confirm
                         </button>

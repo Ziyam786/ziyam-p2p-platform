@@ -4,9 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/api_client.dart';
 import '../../core/providers.dart';
+import '../../data/payments/razorpay_verify.dart';
 import '../../domain/itinerary/itinerary_unlock.dart';
 import '../shared/app_bottom_nav.dart';
-import '../shared/payu_webview.dart';
+import '../shared/razorpay_checkout.dart';
 
 class DestinationPickScreen extends ConsumerStatefulWidget {
   const DestinationPickScreen({super.key});
@@ -33,17 +34,34 @@ class _DestinationPickScreenState extends ConsumerState<DestinationPickScreen> {
         customerEmail: user?.email ?? '',
         customerPhone: user?.phoneNumber ?? '',
       );
-      if (!mounted) return;
-      final paid = await Navigator.of(context).push<bool>(
-        MaterialPageRoute(
-          builder: (_) => PayuWebViewScreen(checkoutUrl: result.checkout.url, fields: result.checkout.fields),
-        ),
+      final checkoutResult = await RazorpayCheckoutController().open(
+        keyId: result.checkout.keyId,
+        orderId: result.checkout.orderId,
+        amount: result.checkout.amount,
+        currency: result.checkout.currency,
+        description: 'Road-trip itinerary — $destination',
+        prefillEmail: user?.email,
+        prefillContact: user?.phoneNumber,
       );
       if (!mounted) return;
-      if (paid == true) {
+      if (!checkoutResult.success ||
+          checkoutResult.orderId == null ||
+          checkoutResult.paymentId == null ||
+          checkoutResult.signature == null) {
+        setState(() => _error = checkoutResult.errorMessage ?? 'Payment was not completed — your itinerary was not unlocked.');
+        return;
+      }
+      final verified = await verifyRazorpayPayment(
+        ref.read(apiClientProvider),
+        orderId: checkoutResult.orderId!,
+        paymentId: checkoutResult.paymentId!,
+        signature: checkoutResult.signature!,
+      );
+      if (!mounted) return;
+      if (verified.success) {
         context.go('/itineraries/${result.id}');
       } else {
-        setState(() => _error = 'Payment was not completed — your itinerary was not unlocked.');
+        setState(() => _error = 'Payment could not be verified — please contact support before retrying.');
       }
     } on ApiException catch (e) {
       setState(() => _error = e.message);

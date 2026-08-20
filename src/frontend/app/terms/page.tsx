@@ -7,6 +7,23 @@ export default function TermsPage() {
     <LegalPage
       title="Terms & Conditions"
       updated="18 August 2026"
+      detailsAnchor="terms"
+      detailsLabel="Full Terms & Conditions"
+      summary={[
+        { icon: '🪪', title: 'Eligibility', body: '18+, valid government ID and driving licence, completed KYC, and an accepted payment method on file.' },
+        { icon: '💳', title: 'Booking & payment', body: 'Pricing varies by duration, category, and demand. Security deposits may be held and charges recovered for damage or violations.' },
+        { icon: '🚗', title: 'Vehicle usage', body: 'Lawful, sober driving only — no stunts, unauthorized drivers, or tampering with GPS/odometer.' },
+        { icon: '⚠️', title: 'Damage & liability', body: 'You’re liable for negligence-caused damage; report accidents or issues immediately.' },
+        { icon: '↩️', title: 'Cancellation & refunds', body: 'Refund eligibility depends on timing and payment method — see the full Refund & Cancellation Policy.' },
+        { icon: '⚖️', title: 'Governing law', body: 'Governed by Indian law; disputes resolved by arbitration, seated in Bengaluru.' },
+      ]}
+      contact={{
+        body: [
+          `${COMPANY.legalName} (${COMPANY.brand} Mobility Services)`,
+          `Email: ${COMPANY.email}  ·  Phone: ${COMPANY.phone}`,
+          `Registered Address: ${COMPANY.address}`,
+        ],
+      }}
       sections={[
         {
           heading: '1. Company Details',
@@ -139,14 +156,6 @@ export default function TermsPage() {
         {
           heading: '22. Severability',
           body: ['If any provision is deemed invalid or unenforceable, the remaining provisions continue in full effect.'],
-        },
-        {
-          heading: '23. Contact Information',
-          body: [
-            `${COMPANY.legalName} (${COMPANY.brand} Mobility Services)`,
-            `Email: ${COMPANY.email}  ·  Phone: ${COMPANY.phone}`,
-            `Registered Address: ${COMPANY.address}`,
-          ],
         },
       ]}
     />

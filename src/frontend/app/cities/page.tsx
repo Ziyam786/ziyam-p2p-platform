@@ -29,7 +29,7 @@ export default function CitiesPage() {
                 href={`/cities/${encodeURIComponent(c.name)}`}
                 className="bg-gray-50 rounded-2xl p-5 border border-amber-400 hover:shadow-md transition text-center relative"
               >
-                <span className="absolute top-2 right-2 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">LIVE</span>
+                <span className="absolute top-2 right-2 text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">LIVE</span>
                 <span className="text-3xl block mb-2">{c.emoji}</span>
                 <p className="font-semibold text-gray-800 text-sm">{c.name}</p>
               </a>

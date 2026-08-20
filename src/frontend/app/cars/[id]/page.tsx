@@ -334,7 +334,7 @@ export default function CarDetailPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {car.features.map((f) => (
                     <div key={f} className="flex items-center gap-2 text-sm text-gray-700">
-                      <span className="text-emerald-500">✓</span> {f}
+                      <span className="text-amber-500">✓</span> {f}
                     </div>
                   ))}
                 </div>

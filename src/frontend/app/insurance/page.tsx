@@ -50,7 +50,7 @@ export default function InsurancePage() {
                 <ul className="space-y-2">
                   {p.features.map((f) => (
                     <li key={f} className="flex items-start gap-2 text-sm text-gray-700">
-                      <span className="text-emerald-500 font-bold">✓</span> {f}
+                      <span className="text-amber-500 font-bold">✓</span> {f}
                     </li>
                   ))}
                 </ul>

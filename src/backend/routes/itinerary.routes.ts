@@ -38,18 +38,14 @@ router.post('/itineraries/unlock', async (req: Request, res: Response) => {
 
   try {
     const checkout = await paymentGateway.initiateCheckout({
-      bookingId: unlock.id,
       amount: ITINERARY_PRICE,
-      customerName: unlock.customerName,
-      customerEmail: unlock.customerEmail,
-      customerPhone: unlock.customerPhone,
-      productInfo: `Ziyam Road Trip Itinerary — Bengaluru to ${destination}`,
-      callbackPath: '/api/payments/payu/itinerary-callback',
+      receipt: `itinerary_${unlock.id.slice(0, 20)}`,
+      notes: { kind: 'itinerary', unlockId: unlock.id },
     });
 
-    await prisma.itineraryUnlock.update({ where: { id: unlock.id }, data: { paymentIntentId: checkout.txnid } });
+    await prisma.itineraryUnlock.update({ where: { id: unlock.id }, data: { paymentIntentId: checkout.orderId } });
 
-    res.status(201).json({ success: true, data: { id: unlock.id, url: checkout.checkoutUrl, fields: checkout.fields } });
+    res.status(201).json({ success: true, data: { id: unlock.id, ...checkout } });
   } catch (error: any) {
     console.error('[itineraries/unlock] payment init failed:', error);
     res.status(502).json({ error: `Could not start payment: ${safeErrorMessage(error)}` });

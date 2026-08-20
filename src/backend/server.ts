@@ -21,7 +21,8 @@ import adminRoutes from './routes/admin.routes';
 import settingsRoutes from './routes/settings.routes';
 import aiRoutes from './routes/ai.routes';
 import promoCodeRoutes from './routes/promoCode.routes';
-import payuCallbackRoutes from './routes/payuCallback.routes';
+import razorpayWebhookRoutes from './routes/razorpayWebhook.routes';
+import razorpayVerifyRoutes from './routes/razorpayVerify.routes';
 import wishlistRoutes from './routes/wishlist.routes';
 import notificationRoutes from './routes/notification.routes';
 import fleetLedgerRoutes from './routes/fleetLedger.routes';
@@ -44,11 +45,12 @@ app.use(helmet());
 app.use(compression());
 app.use(express.urlencoded({ extended: true }));
 
-// PayU posts its success/failure callback as a real browser form navigation
-// (not a fetch/XHR call), from PayU's own domain, with no cookies involved.
-// Mount it ahead of the CORS middleware below so an unrecognized Origin
-// header on that navigation can't cause our strict origin check to reject it.
-app.use('/api', payuCallbackRoutes);
+// Razorpay posts its webhook as a real server-to-server call from Razorpay's
+// own infrastructure, with no cookies involved. Mount it ahead of the CORS
+// middleware below so an unrecognized Origin header can't cause our strict
+// origin check to reject it, and ahead of express.json() since the webhook
+// route parses its own raw body for signature verification.
+app.use('/api', razorpayWebhookRoutes);
 
 // CORS configuration - allow multiple origins
 const allowedOrigins = [
@@ -59,6 +61,9 @@ const allowedOrigins = [
   'http://localhost:3001',
   'http://localhost:3002',
   'http://localhost:5000',
+  // mobile/ Flutter app's web dev build (`flutter run -d chrome --web-port=8765`) —
+  // real devices/emulators aren't browser-origin requests so don't need an entry here.
+  'http://localhost:8765',
 ];
 
 app.use(cors({
@@ -122,6 +127,7 @@ api.use(adminRoutes);
 api.use(settingsRoutes);
 api.use(aiRoutes);
 api.use(promoCodeRoutes);
+api.use(razorpayVerifyRoutes);
 api.use(wishlistRoutes);
 api.use(notificationRoutes);
 api.use(fleetLedgerRoutes);

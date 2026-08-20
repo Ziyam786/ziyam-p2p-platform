@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import Navbar from '../../../../components/Navbar';
@@ -12,7 +12,8 @@ import { useAuth } from '../../../../lib/auth-context';
 import TripChat from '../../../../components/TripChat';
 import ConditionPhotoCapture from '../../../../components/ConditionPhotoCapture';
 import { HostDeliverySharePanel, GuestDeliveryTracker } from '../../../../components/LiveDeliveryTracker';
-import { bookingsApi, reviewsApi, damageClaimApi, disputeSupportApi } from '../../../../lib/api';
+import { bookingsApi, reviewsApi, damageClaimApi, disputeSupportApi, paymentsApi } from '../../../../lib/api';
+import { openRazorpayCheckout } from '../../../../lib/razorpayCheckout';
 import type { Booking, BookingConditionPhoto, DamageClaim, DisputeSupportRequest, PhotoAngle, TripStage } from '../../../../lib/types';
 
 const REQUIRED_PHOTO_ANGLES: PhotoAngle[] = ['FRONT', 'REAR', 'LEFT', 'RIGHT'];
@@ -66,8 +67,6 @@ function TripDetailInner() {
   const [payingExcessId, setPayingExcessId] = useState<string | null>(null);
   const [disputeRequests, setDisputeRequests] = useState<DisputeSupportRequest[]>([]);
   const [requestingSupport, setRequestingSupport] = useState(false);
-  const [excessCheckout, setExcessCheckout] = useState<{ url: string; fields: Record<string, string> } | null>(null);
-  const excessFormRef = useRef<HTMLFormElement>(null);
   const [capturingStage, setCapturingStage] = useState<TripStage | null>(null);
   const [cancelPreviewOpen, setCancelPreviewOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
@@ -118,11 +117,23 @@ function TripDetailInner() {
     setPayingExcessId(claimId);
     try {
       const res = await damageClaimApi.payExcess(claimId);
-      setExcessCheckout(res.data);
-      // Wait a tick for the hidden form's inputs to render with the new fields, then submit.
-      requestAnimationFrame(() => excessFormRef.current?.submit());
+      const result = await openRazorpayCheckout(res.data, {
+        name: 'Ziyam SelfDrive',
+        description: 'Damage claim excess charge',
+        prefillEmail: user?.email,
+        prefillContact: user?.phoneNumber,
+      });
+      await paymentsApi.verifyRazorpay({
+        razorpay_order_id: result.orderId,
+        razorpay_payment_id: result.paymentId,
+        razorpay_signature: result.signature,
+      });
+      show('Excess charge paid.', 'success');
+      // Re-fetch the trip so the issue report's excessChargePaidAt reflects the just-completed payment.
+      bookingsApi.get(params.id).then((res) => setTrip(res.data)).catch(() => {});
     } catch (err: any) {
       show(err.message ?? 'Could not start payment', 'error');
+    } finally {
       setPayingExcessId(null);
     }
   }
@@ -502,13 +513,6 @@ function TripDetailInner() {
           <GuestDeliveryTracker bookingId={trip.id} hostName={trip.car?.owner?.fullName} hostAvatarUrl={trip.car?.owner?.avatarUrl} />
         )}
 
-        {/* Hidden auto-submitting form to PayU's hosted checkout for an issue report's excess amount. */}
-        <form ref={excessFormRef} action={excessCheckout?.url} method="POST" className="hidden">
-          {excessCheckout && Object.entries(excessCheckout.fields).map(([name, value]) => (
-            <input key={name} type="hidden" name={name} value={value} />
-          ))}
-        </form>
-
         {issueReports.length > 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-6">
             <h2 className="font-bold text-gray-900 mb-4">Trip Issue Reports</h2>
@@ -557,7 +561,7 @@ function TripDetailInner() {
                         <button
                           onClick={() => handlePayExcess(r.id)}
                           disabled={payingExcessId === r.id}
-                          className="mt-2 btn-gradient disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none text-white text-xs font-bold px-4 py-2 rounded-xl transition"
+                          className="mt-2 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 text-white text-xs font-bold px-4 py-2 rounded-xl transition"
                         >
                           {payingExcessId === r.id ? 'Starting payment…' : `Pay ₹${r.excessChargeAmount.toLocaleString('en-IN')}`}
                         </button>

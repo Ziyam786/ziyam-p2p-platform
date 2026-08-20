@@ -262,7 +262,11 @@ function KycInner() {
                     type="button"
                     onClick={handleSendAadhaarOtp}
                     disabled={aadhaarNumber.length !== 12 || aadhaarSending}
-                    className="w-full btn-gradient disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none text-white font-bold py-3 rounded-xl transition"
+                    className={
+                      aadhaarRef
+                        ? 'w-full border border-gray-200 hover:border-amber-400 disabled:opacity-60 text-gray-700 font-semibold py-3 rounded-xl transition text-sm'
+                        : 'w-full btn-gradient disabled:!bg-none disabled:bg-gray-300 disabled:!shadow-none text-white font-bold py-3 rounded-xl transition'
+                    }
                   >
                     {aadhaarSending ? 'Sending OTP…' : aadhaarRef ? 'Resend OTP' : 'Send Aadhaar OTP'}
                   </button>

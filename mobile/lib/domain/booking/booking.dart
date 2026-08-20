@@ -57,42 +57,75 @@ class Booking {
       );
 }
 
+/// Matches `prisma/schema.prisma`'s real `BookingStatus` enum exactly — the
+/// two-stage Razorpay checkout (reservation fee, then balance) moves a
+/// booking through `pendingPayment` -> `reserved` -> `pendingHostReview` ->
+/// `confirmed`/`rejected` -> `active` -> `completed`/`cancelled`. Do not
+/// invent status names without checking the schema — this enum previously
+/// had a fabricated `PENDING_APPROVAL` value that never existed server-side.
 enum BookingStatus {
+  pending,
   pendingPayment,
+  reserved,
+  pendingHostReview,
   confirmed,
-  pendingApproval,
-  cancelled,
+  active,
   completed,
+  cancelled,
+  rejected,
   unknown;
 
   static BookingStatus fromWire(String? value) {
     switch (value) {
-      case 'CONFIRMED':
-        return BookingStatus.confirmed;
-      case 'PENDING_APPROVAL':
-        return BookingStatus.pendingApproval;
+      case 'PENDING':
+        return BookingStatus.pending;
       case 'PENDING_PAYMENT':
         return BookingStatus.pendingPayment;
-      case 'CANCELLED':
-        return BookingStatus.cancelled;
+      case 'RESERVED':
+        return BookingStatus.reserved;
+      case 'PENDING_HOST_REVIEW':
+        return BookingStatus.pendingHostReview;
+      case 'CONFIRMED':
+        return BookingStatus.confirmed;
+      case 'ACTIVE':
+        return BookingStatus.active;
       case 'COMPLETED':
         return BookingStatus.completed;
+      case 'CANCELLED':
+        return BookingStatus.cancelled;
+      case 'REJECTED':
+        return BookingStatus.rejected;
       default:
         return BookingStatus.unknown;
     }
   }
 }
 
-/// What the checkout-session endpoint returns — the same PayU hosted
-/// checkout shape used for itinerary unlock (see contracts/rest-api.md).
-class PayuCheckout {
-  const PayuCheckout({required this.url, required this.fields});
+/// What `POST /booking/:id/checkout-session` (and `/balance-checkout-session`,
+/// and `POST /itineraries/unlock`) return — `PaymentGateway.initiateCheckout`'s
+/// Razorpay Orders API result (see contracts/rest-api.md). `keyId` is
+/// Razorpay's public key id, safe to hand to the client — it opens
+/// Razorpay Checkout against this order, never a secret.
+class RazorpayCheckoutSession {
+  const RazorpayCheckoutSession({
+    required this.orderId,
+    required this.amount,
+    required this.currency,
+    required this.keyId,
+  });
 
-  final String url;
-  final Map<String, String> fields;
+  final String orderId;
 
-  factory PayuCheckout.fromJson(Map<String, dynamic> json) => PayuCheckout(
-        url: json['url'] as String,
-        fields: (json['fields'] as Map).map((k, v) => MapEntry(k.toString(), v.toString())),
+  /// Paise (Razorpay's base unit) — what Razorpay Checkout's `amount`
+  /// option expects directly, no conversion needed client-side.
+  final int amount;
+  final String currency;
+  final String keyId;
+
+  factory RazorpayCheckoutSession.fromJson(Map<String, dynamic> json) => RazorpayCheckoutSession(
+        orderId: json['orderId'] as String,
+        amount: (json['amount'] as num).toInt(),
+        currency: json['currency'] as String,
+        keyId: json['keyId'] as String,
       );
 }

@@ -109,8 +109,8 @@ router.patch('/issue-reports/:id/submit-bill', requireAuth, async (req: Request,
 });
 
 // Guest pays the portion of an approved claim that exceeds the held
-// deposit — a real PayU charge, not an IOU. Only reachable once an admin
-// has approved the claim for more than the deposit covers.
+// deposit — a real Razorpay charge, not an IOU. Only reachable once an
+// admin has approved the claim for more than the deposit covers.
 router.post('/issue-reports/:id/pay-excess', requireAuth, async (req: Request, res: Response) => {
   const { id } = req.params;
   const claim = await prisma.damageClaim.findUnique({
@@ -126,19 +126,15 @@ router.post('/issue-reports/:id/pay-excess', requireAuth, async (req: Request, r
 
   try {
     const checkout = await paymentGateway.initiateCheckout({
-      bookingId: claim.bookingId,
       amount: claim.excessChargeAmount,
-      customerName: claim.booking.customer.fullName,
-      customerEmail: claim.booking.customer.email,
-      customerPhone: claim.booking.customer.phoneNumber,
-      productInfo: `Trip issue reimbursement — ${claim.booking.car.make} ${claim.booking.car.model}`,
-      callbackPath: '/api/payments/payu/issue-report-callback',
+      receipt: `issue_${claim.id.slice(0, 20)}`,
+      notes: { kind: 'issue_report', claimId: claim.id },
     });
     // Stored on the CLAIM, never on Booking.paymentIntentId — that field is
     // the original trip transaction, still needed later for the
     // deposit-portion split in PayoutEngine.fastPayoutForIssueReport.
-    await prisma.damageClaim.update({ where: { id }, data: { excessChargePaymentIntentId: checkout.txnid } });
-    res.json({ success: true, data: { url: checkout.checkoutUrl, fields: checkout.fields } });
+    await prisma.damageClaim.update({ where: { id }, data: { excessChargePaymentIntentId: checkout.orderId } });
+    res.json({ success: true, data: checkout });
   } catch (error: any) {
     console.error('[pay-excess] payment init failed:', error);
     res.status(502).json({ error: `Could not start payment: ${safeErrorMessage(error)}` });

@@ -196,9 +196,13 @@ export interface AvailabilityRange {
 }
 
 /* ── Bookings ─────────────────────────────────────────────────────── */
-export interface PayuCheckoutSession {
-  url: string;
-  fields: Record<string, string>;
+export interface RazorpayCheckoutSession {
+  /** Razorpay's order id — passed back to /payments/razorpay/verify after Checkout succeeds. */
+  orderId: string;
+  /** Paise — what Razorpay Checkout's `amount` option expects. */
+  amount: number;
+  currency: string;
+  keyId: string;
 }
 
 export const bookingsApi = {
@@ -207,8 +211,8 @@ export const bookingsApi = {
     protectionPlan?: ProtectionPlan; deliveryRequested?: boolean; promoCode?: string;
     coDriverRequested?: boolean; coDriverName?: string; coDriverLicenseNumber?: string;
   }) => post<{ success: true; bookingId: string }>('/booking', data),
-  createCheckoutSession: (id: string) => post<{ success: true; data: PayuCheckoutSession }>(`/booking/${id}/checkout-session`),
-  balanceCheckoutSession: (id: string) => post<{ success: true; data: PayuCheckoutSession }>(`/booking/${id}/balance-checkout-session`),
+  createCheckoutSession: (id: string) => post<{ success: true; data: RazorpayCheckoutSession }>(`/booking/${id}/checkout-session`),
+  balanceCheckoutSession: (id: string) => post<{ success: true; data: RazorpayCheckoutSession }>(`/booking/${id}/balance-checkout-session`),
   start: (id: string, otp: string) => post<{ success: true; data: Booking }>(`/booking/${id}/start`, { otp }),
   complete: (id: string, otp: string) => post<{ success: true; message: string }>(`/booking/${id}/complete`, { otp }),
   startOtp: (id: string) => get<{ success: true; data: { otp: string | null } }>(`/booking/${id}/start-otp`),
@@ -246,7 +250,7 @@ export const damageClaimApi = {
   list: (bookingId: string) => get<{ success: true; count: number; data: DamageClaim[] }>(`/bookings/${bookingId}/issue-reports`),
   submitBill: (id: string, data: { billUrl: string; billAmount: number; photos: string[] }) =>
     patch<{ success: true; data: DamageClaim }>(`/issue-reports/${id}/submit-bill`, data),
-  payExcess: (id: string) => post<{ success: true; data: { url: string; fields: Record<string, string> } }>(`/issue-reports/${id}/pay-excess`),
+  payExcess: (id: string) => post<{ success: true; data: RazorpayCheckoutSession }>(`/issue-reports/${id}/pay-excess`),
 };
 
 /* ── Dispute-resolution concierge (phone/WhatsApp, Standard/Premium plans only) ── */
@@ -273,10 +277,17 @@ export interface ItineraryUnlock {
 
 export const itinerariesApi = {
   unlock: (data: { destination: ItineraryDestination; customerName: string; customerEmail: string; customerPhone: string }) =>
-    post<{ success: true; data: PayuCheckoutSession & { id: string } }>('/itineraries/unlock', data),
+    post<{ success: true; data: RazorpayCheckoutSession & { id: string } }>('/itineraries/unlock', data),
   get: (id: string) => get<{ success: true; data: ItineraryUnlock }>(`/itineraries/${id}`),
   saveContent: (id: string, generatedContent: string) =>
     post<{ success: true; data: ItineraryUnlock }>(`/itineraries/${id}/content`, { generatedContent }),
+};
+
+/* ── Payments ─────────────────────────────────────────────────────── */
+export const paymentsApi = {
+  /** Client-side confirmation right after Razorpay Checkout's `handler` fires — see razorpayVerify.routes.ts. */
+  verifyRazorpay: (data: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
+    post<{ success: true; kind: 'booking_reservation' | 'booking_balance' | 'issue_report' | 'itinerary'; entityId: string }>('/payments/razorpay/verify', data),
 };
 
 export interface TripMessage {

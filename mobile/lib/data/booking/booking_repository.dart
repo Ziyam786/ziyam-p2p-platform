@@ -5,7 +5,10 @@ import '../../domain/booking/booking.dart';
 /// routes as-is (see contracts/rest-api.md's Booking section). The
 /// no-double-booking guarantee (FR-007) is enforced server-side by the
 /// `$transaction` fix tracked in tasks.md T011 — this repository does not
-/// attempt to re-implement locking client-side.
+/// attempt to re-implement locking client-side. Checkout sessions return a
+/// Razorpay order (see RazorpayCheckoutSession) — open it via
+/// `presentation/shared/razorpay_checkout.dart`, then verify with
+/// `data/payments/razorpay_verify.dart`.
 class BookingRepository {
   BookingRepository({ApiClient? apiClient}) : _api = apiClient ?? ApiClient();
 
@@ -38,15 +41,15 @@ class BookingRepository {
     return response.data!['bookingId'] as String;
   }
 
-  Future<PayuCheckout> checkoutSession(String bookingId) async {
+  Future<RazorpayCheckoutSession> checkoutSession(String bookingId) async {
     final response = await _api.post<Map<String, dynamic>>('/booking/$bookingId/checkout-session');
-    return PayuCheckout.fromJson(response.data!['data'] as Map<String, dynamic>);
+    return RazorpayCheckoutSession.fromJson(response.data!['data'] as Map<String, dynamic>);
   }
 
-  Future<PayuCheckout> balanceCheckoutSession(String bookingId) async {
+  Future<RazorpayCheckoutSession> balanceCheckoutSession(String bookingId) async {
     final response =
         await _api.post<Map<String, dynamic>>('/booking/$bookingId/balance-checkout-session');
-    return PayuCheckout.fromJson(response.data!['data'] as Map<String, dynamic>);
+    return RazorpayCheckoutSession.fromJson(response.data!['data'] as Map<String, dynamic>);
   }
 
   /// Note the plural path — `GET /bookings/:id` (in `user.routes.ts`), not

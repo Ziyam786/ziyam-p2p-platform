@@ -38,22 +38,15 @@ export const config = {
     settlementHours: Number(process.env.PAYOUT_SETTLEMENT_HOURS ?? 24),
   },
 
-  payments: {
-    provider: process.env.PAYMENT_PROVIDER ?? 'razorpay',
-    apiKey: process.env.PAYMENT_API_KEY ?? '',
-    apiSecret: process.env.PAYMENT_API_SECRET ?? '',
-    webhookSecret: process.env.PAYMENT_WEBHOOK_SECRET ?? '',
-  },
-
-  payu: {
-    mode: process.env.PAYU_MODE ?? 'test', // 'test' | 'live'
-    key: process.env.PAYU_KEY ?? '',
-    salt: process.env.PAYU_SALT ?? '',
-    clientId: process.env.PAYU_CLIENT_ID ?? '',
-    clientSecret: process.env.PAYU_CLIENT_SECRET ?? '',
-    get checkoutUrl() {
-      return this.mode === 'live' ? 'https://secure.payu.in/_payment' : 'https://test.payu.in/_payment';
-    },
+  // Razorpay — Orders API for checkout (see paymentGateway.ts), signature
+  // verification for the client-side verify call and the async webhook (see
+  // utils/razorpaySignature.ts), and payment Transfers for host payouts (see
+  // payoutEngine.ts). keyId is also handed to clients so they can open
+  // Razorpay Checkout directly against the order.
+  razorpay: {
+    keyId: process.env.RAZORPAY_KEY_ID ?? '',
+    keySecret: process.env.RAZORPAY_KEY_SECRET ?? '',
+    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? '',
   },
 
   telematics: {

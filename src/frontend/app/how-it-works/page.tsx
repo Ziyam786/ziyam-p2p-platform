@@ -133,7 +133,7 @@ export default function HowItWorksPage() {
                   <ul className="space-y-1">
                     {s.detail.map((d) => (
                       <li key={d} className="flex items-center gap-2 text-xs text-gray-500">
-                        <span className="text-emerald-500 font-bold">✓</span> {d}
+                        <span className="text-amber-500 font-bold">✓</span> {d}
                       </li>
                     ))}
                   </ul>

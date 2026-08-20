@@ -1,74 +1,64 @@
+import Razorpay from 'razorpay';
 import { config } from '../config';
-import { generatePayuHash } from '../utils/payuHash';
 
 interface InitiateCheckoutParams {
-  bookingId: string;
+  /** Rupees — converted to paise (Razorpay's base unit) before calling the Orders API. */
   amount: number;
-  customerName: string;
-  customerEmail: string;
-  customerPhone: string;
-  productInfo: string;
-  /** Defaults to the booking callback — pass a different path for other PayU
-   * flows (e.g. itinerary unlocks) so they land on their own callback route
-   * instead of being mistaken for a booking payment. */
-  callbackPath?: string;
+  /** Short, unique-enough label stored on the order (Razorpay allows up to 40 chars). */
+  receipt: string;
+  /** Arbitrary metadata echoed back on the order/payment — not relied on for
+   * routing (see razorpayPaymentHandler.ts, which resolves the entity by
+   * matching the stored order id instead), but useful for reconciliation in
+   * the Razorpay Dashboard. */
+  notes?: Record<string, string>;
 }
 
-export interface PayuCheckoutSession {
-  /** PayU's transaction id for this attempt — stored as Booking.paymentIntentId. */
-  txnid: string;
-  /** The URL the browser must POST `fields` to (PayU's hosted checkout page). */
-  checkoutUrl: string;
-  /** Hidden form fields to auto-submit, including the computed hash. */
-  fields: Record<string, string>;
+export interface RazorpayCheckoutSession {
+  /** Razorpay's order id — stored as Booking/DamageClaim/ItineraryUnlock's `paymentIntentId`. */
+  orderId: string;
+  /** Paise — what Razorpay Checkout expects for its `amount` option. */
+  amount: number;
+  currency: string;
+  /** Public key id — safe to hand to the client, it's not a secret. */
+  keyId: string;
+}
+
+let client: Razorpay | null = null;
+function getClient(): Razorpay {
+  if (!client) {
+    if (!config.razorpay.keyId || !config.razorpay.keySecret) {
+      throw new Error('Razorpay key id/secret are not configured');
+    }
+    client = new Razorpay({ key_id: config.razorpay.keyId, key_secret: config.razorpay.keySecret });
+  }
+  return client;
 }
 
 /**
- * PayU Hosted Checkout integration (https://docs.payu.in/docs/generate-hash-payu-hosted).
+ * Razorpay Orders + Checkout integration (https://razorpay.com/docs/payments/server-integration/nodejs/payment-gateway/build-integration/).
  *
- * We collect the FULL booking amount into our own (aggregator) PayU merchant
- * account here — hosts are paid out later on the existing N+1 escrow schedule
- * via PayoutEngine, which calls PayU's Split After Transaction API. This
- * matches our escrow/hold-then-release model; PayU's split-at-checkout
- * feature (splitRequest) would send the host's cut instantly and bypass N+1,
- * so we intentionally don't use it here.
+ * We collect the FULL booking amount into our own (aggregator) Razorpay
+ * account here — hosts are paid out later on the existing N+1 escrow
+ * schedule via PayoutEngine, which calls Razorpay's Transfers API against
+ * the captured payment. This matches our escrow/hold-then-release model;
+ * marking transfers at order-creation time would send the host's cut
+ * instantly and bypass N+1, so we intentionally don't use that here.
  */
 class PaymentGateway {
-  async initiateCheckout(params: InitiateCheckoutParams): Promise<PayuCheckoutSession> {
-    if (config.nodeEnv === 'production' && (!config.payu.key || !config.payu.salt)) {
-      throw new Error('PayU key/salt are not configured');
+  async initiateCheckout(params: InitiateCheckoutParams): Promise<RazorpayCheckoutSession> {
+    if (config.nodeEnv === 'production' && (!config.razorpay.keyId || !config.razorpay.keySecret)) {
+      throw new Error('Razorpay key id/secret are not configured');
     }
 
-    const txnid = `ziyam_${params.bookingId.slice(0, 8)}_${Date.now()}`;
-    const amount = params.amount.toFixed(2);
-    const [firstname, ...rest] = params.customerName.trim().split(' ');
-
-    const hash = generatePayuHash({
-      txnid,
-      amount,
-      productinfo: params.productInfo,
-      firstname: firstname || params.customerName,
-      email: params.customerEmail,
-      udf1: params.bookingId,
+    const amountPaise = Math.round(params.amount * 100);
+    const order = await getClient().orders.create({
+      amount: amountPaise,
+      currency: 'INR',
+      receipt: params.receipt,
+      notes: params.notes,
     });
 
-    const callbackPath = params.callbackPath ?? '/api/payments/payu/callback';
-    const fields: Record<string, string> = {
-      key: config.payu.key,
-      txnid,
-      amount,
-      productinfo: params.productInfo,
-      firstname: firstname || params.customerName,
-      lastname: rest.join(' '),
-      email: params.customerEmail,
-      phone: params.customerPhone,
-      udf1: params.bookingId,
-      surl: `${config.serverUrl}${callbackPath}`,
-      furl: `${config.serverUrl}${callbackPath}`,
-      hash,
-    };
-
-    return { txnid, checkoutUrl: config.payu.checkoutUrl, fields };
+    return { orderId: order.id, amount: amountPaise, currency: order.currency, keyId: config.razorpay.keyId };
   }
 }
 
