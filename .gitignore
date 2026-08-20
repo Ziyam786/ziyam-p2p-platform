@@ -65,3 +65,8 @@ mobile/ios/Flutter/Flutter.framework
 mobile/ios/Flutter/Flutter.podspec
 *.iml
 
+# Firebase per-platform config (client keys, not truly secret, but no reason
+# to keep re-committing every FlutterFire CLI regeneration going forward)
+mobile/android/app/google-services.json
+mobile/ios/**/GoogleService-Info.plist
+
