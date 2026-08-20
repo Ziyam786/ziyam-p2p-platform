@@ -40,6 +40,7 @@ function mirrorBookingParticipants(bookingId: string, customerId: string, hostId
 
 const WASH_SERVICE_PRICE = 349;
 
+import { isBookingOverlapViolation, BOOKING_OVERLAP_MESSAGE } from '../utils/bookingOverlap';
 const router = Router();
 const prisma = new PrismaClient();
 
@@ -101,7 +102,7 @@ async function creditReferralRewardIfFirstTrip(customerId: string) {
   );
 }
 
-// Create a booking (no payment yet — the checkout page starts a PayU session separately)
+// Create a booking (no payment yet — the checkout page opens a Razorpay Order separately)
 router.post('/booking', requireAuth, async (req: Request, res: Response) => {
   const { carId, startTime, endTime, totalAmount, protectionPlan, deliveryRequested, promoCode, coDriverRequested, coDriverName, coDriverLicenseNumber } = req.body;
   const customerId = req.user!.userId;
@@ -182,7 +183,7 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
 
     // Server-computed, not client-supplied — the deposit fraction can't be
     // tampered with by sending a lower totalAmount. Charged alongside
-    // totalAmount at the PayU checkout-session step (not folded into
+    // totalAmount at the Razorpay checkout-session step (not folded into
     // totalAmount itself, since totalAmount also drives PayoutEngine.splitAmount
     // at trip completion and the deposit isn't host revenue to split).
     const resolvedPlan = VALID_PLANS.includes(protectionPlan) ? protectionPlan : 'BASIC';
@@ -260,7 +261,14 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
       // the losing request's overlap check would have passed, so this IS a
       // double-booking attempt, not a generic failure.
       if (error?.code === 'P2034') {
-        return res.status(409).json({ error: 'This car is already booked for part of the selected dates' });
+        return res.status(409).json({ error: BOOKING_OVERLAP_MESSAGE });
+      }
+      // Belt and braces: the serializable transaction above should already
+      // have caught any real race as P2034, but the database's exclusion
+      // constraint is the backstop that holds even if this path is ever
+      // refactored to a weaker isolation level.
+      if (isBookingOverlapViolation(error)) {
+        return res.status(409).json({ error: BOOKING_OVERLAP_MESSAGE });
       }
       throw error;
     }
@@ -521,7 +529,7 @@ router.post('/booking/:id/wash-service', requireAuth, async (req: Request, res: 
 // the tiered refund from the published Refund & Cancellation Policy §3 —
 // platform fee is never refunded (§3's "minus... platform fees"); the
 // security deposit is always refunded in full since a cancelled trip never
-// happened, so there's nothing for it to cover (§8). No live PayU refund
+// happened, so there's nothing for it to cover (§8). No live Razorpay refund
 // call — creates a RefundRequest for the same manual admin queue the
 // deposit-release/damage-claim flows already use.
 router.post('/bookings/:id/cancel', requireAuth, async (req: Request, res: Response) => {

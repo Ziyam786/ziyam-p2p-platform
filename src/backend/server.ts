@@ -94,7 +94,7 @@ app.use(cors({
 app.use(express.json({ limit: '8mb' }));
 
 // Cookie-auth API: parse cookies and run double-submit CSRF on the same
-// router before any route handler. PayU is mounted on `app` above this, so
+// router before any route handler. The Razorpay webhook is mounted on `app` above this, so
 // it never hits cookieParser. /health and /uploads stay off this router.
 const api = express.Router();
 api.use(cookieParser());

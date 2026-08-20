@@ -28,12 +28,12 @@ export interface PaymentOutcome {
  *
  * Which of the four payment flows this is gets resolved by matching
  * `orderId` against whichever entity actually stored it (exactly mirroring
- * how the old PayU callbacks were split across four separate routes — the
+ * how the old gateway callbacks were split across four separate routes — the
  * booking reservation vs. balance stages are told apart by `booking.status`
  * alone, not by which endpoint was hit), not by trusting client-supplied
  * "kind" metadata.
  *
- * Idempotent per entity's current status, same discipline as the PayU
+ * Idempotent per entity's current status, same discipline as the previous
  * callbacks this replaces — Razorpay may retry the webhook, and the client
  * verify call can also land twice.
  */

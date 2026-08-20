@@ -7,8 +7,9 @@ const prisma = new PrismaClient();
 
 // Money owed back to a guest (deposit release / partial release today —
 // see damageClaim.routes.ts and the depositReleaseCron in payoutEngine.ts).
-// No live PayU refund API integration yet — an admin processes the actual
-// refund manually in the PayU merchant portal, then marks it complete here.
+// No live Razorpay Refunds API integration yet — an admin processes the actual
+// refund manually in the Razorpay dashboard, then marks it complete here.
+// NOTE: automating this is what unlocks the 24-hour deposit-return SLA.
 router.get('/admin/refund-requests', requireAuth, requireRole('ADMIN'), async (req: Request, res: Response) => {
   const { status } = req.query;
   const requests = await prisma.refundRequest.findMany({

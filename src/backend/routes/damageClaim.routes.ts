@@ -6,6 +6,7 @@ import { PayoutEngine } from '../services/payoutEngine';
 import paymentGateway from '../services/paymentGateway';
 import { safeErrorMessage } from '../utils/errorResponse';
 
+import { computeDepositDeduction } from '../utils/depositDeduction';
 const router = Router();
 const prisma = new PrismaClient();
 
@@ -197,10 +198,11 @@ router.patch('/admin/issue-reports/:id', requireAuth, requireRole('ADMIN'), asyn
     return res.status(400).json({ error: 'approvedDeduction must be a positive number when approving' });
   }
 
-  const depositPortion = Math.min(approvedDeduction, booking.depositAmount);
-  const remainder = booking.depositAmount - depositPortion;
-  const excessPortion = Math.max(0, approvedDeduction - booking.depositAmount);
-  const forfeited = remainder <= 0;
+  // Arithmetic lives in utils/depositDeduction.ts so it can be tested directly
+  // — see tests/depositDeduction.test.ts, which pins the two reconciliation
+  // invariants (deposit splits exactly; deduction is fully accounted for).
+  const { depositPortion, remainder, excessPortion, forfeited, depositStatus } =
+    computeDepositDeduction(approvedDeduction, booking.depositAmount);
 
   const ops: any[] = [
     prisma.damageClaim.update({
@@ -217,7 +219,7 @@ router.patch('/admin/issue-reports/:id', requireAuth, requireRole('ADMIN'), asyn
     prisma.booking.update({
       where: { id: booking.id },
       data: {
-        depositStatus: forfeited ? BookingDepositStatus.FORFEITED : BookingDepositStatus.PARTIALLY_DEDUCTED,
+        depositStatus,
         ...(!forfeited && { depositReleasedAt: now }),
       },
     }),
@@ -240,7 +242,7 @@ router.patch('/admin/issue-reports/:id', requireAuth, requireRole('ADMIN'), asyn
       `/account/trips/${booking.id}`
     );
     // Fast payout waits for the excess charge to actually succeed —
-    // triggered from the /payments/payu/issue-report-callback handler instead.
+    // triggered from the Razorpay excess-charge confirmation instead.
   } else {
     await notify(
       booking.customerId,
