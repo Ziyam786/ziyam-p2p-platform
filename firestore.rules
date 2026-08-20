@@ -34,6 +34,11 @@ service cloud.firestore {
       allow write: if false; // backend-only
     }
 
+    match /tripTracking/{bookingId} {
+      allow read: if isBookingParticipant(bookingId);
+      allow write: if false; // backend-only
+    }
+
     match /tripChats/{bookingId}/messages/{messageId} {
       allow read: if isBookingParticipant(bookingId);
       allow write: if false; // backend-only

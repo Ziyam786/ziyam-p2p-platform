@@ -726,6 +726,69 @@ router.get('/bookings/:id/delivery-location', requireAuth, async (req: Request, 
   });
 });
 
+// Live in-trip tracking — same mechanism as delivery-location above (host's
+// device reports GPS, guest watches it move), but scoped to ACTIVE bookings
+// instead of pre-pickup CONFIRMED+deliveryRequested ones. Not gated on
+// deliveryRequested: every trip can be tracked once it's underway, not just
+// ones that opted into doorstep delivery.
+router.post('/bookings/:id/live-location', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { latitude, longitude } = req.body;
+  if (typeof latitude !== 'number' || typeof longitude !== 'number' || Number.isNaN(latitude) || Number.isNaN(longitude)) {
+    return res.status(400).json({ error: 'latitude and longitude must be numbers' });
+  }
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return res.status(400).json({ error: 'latitude/longitude out of range' });
+  }
+
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  if (booking.car.ownerId !== req.user!.userId) return res.status(403).json({ error: 'Only the host can share this trip\'s location' });
+  if (booking.status !== BookingStatus.ACTIVE) {
+    return res.status(400).json({ error: `Cannot share live location for a booking with status ${booking.status}` });
+  }
+
+  const updated = await prisma.booking.update({
+    where: { id },
+    data: { liveLatitude: latitude, liveLongitude: longitude, liveLocationUpdatedAt: new Date() },
+    select: { liveLatitude: true, liveLongitude: true, liveLocationUpdatedAt: true },
+  });
+  mirrorBookingParticipants(id, booking.customerId, booking.car.ownerId);
+  mirrorToFirestore('tripTracking', id, {
+    latitude: updated.liveLatitude,
+    longitude: updated.liveLongitude,
+    updatedAt: updated.liveLocationUpdatedAt?.toISOString(),
+    source: 'HOST_APP',
+  });
+  res.json({ success: true, data: updated });
+});
+
+router.get('/bookings/:id/live-location', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  const isCustomer = booking.customerId === req.user!.userId;
+  const isHost = booking.car.ownerId === req.user!.userId;
+  if (!isCustomer && !isHost) return res.status(403).json({ error: 'Not part of this booking' });
+
+  if (booking.car.telematicsImei) {
+    try {
+      const state = await TelematicsService.getVehicleState(booking.car.telematicsImei);
+      return res.json({ success: true, data: { latitude: state.latitude, longitude: state.longitude, updatedAt: new Date(), source: 'TELEMATICS' } });
+    } catch {
+      // Fall through to the host-reported position below.
+    }
+  }
+
+  if (booking.liveLatitude == null || booking.liveLongitude == null) {
+    return res.json({ success: true, data: null });
+  }
+  res.json({
+    success: true,
+    data: { latitude: booking.liveLatitude, longitude: booking.liveLongitude, updatedAt: booking.liveLocationUpdatedAt, source: 'HOST_APP' },
+  });
+});
+
 // Guest<->host messaging, scoped to this booking. Either party can read/send;
 // no general DM system, just pickup coordination and pre-trip questions.
 router.get('/bookings/:id/messages', requireAuth, async (req: Request, res: Response) => {

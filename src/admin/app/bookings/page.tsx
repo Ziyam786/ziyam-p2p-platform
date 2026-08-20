@@ -198,6 +198,15 @@ export default function BookingsPage() {
                     <td className="py-3 px-4 text-slate-400">₹{b.totalAmount.toLocaleString()}</td>
                     <td className="py-3 px-4">
                       <span className="bg-slate-800 px-2 py-1 rounded-full text-xs">{b.status}</span>
+                      {b.status === 'ACTIVE' && (
+                        <span
+                          className={`ml-1.5 px-2 py-1 rounded-full text-xs font-semibold ${
+                            new Date(b.endTime).getTime() < Date.now() ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'
+                          }`}
+                        >
+                          {new Date(b.endTime).getTime() < Date.now() ? '⚠ Return overdue' : '✓ On track'}
+                        </span>
+                      )}
                       {(tab === 'rejected' || tab === 'cancelled') && (
                         <p className="text-[11px] text-slate-500 mt-1 max-w-[220px]">
                           {(tab === 'rejected' ? b.rejectionReason : b.cancellationReason) ?? '—'}

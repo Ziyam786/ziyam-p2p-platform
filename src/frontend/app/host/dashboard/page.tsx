@@ -11,6 +11,7 @@ import { LogoBadge } from '../../../components/Logo';
 import BlackoutManager from '../../../components/BlackoutManager';
 import BookingRequestsPanel from '../../../components/BookingRequestsPanel';
 import YieldBadge from '../../../components/YieldBadge';
+import { HostTripSharePanel } from '../../../components/LiveDeliveryTracker';
 import { useAuth } from '../../../lib/auth-context';
 import { useToast } from '../../../components/Toast';
 import { hostApi, carsApi, hostReviewApi, usersApi, ApiError } from '../../../lib/api';
@@ -32,6 +33,7 @@ function DashboardInner() {
   const [loading, setLoading] = useState(true);
   const [blackoutCar, setBlackoutCar] = useState<Car | null>(null);
   const [requestCount, setRequestCount] = useState(0);
+  const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
 
   function loadRequestCount() {
     hostReviewApi.requests().then((res) => setRequestCount(res.count)).catch(() => {});
@@ -268,18 +270,42 @@ function DashboardInner() {
             ) : (
               trips.map((b) => {
                 const car = cars.find((c) => c.id === b.carId);
+                const overdue = b.status === 'ACTIVE' && new Date(b.endTime).getTime() < Date.now();
+                const expanded = expandedTripId === b.id;
                 return (
-                  <div key={b.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="font-semibold">{car ? `${car.make} ${car.model}` : 'Car'} · {b.customer?.fullName ?? 'Guest'}</p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {new Date(b.startTime).toLocaleDateString('en-IN')} – {new Date(b.endTime).toLocaleDateString('en-IN')}
-                        {' · '}₹{b.hostPayoutAmount.toLocaleString('en-IN')} host share
-                      </p>
+                  <div key={b.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="font-semibold">{car ? `${car.make} ${car.model}` : 'Car'} · {b.customer?.fullName ?? 'Guest'}</p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {new Date(b.startTime).toLocaleDateString('en-IN')} – {new Date(b.endTime).toLocaleDateString('en-IN')}
+                          {' · '}₹{b.hostPayoutAmount.toLocaleString('en-IN')} host share
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {b.status === 'ACTIVE' && (
+                          <span className={`text-xs font-semibold px-3 py-1 rounded-full ${overdue ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                            {overdue ? 'Return overdue' : 'On schedule'}
+                          </span>
+                        )}
+                        <span className={`text-xs font-semibold px-3 py-1 rounded-full ${b.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-gray-800 text-gray-300'}`}>
+                          {b.status}
+                        </span>
+                        {b.status === 'ACTIVE' && (
+                          <button
+                            onClick={() => setExpandedTripId(expanded ? null : b.id)}
+                            className="text-xs font-semibold px-3 py-1 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-200 transition"
+                          >
+                            📍 {expanded ? 'Hide location' : 'Live location'}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <span className={`text-xs font-semibold px-3 py-1 rounded-full ${b.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-gray-800 text-gray-300'}`}>
-                      {b.status}
-                    </span>
+                    {expanded && (
+                      <div className="mt-3">
+                        <HostTripSharePanel bookingId={b.id} />
+                      </div>
+                    )}
                   </div>
                 );
               })

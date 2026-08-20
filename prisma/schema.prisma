@@ -582,6 +582,16 @@ model Booking {
   deliveryLongitude         Float?
   deliveryLocationUpdatedAt DateTime?
 
+  // Live in-trip tracking — same "last-known-position only" shape as the
+  // delivery fields above, but for after pickup: meaningful only while
+  // status is ACTIVE, via POST/GET /bookings/:id/live-location. Kept
+  // separate from the delivery* fields rather than reusing them, since a
+  // completed delivery and an in-progress trip are different moments with
+  // different eligibility rules (deliveryRequested+CONFIRMED vs ACTIVE).
+  liveLatitude          Float?
+  liveLongitude         Float?
+  liveLocationUpdatedAt DateTime?
+
   // Host review — inserted between payment success and CONFIRMED (see
   // hostReview.routes.ts). hostReviewDeadline drives the auto-reject cron in
   // payoutEngine.ts once the review window (host_review_window_hours setting)
