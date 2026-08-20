@@ -122,6 +122,7 @@ export default function AboutPage() {
                   </div>
                   <p className="font-bold text-gray-900 text-sm">{person.name}</p>
                   <p className="text-xs text-gray-500 mt-1">{person.role}</p>
+                  {person.bio && <p className="text-xs text-gray-400 mt-2 leading-relaxed">{person.bio}</p>}
                 </div>
               </StaggerItem>
             ))}

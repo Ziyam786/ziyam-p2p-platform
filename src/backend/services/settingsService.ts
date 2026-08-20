@@ -85,11 +85,31 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     scopeNote: 'Currently operating in Bengaluru only — expanding pan-India as the fleet grows.',
     jurisdiction: 'Courts at Bengaluru, Karnataka',
     team: [
-      { name: 'Syed Fardeen', role: 'Founder & Director' },
-      { name: 'Junaid Khan', role: 'Co-founder & Director' },
-      { name: 'Numer Saqlain M', role: 'Co-founder & Director' },
-      { name: 'Mohammed Azam A', role: 'Co-founder & Managing Director' },
-      { name: 'Shaik Afnan Sabil', role: 'Co-founder & VP Operations' },
+      {
+        name: 'Syed Fardeen',
+        role: 'Founder, CEO & Director',
+        bio: 'Sets group strategy and capital allocation across Ziyam Self Drive, Mechanix Pro and Marc8. Owns fleet expansion, brand and long-term partnerships.',
+      },
+      {
+        name: 'Mohammed Azam A',
+        role: 'Co-Founder & Managing Director',
+        bio: 'Leads business growth and expansion: hub network, partner and vendor relationships, and P&L accountability across the EFPL brands.',
+      },
+      {
+        name: 'Shaik Afnan Sabil',
+        role: 'Co-Founder & VP, Operations',
+        bio: 'Owns fleet operations end to end: handover and return inspections, preventive maintenance cycles, hub parking protocols and agent performance.',
+      },
+      {
+        name: 'Junaid Khan',
+        role: 'Co-Founder & Chief Operating Officer',
+        bio: 'Owns execution across the fleet: hub throughput, vehicle utilisation, service standards and delivery across Ziyam Self Drive and Mechanix Pro.',
+      },
+      {
+        name: 'Numer Saqlain M',
+        role: 'Co-Founder & Chief Financial Officer',
+        bio: 'Owns finance across EFPL: host settlements and payout cycles, unit economics, GST and statutory compliance, and capital planning.',
+      },
     ],
   },
   commission_percentage: config.payout.platformCommission,
