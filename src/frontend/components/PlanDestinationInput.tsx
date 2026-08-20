@@ -31,6 +31,7 @@ export default function PlanDestinationInput({ onResolved }: { onResolved: (resu
 
     timerRef.current = setTimeout(async () => {
       const currentQuery = trimmedQuery;
+      if (latestQueryRef.current !== currentQuery) return;
       setChecking(true);
       try {
         const res = await planApi.destinationCheck(currentQuery);
