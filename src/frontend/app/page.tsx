@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import { motion, useScroll, useTransform, useReducedMotion } from 'motion/react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -10,7 +9,7 @@ import {
   ChevronRight, Star, Clock, MessageCircle, Mountain, ArrowRight, ArrowUpRight,
   Users, BadgeCheck, Radio, Camera, Building2, Mail, Route,
   IndianRupee, CalendarClock, MapPin, CheckCircle2, SlidersHorizontal, Award,
-  CarFront, Gem, BatteryCharging, Settings2, Coffee, Waves, TreePine,
+  CarFront, Gem, BatteryCharging, Settings2,
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -20,11 +19,7 @@ import { CarCardSkeleton } from '../components/Skeleton';
 import ScrollReveal, { StaggerGroup, StaggerItem } from '../components/ScrollReveal';
 import MotionButton from '../components/MotionButton';
 import TiltCard from '../components/TiltCard';
-import Modal from '../components/Modal';
-import { useToast } from '../components/Toast';
-import { carsApi, settingsApi, itinerariesApi, paymentsApi, ApiError } from '../lib/api';
-import type { ItineraryDestination } from '../lib/api';
-import { openRazorpayCheckout } from '../lib/razorpayCheckout';
+import { carsApi, settingsApi } from '../lib/api';
 import { COMPANY } from '../lib/companyInfo';
 import { setStickyDates } from '../lib/searchDates';
 import type { Car, CategoryDef, CityDef, Testimonial, TrustBadge } from '../lib/types';
@@ -141,13 +136,6 @@ function matchesFleetFilter(car: Car, filter: FleetFilter): boolean {
   }
 }
 
-const ROAD_TRIPS: { to: string; tag: string; distance: string; icon: LucideIcon; from: string; to2: string }[] = [
-  { to: 'Ooty', tag: 'Hill Station', distance: '~270 km from Bengaluru', icon: Mountain, from: '#5872ea', to2: '#183eeb' },
-  { to: 'Coorg', tag: 'Coffee Country', distance: '~250 km from Bengaluru', icon: Coffee, from: '#10b981', to2: '#047857' },
-  { to: 'Chikmagalur', tag: 'Misty Hills', distance: '~245 km from Bengaluru', icon: TreePine, from: '#8fa3f2', to2: '#1230c4' },
-  { to: 'Gokarna', tag: 'Beach Escape', distance: '~480 km from Bengaluru', icon: Waves, from: '#0e259d', to2: '#020617' },
-];
-
 /** Cursor-following ambient glow blobs behind a dark section — pure CSS blur, no JS. */
 function Glow({ className }: { className: string }) {
   return <div aria-hidden className={`absolute rounded-full blur-[110px] pointer-events-none ${className}`} />;
@@ -163,7 +151,6 @@ function toLocalInputValue(d: Date): string {
 }
 
 export default function HomePage() {
-  const router = useRouter();
   const reduceMotion = useReducedMotion();
   const { scrollY } = useScroll();
   const heroGlowY = useTransform(scrollY, [0, 800], [0, 160]);
@@ -193,46 +180,6 @@ export default function HomePage() {
   // Host earnings calculator teaser state — same defaults as the full page
   const [calcDailyRate, setCalcDailyRate] = useState(1800);
   const [calcUtilization, setCalcUtilization] = useState(60);
-
-  // Itinerary unlock — real ₹49 Razorpay flow, AI-generated content lands
-  // server-side on /itineraries/:id once /payments/razorpay/verify confirms.
-  const { show: showToast } = useToast();
-  const [unlockDestination, setUnlockDestination] = useState<ItineraryDestination | null>(null);
-  const [unlockName, setUnlockName] = useState('');
-  const [unlockEmail, setUnlockEmail] = useState('');
-  const [unlockPhone, setUnlockPhone] = useState('');
-  const [unlockSubmitting, setUnlockSubmitting] = useState(false);
-
-  async function handleUnlockSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!unlockDestination) return;
-    setUnlockSubmitting(true);
-    try {
-      const res = await itinerariesApi.unlock({
-        destination: unlockDestination,
-        customerName: unlockName.trim(),
-        customerEmail: unlockEmail.trim(),
-        customerPhone: unlockPhone.trim(),
-      });
-      const result = await openRazorpayCheckout(res.data, {
-        name: 'Ziyam SelfDrive',
-        description: `${unlockDestination} road-trip itinerary`,
-        prefillEmail: unlockEmail.trim(),
-        prefillContact: unlockPhone.trim(),
-      });
-      const verified = await paymentsApi.verifyRazorpay({
-        razorpay_order_id: result.orderId,
-        razorpay_payment_id: result.paymentId,
-        razorpay_signature: result.signature,
-      });
-      setUnlockDestination(null);
-      router.push(`/itineraries/${verified.entityId}`);
-    } catch (err) {
-      showToast(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Could not start payment', 'error');
-    } finally {
-      setUnlockSubmitting(false);
-    }
-  }
 
   useEffect(() => {
     let active = true;
@@ -974,81 +921,31 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── ROAD TRIP ITINERARIES TEASER ─────────────────────────────── */}
+      {/* ── ROAD TRIP PLANNER CTA ────────────────────────────────────── */}
       <section id="itineraries" className="relative bg-slate-950 py-20 overflow-hidden">
         <Glow className="top-0 left-0 w-[30rem] h-[26rem] bg-amber-500/10" />
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <ScrollReveal className="text-center mb-10">
-            <span className="text-amber-400 text-xs font-bold uppercase tracking-widest">AI-Generated · ₹49</span>
-            <h2 className="text-3xl md:text-4xl font-extrabold text-white mt-2 mb-3">Smart road-trip itineraries</h2>
-            <p className="text-slate-400 text-sm max-w-xl mx-auto">
-              A day-by-day route plan out of Bengaluru, generated for you the moment you unlock it — stops, timing, and self-drive tips included. Distances are approximate.
-            </p>
-          </ScrollReveal>
-
-          <StaggerGroup className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {ROAD_TRIPS.map((trip) => {
-              const Icon = trip.icon;
-              return (
-                <StaggerItem key={trip.to}>
-                  <motion.div
-                    whileHover={{ y: -6 }}
-                    transition={{ duration: 0.25, ease: EASE }}
-                    className="relative rounded-2xl overflow-hidden border border-slate-800/80 h-56 flex flex-col justify-between p-5"
-                    style={{ backgroundImage: `linear-gradient(155deg, ${trip.from}, ${trip.to2})` }}
-                  >
-                    <div className="flex items-start justify-between">
-                      <Icon className="w-7 h-7 text-white/90" />
-                      <span className="bg-black/25 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-1 rounded-full">₹49</span>
-                    </div>
-                    <div>
-                      <p className="text-white/70 text-[11px] font-semibold uppercase tracking-wider mb-1">{trip.tag}</p>
-                      <h3 className="text-white font-extrabold text-lg mb-1">Bengaluru → {trip.to}</h3>
-                      <p className="text-white/70 text-xs mb-3">{trip.distance}</p>
-                      <button
-                        type="button"
-                        onClick={() => setUnlockDestination(trip.to as ItineraryDestination)}
-                        className="inline-flex items-center gap-1 text-white text-xs font-bold bg-white/15 hover:bg-white/25 backdrop-blur-sm px-3 py-1.5 rounded-lg transition-colors"
-                      >
-                        Unlock Itinerary <ArrowUpRight className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </motion.div>
-                </StaggerItem>
-              );
-            })}
-          </StaggerGroup>
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <span className="text-amber-400 text-xs font-bold uppercase tracking-widest">Plan a trip</span>
+          <h2 className="text-3xl md:text-4xl font-extrabold text-white mt-2 mb-3">Plan your next road trip</h2>
+          <p className="text-slate-400 text-sm max-w-xl mx-auto mb-8">
+            Tell us where you're headed — we'll suggest a car from our live fleet, a full trip-cost estimate, and places to stay along the way.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <a
+              href="/plan"
+              className="inline-flex items-center justify-center gap-2 btn-gradient text-white font-bold px-6 py-3 rounded-xl transition"
+            >
+              Plan my road trip <ArrowUpRight className="w-4 h-4" />
+            </a>
+            <a
+              href="/cars"
+              className="inline-flex items-center justify-center gap-2 border border-slate-700 text-white font-semibold px-6 py-3 rounded-xl hover:bg-slate-900 transition"
+            >
+              Just browse cars
+            </a>
+          </div>
         </div>
       </section>
-
-      <Modal open={Boolean(unlockDestination)} onClose={() => { if (!unlockSubmitting) setUnlockDestination(null); }} title={`Unlock: Bengaluru → ${unlockDestination}`}>
-        <form onSubmit={handleUnlockSubmit} className="space-y-4">
-          <p className="text-sm text-gray-500">
-            ₹49 unlocks an AI-generated day-by-day itinerary for this route — stops, timing, attractions, and self-drive tips, ready right after payment.
-          </p>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Full Name</label>
-            <input required value={unlockName} onChange={(e) => setUnlockName(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Email</label>
-            <input type="email" required value={unlockEmail} onChange={(e) => setUnlockEmail(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Mobile Number</label>
-            <input type="tel" required value={unlockPhone} onChange={(e) => setUnlockPhone(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
-          </div>
-
-          <button
-            type="submit"
-            disabled={unlockSubmitting}
-            className="w-full btn-gradient text-white font-bold py-3 rounded-xl transition disabled:opacity-60"
-          >
-            {unlockSubmitting ? 'Processing…' : 'Pay ₹49 & Unlock'}
-          </button>
-          <p className="text-[11px] text-gray-400 text-center">🔒 Secure checkout via Razorpay. No account needed.</p>
-        </form>
-      </Modal>
 
       {/* ── TOP CITIES ───────────────────────────────────────────────── */}
       <section className="py-16 bg-marc8cream">
