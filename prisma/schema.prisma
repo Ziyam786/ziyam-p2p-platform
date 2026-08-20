@@ -601,7 +601,8 @@ model Booking {
   esignRequestId   String?
   esignStatus      String? // sign_initiated | sign_pending | sign_in_progress | sign_complete
   esignDownloadUrl String?
-  paymentIntentId  String?
+  paymentIntentId  String? // Razorpay order id, assigned at checkout initiation
+  razorpayPaymentId String? // Razorpay captured payment id — set once verified/webhook-confirmed; what PayoutEngine transfers against
   payoutLedgers    PayoutLedger[]
   review           Review?
   serviceRequests  ServiceRequest[]
@@ -649,11 +650,12 @@ model DamageClaim {
   resolutionSubmittedAt DateTime?
 
   // When approvedDeduction exceeds the booking's held deposit, the excess is
-  // charged to the guest as a real PayU transaction (see
-  // /api/payments/payu/issue-report-callback) rather than silently going
+  // charged to the guest as a real Razorpay transaction (see
+  // /api/payments/razorpay/verify and /webhook) rather than silently going
   // uncharged, which is what happened before this field existed.
   excessChargeAmount          Float?
-  excessChargePaymentIntentId String?
+  excessChargePaymentIntentId String? // Razorpay order id
+  excessChargeRazorpayPaymentId String? // Razorpay captured payment id — what PayoutEngine transfers against
   excessChargePaidAt          DateTime?
 
   @@index([status])
@@ -1278,7 +1280,8 @@ model ItineraryUnlock {
   customerEmail    String
   customerPhone    String
   amount           Float                 @default(49)
-  paymentIntentId  String?               @unique // PayU txnid
+  paymentIntentId  String?               @unique // Razorpay order id
+  razorpayPaymentId String? // Razorpay captured payment id
   status           ItineraryUnlockStatus @default(PENDING_PAYMENT)
   generatedContent String?
   createdAt        DateTime              @default(now())

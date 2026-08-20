@@ -45,12 +45,20 @@ class BookingListScreen extends ConsumerWidget {
 
   String _statusLabel(BookingStatus status) {
     switch (status) {
-      case BookingStatus.confirmed:
-        return 'Confirmed';
-      case BookingStatus.pendingApproval:
-        return 'Pending host approval';
+      case BookingStatus.pending:
+        return 'Pending';
       case BookingStatus.pendingPayment:
         return 'Payment pending';
+      case BookingStatus.reserved:
+        return 'Reserved — balance due';
+      case BookingStatus.pendingHostReview:
+        return 'Pending host approval';
+      case BookingStatus.confirmed:
+        return 'Confirmed';
+      case BookingStatus.active:
+        return 'Trip in progress';
+      case BookingStatus.rejected:
+        return 'Declined by host';
       case BookingStatus.cancelled:
         return 'Cancelled';
       case BookingStatus.completed:

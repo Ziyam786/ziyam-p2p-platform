@@ -272,12 +272,13 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-// Starts (or restarts) a PayU Hosted Checkout session for a pending booking —
-// STAGE 1 of the two-stage checkout: charges only reservationFeeAmount, not
-// the full trip cost. Holds the dates so the guest can review everything
-// with real confidence before committing the rest of the money (see
+// Starts (or restarts) a Razorpay order for a pending booking — STAGE 1 of
+// the two-stage checkout: charges only reservationFeeAmount, not the full
+// trip cost. Holds the dates so the guest can review everything with real
+// confidence before committing the rest of the money (see
 // /balance-checkout-session below). Real confirmation only ever happens via
-// the hash-verified callback in payuCallback.routes.ts, never from here.
+// the signature-verified /payments/razorpay/verify call or webhook, never
+// from here.
 router.post('/booking/:id/checkout-session', requireAuth, async (req: Request, res: Response) => {
   const { id } = req.params;
   const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true, customer: true } });
@@ -289,17 +290,14 @@ router.post('/booking/:id/checkout-session', requireAuth, async (req: Request, r
 
   try {
     const checkout = await paymentGateway.initiateCheckout({
-      bookingId: booking.id,
       amount: booking.reservationFeeAmount,
-      customerName: booking.customer.fullName,
-      customerEmail: booking.customer.email,
-      customerPhone: booking.customer.phoneNumber,
-      productInfo: `Reservation fee — ${booking.car.make} ${booking.car.model}`,
+      receipt: `booking_${booking.id.slice(0, 20)}_reservation`,
+      notes: { kind: 'booking_reservation', bookingId: booking.id },
     });
 
-    await prisma.booking.update({ where: { id }, data: { paymentIntentId: checkout.txnid } });
+    await prisma.booking.update({ where: { id }, data: { paymentIntentId: checkout.orderId } });
 
-    res.json({ success: true, data: { url: checkout.checkoutUrl, fields: checkout.fields } });
+    res.json({ success: true, data: checkout });
   } catch (error: any) {
     console.error('[checkout-session] payment init failed:', error);
     res.status(502).json({ error: `Could not start payment: ${safeErrorMessage(error)}` });
@@ -309,8 +307,8 @@ router.post('/booking/:id/checkout-session', requireAuth, async (req: Request, r
 // STAGE 2 of the two-stage checkout — charges the remaining balance
 // (trip cost + platform fee + full deposit, minus the reservation fee
 // already paid) once the guest is ready to commit. Only valid from RESERVED;
-// success moves the booking into the existing host-review flow (see the
-// /payments/payu/balance-callback handler).
+// success moves the booking into the existing host-review flow (see
+// razorpayPaymentHandler.ts's RESERVED branch).
 router.post('/booking/:id/balance-checkout-session', requireAuth, async (req: Request, res: Response) => {
   const { id } = req.params;
   const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true, customer: true } });
@@ -321,24 +319,20 @@ router.post('/booking/:id/balance-checkout-session', requireAuth, async (req: Re
   }
 
   try {
-    // Deposit is charged in the same PayU transaction as the trip cost, not
+    // Deposit is charged in the same Razorpay order as the trip cost, not
     // held separately — booking.totalAmount itself stays deposit-exclusive
     // since PayoutEngine.splitAmount reads it at trip completion, and the
     // deposit isn't host revenue to split.
     const balanceAmount = booking.totalAmount + booking.depositAmount - booking.reservationFeeAmount;
     const checkout = await paymentGateway.initiateCheckout({
-      bookingId: booking.id,
       amount: balanceAmount,
-      customerName: booking.customer.fullName,
-      customerEmail: booking.customer.email,
-      customerPhone: booking.customer.phoneNumber,
-      productInfo: `Balance payment — ${booking.car.make} ${booking.car.model}`,
-      callbackPath: '/api/payments/payu/balance-callback',
+      receipt: `booking_${booking.id.slice(0, 20)}_balance`,
+      notes: { kind: 'booking_balance', bookingId: booking.id },
     });
 
-    await prisma.booking.update({ where: { id }, data: { paymentIntentId: checkout.txnid } });
+    await prisma.booking.update({ where: { id }, data: { paymentIntentId: checkout.orderId } });
 
-    res.json({ success: true, data: { url: checkout.checkoutUrl, fields: checkout.fields } });
+    res.json({ success: true, data: checkout });
   } catch (error: any) {
     console.error('[checkout-session] payment init failed:', error);
     res.status(502).json({ error: `Could not start payment: ${safeErrorMessage(error)}` });

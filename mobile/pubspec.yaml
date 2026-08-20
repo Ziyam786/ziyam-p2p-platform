@@ -38,10 +38,10 @@ dependencies:
   go_router: ^17.5.0
   dio: ^5.11.0
   flutter_secure_storage: ^11.0.0
-  webview_flutter: ^4.14.1
+  razorpay_flutter: ^1.4.5
   firebase_core: ^4.13.0
-  firebase_ai: ^3.15.0
   google_fonts: ^8.2.1
+  mappls_gl: ^2.0.6
 
 dev_dependencies:
   flutter_test:

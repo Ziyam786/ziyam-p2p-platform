@@ -4,8 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/api_client.dart';
 import '../../core/providers.dart';
+import '../../data/payments/razorpay_verify.dart';
 import '../shared/error_state.dart';
-import '../shared/payu_webview.dart';
+import '../shared/razorpay_checkout.dart';
 
 class BookingCheckoutScreen extends ConsumerStatefulWidget {
   const BookingCheckoutScreen({super.key, required this.carId});
@@ -60,15 +61,35 @@ class _BookingCheckoutScreenState extends ConsumerState<BookingCheckoutScreen> {
         totalAmount: _estimatedTotal(dailyRate),
       );
       final checkout = await bookingRepo.checkoutSession(bookingId);
-      if (!mounted) return;
-      final paid = await Navigator.of(context).push<bool>(
-        MaterialPageRoute(builder: (_) => PayuWebViewScreen(checkoutUrl: checkout.url, fields: checkout.fields)),
+      final user = ref.read(currentUserProvider);
+      final checkoutResult = await RazorpayCheckoutController().open(
+        keyId: checkout.keyId,
+        orderId: checkout.orderId,
+        amount: checkout.amount,
+        currency: checkout.currency,
+        description: 'Booking reservation fee',
+        prefillEmail: user?.email,
+        prefillContact: user?.phoneNumber,
       );
       if (!mounted) return;
-      if (paid == true) {
+      if (!checkoutResult.success ||
+          checkoutResult.orderId == null ||
+          checkoutResult.paymentId == null ||
+          checkoutResult.signature == null) {
+        setState(() => _error = checkoutResult.errorMessage ?? 'Payment was not completed. Your dates have not been confirmed.');
+        return;
+      }
+      final verified = await verifyRazorpayPayment(
+        ref.read(apiClientProvider),
+        orderId: checkoutResult.orderId!,
+        paymentId: checkoutResult.paymentId!,
+        signature: checkoutResult.signature!,
+      );
+      if (!mounted) return;
+      if (verified.success) {
         context.go('/bookings/$bookingId');
       } else {
-        setState(() => _error = 'Payment was not completed. Your dates have not been confirmed.');
+        setState(() => _error = 'Payment could not be verified — please contact support before retrying.');
       }
     } on ApiException catch (e) {
       setState(() {

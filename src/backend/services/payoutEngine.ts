@@ -1,17 +1,22 @@
 import { PrismaClient, PayoutStatus, BookingStatus, BookingDepositStatus, RefundRequestType, CancelledBy } from '@prisma/client';
 import cron from 'node-cron';
-import axios from 'axios';
+import Razorpay from 'razorpay';
 import { config } from '../config';
 import { getSetting } from './settingsService';
-import { generatePayuCommandHash } from '../utils/payuHash';
 import { notify } from './notificationService';
 
 const prisma = new PrismaClient();
 
-const PAYU_COMMAND_URL =
-  config.payu.mode === 'live'
-    ? 'https://info.payu.in/merchant/postservice.php?form=2'
-    : 'https://test.payu.in/merchant/postservice.php?form=2';
+let razorpayClient: Razorpay | null = null;
+function getRazorpayClient(): Razorpay {
+  if (!razorpayClient) {
+    if (!config.razorpay.keyId || !config.razorpay.keySecret) {
+      throw new Error('Razorpay key id/secret are not configured');
+    }
+    razorpayClient = new Razorpay({ key_id: config.razorpay.keyId, key_secret: config.razorpay.keySecret });
+  }
+  return razorpayClient;
+}
 
 // Must match REPORT_WINDOW_HOURS in routes/damageClaim.routes.ts — duplicated
 // rather than imported since a service importing a route module (and its
@@ -180,13 +185,13 @@ export class PayoutEngine {
           if (!payout.host.payoutAccountId || !payout.host.bankAccountVerified) {
             throw new Error('Host has no linked, Sandbox-verified payout account');
           }
-          if (!payout.booking.paymentIntentId) {
-            throw new Error('Underlying booking has no PayU transaction id to split from');
+          if (!payout.booking.razorpayPaymentId) {
+            throw new Error('Underlying booking has no captured Razorpay payment to split from');
           }
           const payoutTxnId = await this.executeBankTransfer(
             payout.host.payoutAccountId,
             payout.netPayout,
-            payout.booking.paymentIntentId,
+            payout.booking.razorpayPaymentId,
             payout.id
           );
           await prisma.payoutLedger.update({
@@ -323,7 +328,7 @@ export class PayoutEngine {
    * Runs hourly alongside the other crons — a booking that sat RESERVED past
    * its 24h reservationDeadline with the balance unpaid auto-cancels: dates
    * release for other guests, and the reservation fee is forfeited by design
-   * (no RefundRequest — see booking.routes.ts/payuCallback.routes.ts's
+   * (no RefundRequest — see booking.routes.ts/razorpayVerify.routes.ts's
    * two-stage checkout). This is the guest-paced counterpart to
    * initializeHostReviewTimeoutCron above.
    */
@@ -365,13 +370,13 @@ export class PayoutEngine {
     if (!payout) throw new Error('Payout ledger entry not found');
     if (payout.status !== PayoutStatus.FAILED) throw new Error(`Cannot retry a payout in status ${payout.status}`);
     if (!payout.host.payoutAccountId || !payout.host.bankAccountVerified) throw new Error('Host has no linked, Sandbox-verified payout account');
-    if (!payout.booking.paymentIntentId) throw new Error('Underlying booking has no PayU transaction id to split from');
+    if (!payout.booking.razorpayPaymentId) throw new Error('Underlying booking has no captured Razorpay payment to split from');
 
     try {
       const payoutTxnId = await this.executeBankTransfer(
         payout.host.payoutAccountId,
         payout.netPayout,
-        payout.booking.paymentIntentId,
+        payout.booking.razorpayPaymentId,
         payout.id
       );
       const updated = await prisma.payoutLedger.update({
@@ -400,8 +405,8 @@ export class PayoutEngine {
    * money movement, not just a status flag: this is what "amount will be
    * sent to host" in the reimbursement flow actually means.
    *
-   * PayU's Split API splits ONE specific original transaction's held funds,
-   * so the approved amount is split into up to two legs depending on where
+   * A Razorpay Route transfer splits ONE specific captured payment's held
+   * funds, so the approved amount is split into up to two legs depending on where
    * it came from: the portion within the deposit splits from the booking's
    * original transaction (the deposit was charged as part of it); any
    * portion beyond the deposit splits from the guest's separate excess
@@ -417,15 +422,15 @@ export class PayoutEngine {
     if (!host) throw new Error('Host account not found');
     this.assertPayoutEligible(host);
     if (!host.payoutAccountId || !host.bankAccountVerified) throw new Error('Host has no linked, Sandbox-verified payout account');
-    if (!booking.paymentIntentId) throw new Error('Underlying booking has no PayU transaction id to split from');
+    if (!booking.razorpayPaymentId) throw new Error('Underlying booking has no captured Razorpay payment to split from');
 
     const depositPortion = Math.min(claim.approvedDeduction, booking.depositAmount);
     const excessPortion = Math.max(0, claim.approvedDeduction - booking.depositAmount);
     if (excessPortion > 0 && !claim.excessChargePaidAt) {
       throw new Error('The excess amount beyond the deposit has not been collected from the guest yet');
     }
-    if (excessPortion > 0 && !claim.excessChargePaymentIntentId) {
-      throw new Error('Excess charge has no PayU transaction id to split from');
+    if (excessPortion > 0 && !claim.excessChargeRazorpayPaymentId) {
+      throw new Error('Excess charge has no captured Razorpay payment to split from');
     }
 
     let netPayout = claim.approvedDeduction;
@@ -451,11 +456,11 @@ export class PayoutEngine {
       const txnIds: string[] = [];
       if (depositPortion > 0) {
         const amount = excessPortion > 0 ? depositPortion : netPayout; // single-leg case carries the fee-adjusted total
-        txnIds.push(await this.executeBankTransfer(host.payoutAccountId, amount, booking.paymentIntentId, ledger.id));
+        txnIds.push(await this.executeBankTransfer(host.payoutAccountId, amount, booking.razorpayPaymentId, ledger.id));
       }
       if (excessPortion > 0) {
         const amount = depositPortion > 0 ? netPayout - depositPortion : netPayout;
-        txnIds.push(await this.executeBankTransfer(host.payoutAccountId, amount, claim.excessChargePaymentIntentId!, ledger.id));
+        txnIds.push(await this.executeBankTransfer(host.payoutAccountId, amount, claim.excessChargeRazorpayPaymentId!, ledger.id));
       }
       await prisma.payoutLedger.update({ where: { id: ledger.id }, data: { status: PayoutStatus.SETTLED, payoutTxnId: txnIds.join(',') } });
       await notify(
@@ -472,55 +477,45 @@ export class PayoutEngine {
   }
 
   /**
-   * Moves a host's cut out of our aggregator PayU account after the fact,
-   * using PayU's Split After Transaction API (postservice.php, command=payment_split).
-   * `accountId` is the host's PayU *child merchant key* — hosts must already be
-   * onboarded with PayU as a child/sub-merchant for this to succeed; that
-   * onboarding is a manual business process on PayU's side, not something
-   * this app can do for them. `originalTxnid` is the PayU txnid of the
-   * original booking payment (Booking.paymentIntentId), which is what's
-   * actually being split.
+   * Moves a host's cut out of our aggregator Razorpay account after the
+   * fact, using Razorpay Route's "create transfers from payment" API
+   * (`POST /payments/{id}/transfers`). `accountId` is the host's Razorpay
+   * *linked account id* (`acc_...`) — hosts must already be onboarded as a
+   * Razorpay Route linked account for this to succeed; that onboarding is a
+   * manual/KYC business process on Razorpay's side, not something this app
+   * can do for them. `razorpayPaymentId` is the CAPTURED PAYMENT id (not
+   * the order id — Route transfers split a specific payment, and only a
+   * payment, not an order), i.e. Booking.razorpayPaymentId /
+   * DamageClaim.excessChargeRazorpayPaymentId, set once
+   * razorpayPaymentHandler.ts has confirmed the payment.
    *
-   * NOTE: PayU's docs say the sum of splitInfo amounts must equal the full
-   * original transaction amount. We only send the host's line item here
-   * (the remainder implicitly stays with the aggregator account). If PayU
-   * rejects this with error AGG-108 ("amount mismatch"), add a second
-   * splitInfo entry for our own merchant key covering the platform's cut.
+   * We only request the host's own line item here — Razorpay leaves
+   * whatever isn't transferred on the aggregator (platform) account, same
+   * "remainder implicitly stays with us" behavior the old PayU integration
+   * relied on, so no second transfer entry for our own cut is needed.
    */
   private static async executeBankTransfer(
     accountId: string,
     amount: number,
-    originalTxnid: string,
+    razorpayPaymentId: string,
     ledgerId: string
   ): Promise<string> {
-    if (!config.payu.key || !config.payu.salt) {
-      throw new Error('PayU key/salt are not configured');
-    }
-
-    const var1 = JSON.stringify({
-      type: 'absolute',
-      payuId: originalTxnid,
-      splitInfo: {
-        [accountId]: {
-          aggregatorSubTxnId: `payout_${ledgerId.slice(0, 12)}`,
-          aggregatorSubAmt: amount.toFixed(2),
+    const { items } = await getRazorpayClient().payments.transfer(razorpayPaymentId, {
+      transfers: [
+        {
+          account: accountId,
+          amount: Math.round(amount * 100),
+          currency: 'INR',
+          notes: { payoutLedgerId: ledgerId },
         },
-      },
+      ],
     });
 
-    const hash = generatePayuCommandHash('payment_split', var1);
-
-    const response = await axios.post(
-      PAYU_COMMAND_URL,
-      new URLSearchParams({ key: config.payu.key, command: 'payment_split', var1, hash }),
-      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-    );
-
-    const data = response.data;
-    if (data?.status !== 1) {
-      throw new Error(`PayU split failed: ${data?.error_desc ?? data?.message ?? 'unknown error'}`);
+    const transfer = items[0];
+    if (!transfer?.id) {
+      throw new Error('Razorpay transfer did not return a transfer id');
     }
 
-    return `PAYU_SPLIT_${originalTxnid}_${Date.now()}`;
+    return transfer.id;
   }
 }

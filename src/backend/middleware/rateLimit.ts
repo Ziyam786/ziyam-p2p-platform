@@ -25,15 +25,15 @@ export const apiRateLimiter = rateLimit({
   message: { error: 'Too many requests. Please slow down and try again shortly.' },
 });
 
-// payuCallback.routes.ts is deliberately mounted in server.ts ahead of
-// cookieParser/CORS/apiRateLimiter (PayU's postback carries no cookies and
-// arrives as a real browser/server navigation from PayU's own domain, not a
-// CORS-bound fetch) — which also means it never passes through
-// apiRateLimiter above, so it needs its own gate. Keyed by IP; 100/15min is
-// well above what PayU's own retries or a legitimate user's checkout
-// redirect ever produce, while still bounding an unauthenticated,
+// razorpayWebhook.routes.ts is deliberately mounted in server.ts ahead of
+// cookieParser/CORS/apiRateLimiter (Razorpay's webhook is a real
+// server-to-server POST from Razorpay's own infrastructure, with no cookies
+// and an Origin header our strict CORS check would otherwise reject) —
+// which also means it never passes through apiRateLimiter above, so it
+// needs its own gate. Keyed by IP; 100/15min is well above what Razorpay's
+// own webhook retries ever produce, while still bounding an unauthenticated,
 // DB-touching public POST endpoint.
-export const payuCallbackRateLimiter = rateLimit({
+export const razorpayWebhookRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 100,
   standardHeaders: true,
