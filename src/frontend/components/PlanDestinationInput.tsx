@@ -17,17 +17,24 @@ export default function PlanDestinationInput({ onResolved }: { onResolved: (resu
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestQueryRef = useRef<string>('');
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     setError(null);
     onResolved(null);
-    if (!query.trim()) return;
+
+    const trimmedQuery = query.trim();
+    latestQueryRef.current = trimmedQuery;
+
+    if (!trimmedQuery) return;
 
     timerRef.current = setTimeout(async () => {
+      const currentQuery = trimmedQuery;
       setChecking(true);
       try {
-        const res = await planApi.destinationCheck(query.trim());
+        const res = await planApi.destinationCheck(currentQuery);
+        if (latestQueryRef.current !== currentQuery) return;
         if (res.data.valid) {
           onResolved({
             placeName: res.data.placeName!,
@@ -39,9 +46,12 @@ export default function PlanDestinationInput({ onResolved }: { onResolved: (resu
           setError(res.data.reason ?? 'Could not check that destination.');
         }
       } catch {
+        if (latestQueryRef.current !== currentQuery) return;
         setError('Could not check that destination right now — try again.');
       } finally {
-        setChecking(false);
+        if (latestQueryRef.current === currentQuery) {
+          setChecking(false);
+        }
       }
     }, DEBOUNCE_MS);
 
