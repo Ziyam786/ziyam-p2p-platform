@@ -106,15 +106,20 @@ function DashboardInner() {
         <div className="flex items-center gap-3">
           <LogoBadge className="w-10 h-10 shrink-0 rounded-xl" />
           <div>
-            <h1 className="text-2xl font-bold tracking-wide text-amber-500">
-              Ziyam <span className="text-white text-lg font-normal">| Fleet Control Center</span>
-            </h1>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-2xl font-bold tracking-wide text-amber-500">
+                Ziyam <span className="text-white text-lg font-normal">| Fleet Control Center</span>
+              </h1>
+              <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                Host Mode
+              </span>
+            </div>
             <p className="text-sm text-gray-400 mt-1">Welcome back, {user?.fullName.split(' ')[0]}</p>
           </div>
         </div>
         <a
           href="/host/cars/new"
-          className="btn-gradient text-black font-semibold px-5 py-2.5 rounded-lg transition"
+          className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-5 py-2.5 rounded-lg transition"
         >
           + Add New Vehicle
         </a>
