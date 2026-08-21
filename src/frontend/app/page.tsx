@@ -712,10 +712,17 @@ export default function HomePage() {
               : filteredFleet.map((car) => (
                 <StaggerItem key={car.id}>
                   <TiltCard maxTilt={6} className="relative h-full">
-                    <span className="absolute -top-3 left-4 z-20 inline-flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg">
-                      <BadgeCheck className="w-3 h-3" /> Verified &amp; Inspected
-                    </span>
-                    <div className="h-full [transform:translateZ(20px)]">
+                    {/* Badge lives inside the same translateZ(20px) plane as the
+                        card, not as a z=0 sibling of it — TiltCard's parent has
+                        transform-style: preserve-3d, and inside a preserve-3d
+                        context, 3D depth (translateZ) determines paint order
+                        ahead of z-index. A z=0 badge next to a z=20px card gets
+                        painted behind the card regardless of z-index, which is
+                        why it showed up as a sliver clipped behind the card. */}
+                    <div className="relative h-full [transform:translateZ(20px)]">
+                      <span className="absolute -top-3 left-4 z-20 inline-flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg">
+                        <BadgeCheck className="w-3 h-3" /> Verified &amp; Inspected
+                      </span>
                       <CarCard car={car} />
                     </div>
                   </TiltCard>

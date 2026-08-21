@@ -16,7 +16,7 @@ export default function LoadingScreen({ label }: { label?: string }) {
           <p className="text-[#F3E9D8] text-lg font-extrabold tracking-tight">
             Ziyam<span className="font-medium opacity-90">SelfDrive</span>
           </p>
-          <p className="text-[#F3E9D8]/50 text-[10px] uppercase tracking-widest mt-0.5">By Eightlines</p>
+          <p className="text-[#F3E9D8]/70 text-xs uppercase tracking-widest mt-1">By Eightlines</p>
           {label && <p className="text-[#F3E9D8]/60 text-xs mt-2">{label}</p>}
         </div>
       </div>
