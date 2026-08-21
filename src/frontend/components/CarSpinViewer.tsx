@@ -18,13 +18,26 @@ interface CarSpinViewerProps {
   onAngleChange: (angle: ExteriorAngle) => void;
   className?: string;
   imgClassName?: string;
+  sizes?: string;
+  priority?: boolean;
 }
 
-export default function CarSpinViewer({ images, imageAngles, alt, angle, onAngleChange, className, imgClassName }: CarSpinViewerProps) {
+export default function CarSpinViewer({
+  images,
+  imageAngles,
+  alt,
+  angle,
+  onAngleChange,
+  className,
+  imgClassName,
+  sizes = '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw',
+  priority = false,
+}: CarSpinViewerProps) {
   const [imgSrc, setImgSrc] = useState<string | null>(null);
   const [showHint, setShowHint] = useState(true);
   const dragAccumulator = useRef(0);
   const dragging = useRef(false);
+  const lastX = useRef(0);
 
   const angleToUrl: Partial<Record<ExteriorAngle, string>> = {};
   for (const spinAngle of EXTERIOR_SPIN_ORDER) {
@@ -57,19 +70,23 @@ export default function CarSpinViewer({ images, imageAngles, alt, angle, onAngle
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     dragging.current = true;
     dragAccumulator.current = 0;
+    lastX.current = e.clientX;
     setShowHint(false);
     e.currentTarget.setPointerCapture(e.pointerId);
   }
 
   function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
     if (!dragging.current) return;
-    dragAccumulator.current += e.movementX;
-    if (dragAccumulator.current >= DRAG_THRESHOLD_PX) {
+    const delta = e.clientX - lastX.current;
+    lastX.current = e.clientX;
+    dragAccumulator.current += delta;
+    while (dragAccumulator.current >= DRAG_THRESHOLD_PX) {
       advance(1);
-      dragAccumulator.current = 0;
-    } else if (dragAccumulator.current <= -DRAG_THRESHOLD_PX) {
+      dragAccumulator.current -= DRAG_THRESHOLD_PX;
+    }
+    while (dragAccumulator.current <= -DRAG_THRESHOLD_PX) {
       advance(-1);
-      dragAccumulator.current = 0;
+      dragAccumulator.current += DRAG_THRESHOLD_PX;
     }
   }
 
@@ -90,7 +107,8 @@ export default function CarSpinViewer({ images, imageAngles, alt, angle, onAngle
         src={currentSrc}
         alt={alt}
         fill
-        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+        sizes={sizes}
+        priority={priority}
         className={imgClassName}
         onError={() => setImgSrc('/placeholder-car.jpg')}
       />

@@ -62,6 +62,7 @@ export default function CarDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const [activeImg, setActiveImg] = useState('');
   const [activeAngle, setActiveAngle] = useState<ExteriorAngle>('FRONT');
+  const [showSpinInHero, setShowSpinInHero] = useState(true);
   const [pickup, setPickup] = useState('');
   const [dropoff, setDropoff] = useState('');
   const [plan, setPlan] = useState<'BASIC' | 'STANDARD' | 'PREMIUM'>('BASIC');
@@ -246,7 +247,7 @@ export default function CarDetailPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* Hero image */}
             <div className="relative rounded-2xl overflow-hidden h-72 md:h-96 bg-gray-200">
-              {isAngleComplete(car.imageAngles) ? (
+              {isAngleComplete(car.imageAngles) && showSpinInHero ? (
                 <CarSpinViewer
                   images={car.images}
                   imageAngles={car.imageAngles ?? []}
@@ -255,6 +256,8 @@ export default function CarDetailPage() {
                   onAngleChange={setActiveAngle}
                   className="absolute inset-0"
                   imgClassName="object-cover"
+                  sizes="(max-width: 1024px) 100vw, 66vw"
+                  priority
                 />
               ) : (
                 activeImg && (
@@ -278,7 +281,12 @@ export default function CarDetailPage() {
                       key={i}
                       onClick={() => {
                         setActiveImg(img);
-                        if (isExteriorAngle) setActiveAngle(thumbnailAngle as ExteriorAngle);
+                        if (isExteriorAngle) {
+                          setActiveAngle(thumbnailAngle as ExteriorAngle);
+                          setShowSpinInHero(true);
+                        } else {
+                          setShowSpinInHero(false);
+                        }
                       }}
                       className={`relative w-20 h-14 rounded-xl overflow-hidden border-2 transition ${
                         isActive ? 'border-amber-500' : 'border-transparent'
