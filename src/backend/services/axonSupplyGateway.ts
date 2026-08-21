@@ -1,4 +1,6 @@
 import { PrismaClient } from '@prisma/client';
+import { isBookable } from '../utils/carPhotoAngles';
+import { config } from '../config';
 
 const prisma = new PrismaClient();
 
@@ -53,6 +55,7 @@ export class AxonSupplyGateway {
         kmIncludedPerDay: true,
         extraKmCharge: true,
         images: true,
+        imageAngles: true,
         features: true,
         city: true,
         address: true,
@@ -67,9 +70,13 @@ export class AxonSupplyGateway {
       },
     });
 
-    if (!cars.length) return [];
+    // Aggregator partners must not keep listing cars that would 409 at
+    // actual booking creation because they're missing required angle photos.
+    const bookableCars = cars.filter((car) => isBookable(car, config.photoAngleEnforcementDate));
 
-    const carIds = cars.map((c) => c.id);
+    if (!bookableCars.length) return [];
+
+    const carIds = bookableCars.map((c) => c.id);
 
     // 2. Find conflicting bookings that overlap with the requested window + buffer
     const conflictingBookings = await prisma.booking.findMany({
@@ -91,8 +98,13 @@ export class AxonSupplyGateway {
 
     const bookedCarIds = new Set(conflictingBookings.map((b) => b.carId));
 
-    // 3. Filter out booked cars
-    return cars.filter((car) => !bookedCarIds.has(car.id));
+    // 3. Filter out booked cars. imageAngles was only selected above to
+    // drive the isBookable() gate — strip it back out here so it doesn't
+    // leak to the aggregator alongside the fields already excluded in the
+    // select above.
+    return bookableCars
+      .filter((car) => !bookedCarIds.has(car.id))
+      .map(({ imageAngles, ...rest }) => rest);
   }
 
   /**
