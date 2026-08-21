@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
 import Rating from './Rating';
 import { useAuth } from '../lib/auth-context';
@@ -20,7 +20,7 @@ const FUEL_ICONS: Record<string, string> = {
 };
 
 export default function CarCard({ car }: CarCardProps) {
-  const image = carImageSrc(car.images);
+  const [imgSrc, setImgSrc] = useState(() => carImageSrc(car.images));
   const { user } = useAuth();
   const { isWishlisted, toggle } = useWishlist();
   const wishlisted = isWishlisted(car.id);
@@ -40,11 +40,12 @@ export default function CarCard({ car }: CarCardProps) {
       {/* Image */}
       <div className="relative h-44 bg-gray-100 overflow-hidden">
         <Image
-          src={image}
+          src={imgSrc}
           alt={`${car.make} ${car.model}`}
           fill
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           className="object-cover transition-transform duration-500 ease-out group-hover:scale-110 will-change-transform"
+          onError={() => setImgSrc('/placeholder-car.jpg')}
         />
         {!car.isAvailable && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
