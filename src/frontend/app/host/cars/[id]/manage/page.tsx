@@ -18,6 +18,7 @@ import FleetOnboardingPanel from '../../../../../components/FleetOnboardingPanel
 import { useAuth } from '../../../../../lib/auth-context';
 import { useToast } from '../../../../../components/Toast';
 import { carsApi } from '../../../../../lib/api';
+import { isValidImageSrc } from '../../../../../lib/carImage';
 import type { Car } from '../../../../../lib/types';
 
 function ManageCarInner() {
@@ -72,7 +73,7 @@ function ManageCarInner() {
         </span>
       </div>
 
-      {car.images[0] && (
+      {isValidImageSrc(car.images[0]) && (
         <div className="relative w-full h-48 rounded-2xl overflow-hidden bg-gray-100 mb-6">
           <Image src={car.images[0]} alt="" fill sizes="(max-width: 768px) 100vw, 700px" className="object-cover" />
         </div>

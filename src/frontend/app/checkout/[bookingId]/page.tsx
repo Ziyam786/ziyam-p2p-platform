@@ -10,6 +10,7 @@ import { useToast } from '../../../components/Toast';
 import { useAuth } from '../../../lib/auth-context';
 import { bookingsApi, paymentsApi } from '../../../lib/api';
 import { openRazorpayCheckout } from '../../../lib/razorpayCheckout';
+import { carImageSrc } from '../../../lib/carImage';
 import type { Booking } from '../../../lib/types';
 
 function CheckoutInner() {
@@ -91,7 +92,7 @@ function CheckoutInner() {
         <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-5">
           <div className="flex items-center gap-4">
             <div className="relative w-20 h-14 rounded-lg overflow-hidden bg-gray-100 shrink-0">
-              <Image src={booking.car?.images?.[0] ?? '/placeholder-car.jpg'} alt="" fill sizes="80px" className="object-cover" />
+              <Image src={carImageSrc(booking.car?.images)} alt="" fill sizes="80px" className="object-cover" />
             </div>
             <div>
               <p className="font-bold text-gray-900">{booking.car?.make} {booking.car?.model}</p>

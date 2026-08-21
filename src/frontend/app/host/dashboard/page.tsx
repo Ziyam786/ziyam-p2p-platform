@@ -15,6 +15,7 @@ import { HostTripSharePanel } from '../../../components/LiveDeliveryTracker';
 import { useAuth } from '../../../lib/auth-context';
 import { useToast } from '../../../components/Toast';
 import { hostApi, carsApi, hostReviewApi, usersApi, ApiError } from '../../../lib/api';
+import { carImageSrc } from '../../../lib/carImage';
 import type { Car, EarningsOverview, UtilizationEntry, Booking } from '../../../lib/types';
 
 const EMPTY: EarningsOverview = {
@@ -192,7 +193,7 @@ function DashboardInner() {
               cars.map((car) => (
                 <div key={car.id} className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex flex-wrap items-center gap-5">
                   <div className="relative w-24 h-16 rounded-lg overflow-hidden bg-gray-800 shrink-0">
-                    <Image src={car.images?.[0] ?? '/placeholder-car.jpg'} alt="" fill sizes="96px" className="object-cover" />
+                    <Image src={carImageSrc(car.images)} alt="" fill sizes="96px" className="object-cover" />
                   </div>
                   <div className="flex-1 min-w-[180px]">
                     <p className="font-bold">{car.make} {car.model} <span className="text-gray-500 font-normal text-sm">({car.year})</span></p>

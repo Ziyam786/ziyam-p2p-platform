@@ -6,6 +6,7 @@ import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
 import ProtectedRoute from '../../../components/ProtectedRoute';
 import { bookingsApi } from '../../../lib/api';
+import { carImageSrc } from '../../../lib/carImage';
 import type { Booking, BookingStatus } from '../../../lib/types';
 
 const STATUS_STYLES: Record<BookingStatus, string> = {
@@ -78,7 +79,7 @@ function TripsInner() {
                 <div className="flex flex-wrap items-center gap-4 justify-between">
                   <div className="flex items-center gap-4">
                     <div className="relative w-20 h-14 rounded-lg overflow-hidden bg-gray-100 shrink-0">
-                      <Image src={trip.car?.images?.[0] ?? '/placeholder-car.jpg'} alt="" fill sizes="80px" className="object-cover" />
+                      <Image src={carImageSrc(trip.car?.images)} alt="" fill sizes="80px" className="object-cover" />
                     </div>
                     <div>
                       <p className="font-bold text-gray-900">{trip.car?.make} {trip.car?.model}</p>

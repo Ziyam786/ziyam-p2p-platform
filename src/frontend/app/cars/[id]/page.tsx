@@ -14,6 +14,7 @@ import { useToast } from '../../../components/Toast';
 import { carsApi, bookingsApi, settingsApi, promoApi, ApiError } from '../../../lib/api';
 import { getStickyDates } from '../../../lib/searchDates';
 import { computeDemandMultiplier, DEMAND_PRICING_FALLBACK } from '../../../lib/demandPricing';
+import { carImageSrc, isValidImageSrc } from '../../../lib/carImage';
 import type { AvailabilityRange } from '../../../lib/api';
 import type { Car, DemandPricing, LongRentalDiscount, Review } from '../../../lib/types';
 
@@ -92,7 +93,7 @@ export default function CarDetailPage() {
       .then((res) => {
         if (!active) return;
         setCar(res.data);
-        setActiveImg(res.data.images?.[0] ?? '');
+        setActiveImg(carImageSrc(res.data.images, ''));
       })
       .catch(() => active && setNotFound(true))
       .finally(() => active && setLoading(false));
@@ -248,9 +249,9 @@ export default function CarDetailPage() {
             </div>
 
             {/* Thumbnails */}
-            {car.images.length > 1 && (
+            {car.images.filter(isValidImageSrc).length > 1 && (
               <div className="flex gap-3">
-                {car.images.map((img, i) => (
+                {car.images.filter(isValidImageSrc).map((img, i) => (
                   <button
                     key={i}
                     onClick={() => setActiveImg(img)}
@@ -374,7 +375,7 @@ export default function CarDetailPage() {
                 className="bg-white rounded-2xl p-5 border border-gray-100 flex items-center gap-5 hover:border-amber-300 transition"
               >
                 <div className="relative w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center text-2xl overflow-hidden">
-                  {car.owner.avatarUrl ? (
+                  {isValidImageSrc(car.owner.avatarUrl) ? (
                     <Image src={car.owner.avatarUrl} alt="" fill sizes="56px" className="object-cover" />
                   ) : (
                     '👤'
