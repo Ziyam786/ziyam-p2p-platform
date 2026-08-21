@@ -77,6 +77,8 @@ enum PhotoAngle {
   MIRROR_LEFT
   MIRROR_RIGHT
   ODOMETER
+  INTERIOR_FRONT   // car-listing interior photo (dashboard) — not a trip condition photo
+  INTERIOR_REAR    // car-listing interior photo (back seats) — not a trip condition photo
   OTHER
 }
 
@@ -333,6 +335,13 @@ model Car {
   // listing's photo genuinely matches its registrationNo. Never exposed on
   // any public-facing route.
   originalImages   String[] @default([])
+  // Angle label for the photo at the same index in `images` — "" (or the
+  // array simply being shorter than `images`) for any legacy/free-form
+  // photo uploaded before this feature shipped. A listing is
+  // "angle-complete" once this array contains all 6 required PhotoAngle
+  // values (see isAngleComplete() in utils/carPhotoAngles.ts). images[0]
+  // is always the FRONT photo once a listing is angle-tagged.
+  imageAngles      String[] @default([])
   features         String[] @default([])
   city             String
   address          String?
