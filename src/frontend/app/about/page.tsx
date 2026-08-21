@@ -1,146 +1,370 @@
-import React from 'react';
+'use client';
+
+import React, { useState } from 'react';
+import Image from 'next/image';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
-import PageHero from '../../components/PageHero';
-import RoadTimeline from '../../components/RoadTimeline';
-import ScrollReveal, { StaggerGroup, StaggerItem } from '../../components/ScrollReveal';
-import MotionButton from '../../components/MotionButton';
+import Emblem3D from '../../components/Emblem3D';
 import { COMPANY } from '../../lib/companyInfo';
 
-const VALUES = [
-  { icon: '🤝', title: 'Trust First', desc: 'Every host and lessee is KYC-verified. Every car is inspected before it goes live.' },
-  { icon: '⚖️', title: 'Fair Splits', desc: 'Hosts keep 70% of every booking — one of the highest host shares of any platform in India.' },
-  { icon: '🌱', title: 'Idle Assets, Active Income', desc: 'The average private car sits parked most of the day. We help owners put that time to work.' },
-  { icon: '🔐', title: 'Safety by Design', desc: 'Escrowed deposits, N+1 payouts, mandatory KYC, and dedicated support protect both sides of every trip.' },
+interface TeamMember {
+  name: string;
+  role: string;
+  focus: string;
+  bio: string;
+  chips: string[];
+  instagram: string;
+  photo: string;
+}
+
+// Richer per-person data for this page's expandable cards — name/role/bio
+// stay in sync with the shared COMPANY.team (Footer, admin-editable
+// company_info), the fields below (focus/chips/instagram/photo) are only
+// ever shown here, so they don't belong in that shared object.
+const TEAM: TeamMember[] = [
+  {
+    name: 'Syed Fardeen',
+    role: 'Founder, CEO & Director',
+    focus: 'Strategy & Technology',
+    bio: COMPANY.team[0].bio ?? '',
+    chips: ['Product strategy', 'Full-stack development', 'Fleet economics', 'Brand', 'Fundraising'],
+    instagram: 'itz_fardeen_ziyam',
+    photo: '/team/syed-fardeen.jpg',
+  },
+  {
+    name: 'Mohammed Azam A',
+    role: 'Co-Founder & Managing Director',
+    focus: 'Growth & Expansion',
+    bio: COMPANY.team[1].bio ?? '',
+    chips: ['Business development', 'Partnerships', 'P&L ownership', 'Hub expansion'],
+    instagram: 'mr_azam_0705',
+    photo: '/team/mohammed-azam.jpg',
+  },
+  {
+    name: 'Shaik Afnan Sabil',
+    role: 'Co-Founder & VP, Operations',
+    focus: 'Fleet & Ground Ops',
+    bio: COMPANY.team[2].bio ?? '',
+    chips: ['Vehicle inspection', 'Preventive maintenance', 'Hub protocols', 'Agent training'],
+    instagram: 'shaik_afnan_sabil',
+    photo: '/team/shaik-afnan.jpg',
+  },
+  {
+    name: 'Junaid Khan',
+    role: 'Co-Founder & Chief Operating Officer',
+    focus: 'Operations',
+    bio: COMPANY.team[3].bio ?? '',
+    chips: ['Fleet operations', 'Utilisation planning', 'SLA design', 'Vendor management'],
+    instagram: 'junxid_khxn_02',
+    photo: '/team/junaid-khan.jpg',
+  },
+  {
+    name: 'Numer Saqlain Muneer',
+    role: 'Co-Founder & Chief Financial Officer',
+    focus: 'Finance & Technology',
+    bio: COMPANY.team[4].bio ?? '',
+    chips: ['Financial planning', 'Unit economics', 'GST & compliance', 'Full-stack development', 'Payments'],
+    instagram: '_sonu_._._24',
+    photo: '/team/numer-saqlain.jpg',
+  },
 ];
 
-const TIMELINE = [
-  { year: 'Mar 2026', title: 'Incorporated', desc: `${COMPANY.legalName} was registered (CIN ${COMPANY.cin}) to build ZiyamSelfDrive.` },
-  { year: '2026', title: 'Bengaluru Launch', desc: `Live in ${COMPANY.operatingCity}, onboarding our first verified hosts and fleet partners.` },
-  { year: 'Next', title: 'Pan-India Expansion', desc: 'Scaling city by city as our host and fleet network grows beyond Bengaluru.' },
+const BUILDING = [
+  {
+    name: 'Self-drive mobile app',
+    status: 'In development',
+    description: 'Native booking, digital KYC, keyless handover checklist, live trip and fare view, and in-app roadside request routed to Mechanix Pro.',
+    items: ['Booking & availability', 'Digital KYC', 'Handover checklist', 'Trip & fare view'],
+  },
+  {
+    name: 'Host web app',
+    status: 'In development',
+    description: 'Peer-to-peer supply side: list a car, set availability and pricing, track trip-wise earnings, and view settlement cycles.',
+    items: ['Listing & onboarding', 'Availability calendar', 'Earnings dashboard', 'Settlement view'],
+  },
+  {
+    name: 'Fleet operations console',
+    status: 'In development',
+    description: 'Internal tooling for hub teams: vehicle status, inspection logs, maintenance scheduling and agent performance.',
+    items: ['Vehicle status', 'Inspection logs', 'PM scheduling', 'Agent scoring'],
+  },
+  {
+    name: 'Multi-business platform',
+    status: 'Roadmap',
+    description: 'One account layer across mobility, roadside assistance and stay — shared identity, payments and support across EFPL brands.',
+    items: ['Shared identity', 'Unified payments', 'Cross-brand support'],
+  },
+];
+
+const STACK = ['React', 'React Native', 'Node.js', 'REST APIs', 'PostgreSQL', 'Payments & settlements', 'Digital KYC', 'Cloud hosting', 'Git'];
+
+const BRANDS: { name: string; description: string; instagram: string | null }[] = [
+  { name: 'Ziyam Self Drive', description: 'Self-drive rentals & peer-to-peer hosting', instagram: 'ziyambyeightlines' },
+  { name: 'Eightlines Fleet', description: 'Parent company & fleet operations', instagram: 'eightlinesfleetofficial' },
+  { name: 'Mechanix Pro', description: 'Roadside assistance & rapid servicing', instagram: null },
+  { name: 'Marc8', description: 'Digital tools & refurbished products', instagram: 'marc8officialindia' },
+  { name: 'Marc8 Lifestyle', description: 'Lifestyle & retail', instagram: 'marc8lifestyleofficial' },
+  { name: 'Marc8Stay', description: 'Short-term accommodation', instagram: 'marc8stay' },
 ];
 
 export default function AboutPage() {
+  const [expanded, setExpanded] = useState<number | null>(null);
+
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
+    <div style={{ fontFamily: "'Poppins', system-ui, sans-serif" }}>
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+      <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;800&display=swap" rel="stylesheet" />
+
       <Navbar />
-      <PageHero
-        eyebrow="Our Story"
-        title="Making every car a shared asset"
-        subtitle="ZiyamSelfDrive is a peer-to-peer self-drive marketplace — connecting car owners with lessees who just want the keys, not the driver."
-      />
 
-      <section className="py-14 bg-white">
-        <ScrollReveal className="max-w-2xl mx-auto px-4 text-center">
-          <p className="inline-block text-xs font-semibold bg-amber-50 text-amber-600 px-3 py-1.5 rounded-full mb-4">
-            📍 {COMPANY.scopeNote}
-          </p>
-          <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900">
-            A young company, <span className="text-amber-500">built to move fast</span>
-          </h2>
-          <p className="text-gray-500 text-sm mt-3">
-            {COMPANY.legalName} was registered on {COMPANY.registeredDate} — we're early, and honest about it. We'd rather earn your trust city by city than promise a scale we haven't reached yet.
-          </p>
-        </ScrollReveal>
-      </section>
-
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-5xl mx-auto px-4">
-          <ScrollReveal>
-            <h2 className="text-2xl font-extrabold text-gray-900 mb-2 text-center">What We Believe</h2>
-            <p className="text-gray-500 text-sm text-center mb-10">The principles behind every product decision we make</p>
-          </ScrollReveal>
-          <StaggerGroup className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-            {VALUES.map((v) => (
-              <StaggerItem key={v.title}>
-                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 text-center h-full hover:border-amber-300 hover:shadow-md transition">
-                  <span className="text-3xl block mb-3">{v.icon}</span>
-                  <h3 className="font-bold text-gray-900 text-sm mb-2">{v.title}</h3>
-                  <p className="text-xs text-gray-500 leading-relaxed">{v.desc}</p>
+      <div className="bg-[#2A2320] text-[#EFE9DE]">
+        <div className="max-w-5xl mx-auto px-6">
+          {/* ── HERO ─────────────────────────────────────────────────── */}
+          <header className="pt-20 pb-6">
+            <div className="flex flex-col md:flex-row items-center gap-10">
+              <div className="flex-1 text-center md:text-left">
+                <p className="text-[#2F9E4F] font-semibold text-xs uppercase tracking-[0.2em]">Eightlines Fleet Private Limited</p>
+                <h1 className="font-extrabold mt-3" style={{ fontSize: 'clamp(2.2rem,6vw,3.6rem)', lineHeight: 1.05, letterSpacing: '-0.02em' }}>
+                  Five founders.
+                  <br />
+                  <span className="text-[#2F9E4F]">One fleet, built in-house.</span>
+                </h1>
+                <p className="text-[#96887A] mt-5 max-w-[56ch] mx-auto md:mx-0 text-[1.02rem]">
+                  Self-drive rentals and peer-to-peer hosting, roadside assistance, and stay — run by an operating team that also writes the software.
+                  Every leader below owns a live part of the business, not a title.
+                </p>
+                <div className="flex flex-wrap gap-3 mt-8 justify-center md:justify-start">
+                  {[
+                    ['5', 'Founders'],
+                    ['4', 'Brands'],
+                    ['3', 'Products in build'],
+                    ['3', 'ISO certifications'],
+                    ['DPIIT', 'Recognised startup'],
+                  ].map(([n, label]) => (
+                    <div key={label} className="border border-[#463C36] rounded-xl px-4 py-3">
+                      <p className="font-extrabold text-2xl">{n}</p>
+                      <p className="text-[#96887A] text-[0.7rem] uppercase tracking-wider">{label}</p>
+                    </div>
+                  ))}
                 </div>
-              </StaggerItem>
-            ))}
-          </StaggerGroup>
-        </div>
-      </section>
+              </div>
+              <div className="shrink-0">
+                <Emblem3D plateSrc="/emblems/ziyam-plate.svg" artSrc="/emblems/ziyam-art.svg" label="Ziyam Self Drive emblem" glareColor="255,252,240" size={220} />
+              </div>
+            </div>
+          </header>
 
-      <section className="py-16 bg-white">
-        <div className="max-w-3xl mx-auto px-4">
-          <ScrollReveal>
-            <h2 className="text-2xl font-extrabold text-gray-900 mb-2 text-center">Our Journey</h2>
-            <p className="text-gray-500 text-sm text-center mb-10">Where we've been, and where we're headed</p>
-          </ScrollReveal>
-          <RoadTimeline items={TIMELINE} />
-        </div>
-      </section>
+          <div className="h-px bg-[#463C36] my-14" />
 
-      <section className="py-16 bg-white">
-        <div className="max-w-4xl mx-auto px-4">
-          <ScrollReveal>
-            <h2 className="text-2xl font-extrabold text-gray-900 mb-2 text-center">Recognition & Certifications</h2>
-            <p className="text-gray-500 text-sm text-center mb-10">Real credentials, not marketing claims</p>
-          </ScrollReveal>
-          <StaggerGroup className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
-            {COMPANY.startupIndiaRecognized && (
-              <StaggerItem>
-                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 h-full">
-                  <span className="text-2xl block mb-2">🇮🇳</span>
-                  <h3 className="font-bold text-gray-900 text-sm">Startup India Recognized</h3>
-                  <p className="text-xs text-gray-500 mt-1">DPIIT-recognized under the Government of India's Startup India initiative.</p>
-                </div>
-              </StaggerItem>
-            )}
-            {COMPANY.certifications.map((c) => (
-              <StaggerItem key={c.standard}>
-                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 h-full">
-                  <span className="text-2xl block mb-2">📋</span>
-                  <h3 className="font-bold text-gray-900 text-sm">{c.standard}</h3>
-                  <p className="text-xs text-gray-500 mt-1">{c.name}</p>
-                  <p className="text-[11px] text-gray-400 mt-2 font-mono">Cert No. {c.certNumber}</p>
-                </div>
-              </StaggerItem>
-            ))}
-          </StaggerGroup>
-          <p className="text-center text-xs text-gray-400 mb-6">
-            Certified by {COMPANY.certifyingBody}, IAF-accredited · Valid {COMPANY.certificationValidFrom} – {COMPANY.certificationExpiry}
-          </p>
-        </div>
-      </section>
+          {/* ── TEAM ─────────────────────────────────────────────────── */}
+          <section>
+            <h2 className="font-extrabold" style={{ fontSize: 'clamp(1.7rem,3.6vw,2.4rem)' }}>
+              The <span className="text-[#2F9E4F]">team</span>
+            </h2>
+            <p className="text-[#96887A] mt-2 max-w-[58ch]">Tap any founder to open their profile, focus areas and skills.</p>
 
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4">
-          <ScrollReveal>
-            <h2 className="text-2xl font-extrabold text-gray-900 mb-2 text-center">Leadership</h2>
-            <p className="text-gray-500 text-sm text-center mb-10">The team behind {COMPANY.brandFull}</p>
-          </ScrollReveal>
-          <StaggerGroup className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-            {COMPANY.team.map((person) => (
-              <StaggerItem key={person.name}>
-                <div className="bg-white rounded-2xl p-5 border border-gray-100 text-center h-full">
-                  <div className="w-14 h-14 rounded-full bg-amber-50 text-amber-600 font-bold text-lg flex items-center justify-center mx-auto mb-3">
-                    {person.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mt-8">
+              {TEAM.map((person, i) => (
+                <button
+                  key={person.name}
+                  onClick={() => setExpanded(expanded === i ? null : i)}
+                  aria-expanded={expanded === i}
+                  className="text-left group"
+                >
+                  <div className="relative rounded-xl overflow-hidden bg-[#161110] aspect-square">
+                    <Image src={person.photo} alt={person.name} fill sizes="200px" className="object-cover grayscale group-hover:grayscale-0 transition-all duration-300" />
                   </div>
-                  <p className="font-bold text-gray-900 text-sm">{person.name}</p>
-                  <p className="text-xs text-gray-500 mt-1">{person.role}</p>
-                  {person.bio && <p className="text-xs text-gray-400 mt-2 leading-relaxed">{person.bio}</p>}
-                </div>
-              </StaggerItem>
-            ))}
-          </StaggerGroup>
-        </div>
-      </section>
+                  <p className="font-bold text-sm mt-2 leading-tight">{person.name}</p>
+                  <p className="text-[#96887A] text-xs mt-0.5 leading-tight">{person.role}</p>
+                  <p className="text-[#2F9E4F] text-[0.68rem] font-semibold uppercase tracking-wider mt-1">{person.focus}</p>
+                </button>
+              ))}
+            </div>
 
-      <section className="py-16 bg-amber-500 text-center">
-        <ScrollReveal className="max-w-2xl mx-auto px-4">
-          <h2 className="text-2xl font-extrabold text-white mb-3">Built by Eightlines</h2>
-          <p className="text-amber-100 text-sm mb-6">
-            ZiyamSelfDrive is operated by {COMPANY.legalName}, a small Bengaluru team obsessed with making mobility in India more flexible, affordable, and trustworthy.
-          </p>
-          <MotionButton href="/careers" className="bg-white text-amber-600 font-bold px-6 py-3 rounded-xl inline-block hover:bg-amber-50 transition-colors">
-            View Open Roles
-          </MotionButton>
-        </ScrollReveal>
-      </section>
+            {TEAM.map((person, i) =>
+              expanded === i ? (
+                <div key={person.name} className="mt-6 bg-[#332A26] border-l-4 border-[#2F9E4F] rounded-lg p-6">
+                  <h3 className="font-extrabold text-lg">{person.name}</h3>
+                  <p className="text-[#96887A] text-sm mt-0.5">{person.role}</p>
+                  <p className="mt-3 text-sm leading-relaxed max-w-[70ch]">{person.bio}</p>
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    {person.chips.map((chip) => (
+                      <span key={chip} className="text-[0.7rem] font-semibold bg-[#2F9E4F]/15 text-[#2F9E4F] px-3 py-1 rounded-full">
+                        {chip}
+                      </span>
+                    ))}
+                  </div>
+                  <a
+                    href={`https://instagram.com/${person.instagram}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block mt-4 text-sm text-[#2F9E4F] hover:underline"
+                  >
+                    @{person.instagram}
+                  </a>
+                </div>
+              ) : null
+            )}
+          </section>
+
+          <div className="h-px bg-[#463C36] my-14" />
+
+          {/* ── WHAT WE'RE BUILDING ──────────────────────────────────── */}
+          <section>
+            <h2 className="font-extrabold" style={{ fontSize: 'clamp(1.7rem,3.6vw,2.4rem)' }}>
+              What we&apos;re <span className="text-[#2F9E4F]">building</span>
+            </h2>
+            <p className="text-[#96887A] mt-2 max-w-[58ch]">
+              Product direction comes from all the founders. The platform is designed and developed in-house by the Eightlines team — no outsourced build.
+            </p>
+
+            <div className="grid sm:grid-cols-2 gap-5 mt-8">
+              {BUILDING.map((item) => (
+                <article key={item.name} className="bg-[#332A26] rounded-xl p-6 border border-transparent hover:border-[#2F9E4F] transition-colors">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="font-extrabold text-[1.05rem]">{item.name}</h3>
+                    <span
+                      className={`text-[0.58rem] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full shrink-0 ${
+                        item.status === 'In development' ? 'bg-[#2F9E4F]/15 text-[#2F9E4F]' : 'bg-[#96887A]/15 text-[#96887A]'
+                      }`}
+                    >
+                      {item.status}
+                    </span>
+                  </div>
+                  <p className="text-[#96887A] text-[0.85rem] mt-2">{item.description}</p>
+                  <ul className="mt-4 space-y-1.5">
+                    {item.items.map((line) => (
+                      <li key={line} className="text-[0.8rem] flex items-center gap-2">
+                        <span className="w-1 h-1 rounded-full bg-[#2F9E4F] shrink-0" />
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
+            </div>
+
+            <p className="text-[#96887A] text-sm mt-9">Working stack</p>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {STACK.map((tech) => (
+                <span key={tech} className="text-xs font-medium bg-[#332A26] border border-[#463C36] px-3 py-1.5 rounded-full">
+                  {tech}
+                </span>
+              ))}
+            </div>
+          </section>
+
+          <div className="h-px bg-[#463C36] my-14" />
+
+          {/* ── REGISTERED & CERTIFIED ───────────────────────────────── */}
+          <section>
+            <h2 className="font-extrabold" style={{ fontSize: 'clamp(1.7rem,3.6vw,2.4rem)' }}>
+              Registered &amp; <span className="text-[#2F9E4F]">certified</span>
+            </h2>
+            <p className="text-[#96887A] mt-2 max-w-[58ch]">Independently audited management systems, and statutory registration in India.</p>
+
+            <div className="grid sm:grid-cols-3 gap-5 mt-8">
+              {COMPANY.certifications.map((cert) => (
+                <article key={cert.certNumber} className="bg-[#332A26] rounded-xl p-6 border border-transparent hover:border-[#2F9E4F] transition-colors">
+                  <span className="text-[0.58rem] font-semibold uppercase tracking-wider bg-[#2F9E4F]/15 text-[#2F9E4F] px-2.5 py-1 rounded-full">Certified</span>
+                  <h3 className="font-extrabold text-[1.05rem] mt-3.5">{cert.standard}</h3>
+                  <p className="text-[#96887A] text-[0.82rem] mt-1">{cert.name}</p>
+                  <div className="mt-4 border-t border-[#463C36] pt-3.5 space-y-2 text-[0.74rem]">
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-[#96887A]">Certificate</dt>
+                      <dd className="font-semibold">{cert.certNumber}</dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-[#96887A]">Issued</dt>
+                      <dd className="font-semibold">{COMPANY.certificationValidFrom}</dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-[#96887A]">Valid to</dt>
+                      <dd className="font-semibold">{COMPANY.certificationExpiry}</dd>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <p className="text-[#96887A] text-xs mt-5">
+              Certified by {COMPANY.certifyingBody} under EGAC/IAF accreditation. Validity subject to annual surveillance audits.
+            </p>
+
+            <div className="mt-7 bg-[#332A26] border-l-4 border-[#2F9E4F] rounded-lg p-5">
+              <span className="block text-[#2F9E4F] text-[0.62rem] font-semibold uppercase tracking-wider">Certified scope of activities</span>
+              <p className="text-sm mt-2 max-w-[76ch]">
+                Technology-driven fleet logistics, asset aggregation platforms, peer-to-peer mobility routing, B2B corporate vehicle rental management, and
+                high-end event and luxury hospitality transport operations.
+              </p>
+            </div>
+          </section>
+
+          <div className="h-px bg-[#463C36] my-14" />
+
+          {/* ── THE GROUP ────────────────────────────────────────────── */}
+          <section>
+            <h2 className="font-extrabold" style={{ fontSize: 'clamp(1.7rem,3.6vw,2.4rem)' }}>
+              The <span className="text-[#2F9E4F]">group</span>
+            </h2>
+            <p className="text-[#96887A] mt-2 max-w-[58ch]">Ziyam Self Drive is a brand of Eightlines Fleet Private Limited.</p>
+
+            <div className="flex flex-col sm:flex-row items-center gap-9 mt-8">
+              <div className="shrink-0">
+                <Emblem3D plateSrc="/emblems/eightlines-plate.svg" artSrc="/emblems/eightlines-art.svg" label="Eightlines Fleet Private Limited emblem" glareColor="255,248,220" size={200} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-extrabold text-[1.2rem]">{COMPANY.legalName}</h3>
+                <p className="text-[#96887A] text-sm mt-3 max-w-[60ch]">
+                  The parent company behind Ziyam Self Drive, Mechanix Pro and the Marc8 brands. Registered in India and operating out of Bengaluru,
+                  Eightlines holds the fleet, the hub network and the technology built in-house by the team.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <div className="h-px bg-[#463C36] my-14" />
+
+          {/* ── BRANDS TABLE ─────────────────────────────────────────── */}
+          <section className="pb-20">
+            <h2 className="font-extrabold" style={{ fontSize: 'clamp(1.7rem,3.6vw,2.4rem)' }}>
+              Brands under <span className="text-[#2F9E4F]">Eightlines</span>
+            </h2>
+            <p className="text-[#96887A] mt-2 max-w-[58ch]">One group, several businesses across mobility, servicing, retail and stay.</p>
+
+            <div className="overflow-x-auto mt-8">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[#96887A] text-xs uppercase tracking-wider border-b border-[#463C36]">
+                    <th className="py-3 pr-4 font-semibold">Brand</th>
+                    <th className="py-3 pr-4 font-semibold">What it does</th>
+                    <th className="py-3 font-semibold">Instagram</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {BRANDS.map((brand) => (
+                    <tr key={brand.name} className="border-b border-[#463C36]/60 last:border-0">
+                      <td className="py-3.5 pr-4 font-bold">{brand.name}</td>
+                      <td className="py-3.5 pr-4 text-[#96887A]">{brand.description}</td>
+                      <td className="py-3.5">
+                        {brand.instagram ? (
+                          <a href={`https://instagram.com/${brand.instagram}`} target="_blank" rel="noopener noreferrer" className="text-[#2F9E4F] hover:underline">
+                            @{brand.instagram}
+                          </a>
+                        ) : (
+                          <span className="text-[#96887A]">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
 
       <Footer />
     </div>

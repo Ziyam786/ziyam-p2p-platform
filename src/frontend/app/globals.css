@@ -37,3 +37,47 @@ html {
 .card-elevated:hover {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 20px 36px -12px rgba(15, 23, 42, 0.18);
 }
+
+/* Interactive 3D badge (Emblem3D.tsx) — gentle float, a radial glare that
+   tracks rotation via --gx/--gy set from JS, and a click-triggered light
+   sweep. --glare-color is set per-instance (gold for Eightlines, cream for
+   Ziyam) since the two brand marks use different metals. */
+.emblem-float {
+  animation: emblem-float 7s ease-in-out infinite;
+}
+@keyframes emblem-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-9px); }
+}
+.emblem-glare {
+  background: radial-gradient(240px 240px at var(--gx, 35%) var(--gy, 28%), rgba(var(--glare-color), 0.34), rgba(var(--glare-color), 0) 62%);
+  -webkit-mask: radial-gradient(circle at 50% 51%, #000 0 44.5%, transparent 45%);
+  mask: radial-gradient(circle at 50% 51%, #000 0 44.5%, transparent 45%);
+}
+.emblem-sheen-mask {
+  -webkit-mask: radial-gradient(circle at 50% 51%, #000 0 44.5%, transparent 45%);
+  mask: radial-gradient(circle at 50% 51%, #000 0 44.5%, transparent 45%);
+}
+.emblem-sheen-bar {
+  position: absolute;
+  top: -25%;
+  left: -45%;
+  width: 32%;
+  height: 150%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.42), transparent);
+  transform: skewX(-18deg);
+  opacity: 0;
+  display: block;
+}
+.emblem-badge.sweep .emblem-sheen-bar {
+  animation: emblem-sweep 1.15s cubic-bezier(0.3, 0.1, 0.3, 1);
+}
+@keyframes emblem-sweep {
+  0% { left: -45%; opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { left: 118%; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .emblem-float { animation: none; }
+}
