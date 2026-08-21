@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { Search } from 'lucide-react';
 import { planApi } from '../lib/api';
 
 const DEBOUNCE_MS = 500;
@@ -64,17 +65,18 @@ export default function PlanDestinationInput({ onResolved }: { onResolved: (resu
 
   return (
     <div>
-      <label className="block text-sm font-semibold text-gray-700 mb-2">Where do you want to drive to?</label>
+      <label className="block text-sm font-semibold text-gray-200 mb-2">Where do you want to drive to?</label>
       <div className="relative">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="e.g. Hampi, Wayanad, Pondicherry…"
-          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-amber-400"
+          className="w-full bg-white/95 border border-white/10 rounded-xl pl-12 pr-4 py-4 text-base text-gray-900 placeholder:text-gray-400 shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-400"
         />
         {checking && <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-gray-400">Checking…</span>}
       </div>
-      {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
+      {error && <p className="text-sm text-red-300 mt-2">{error}</p>}
     </div>
   );
 }

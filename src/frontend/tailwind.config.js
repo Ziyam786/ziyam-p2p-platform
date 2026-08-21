@@ -8,40 +8,53 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Dark surfaces (nav, footer, hero) anchored on Marc8's "Base" navy
-        // (#000250, 40% brand usage) at gray-900/950 — Tailwind's default
-        // "gray" is neutral, not navy-tinted, so this is remapped rather
-        // than adding a parallel color nothing would actually use.
+        // Ziyam brand retheme (superseding the earlier Marc8 navy retheme
+        // below this comment used to describe): dark surfaces (nav, footer,
+        // hero, and the 800-950 end generally) now anchor on the same
+        // espresso tones already used for the About page and the logo
+        // badge's plate (#2A2320/#1C1614/#332A26) — kept under the Tailwind
+        // key "gray" rather than renaming every gray-* class across the
+        // app, same reasoning the prior Marc8 retheme used. 50-300 stay a
+        // warmed-neutral (cream-tinted, not cold blue-gray) for ordinary
+        // light-background text/borders; 400/700 line up exactly with the
+        // "muted"/"rule" tokens from globals.css and companyInfo-adjacent
+        // brand work.
         gray: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#151541',
-          900: '#000250',
-          950: '#000138',
+          50: '#faf8f5',
+          100: '#f3eee8',
+          200: '#e5ddd2',
+          300: '#c9beb0',
+          400: '#96887a',
+          500: '#7a6d60',
+          600: '#5c5148',
+          700: '#463c36',
+          800: '#332a26',
+          900: '#2a2320',
+          950: '#1c1614',
         },
-        // Marc8 brand retheme: Essence Blue (#183eeb, 25% brand usage) is
-        // the site's primary CTA/accent color, anchored at amber-500 (the
-        // shade used most throughout the app). Kept the Tailwind key named
-        // "amber" rather than renaming every amber-* class across the app —
-        // this is the one place the whole site's accent color is defined.
+        // Ziyam brand retheme, corrected: green (originally used for the
+        // primary CTA/accent) was dropped in favor of Eightlines' own
+        // brand gold — Zoomcar's brand color is also green, and reusing it
+        // risked exactly that kind of market confusion. This ramp is built
+        // around the actual gold gradient stops from the extracted
+        // Eightlines mark (public/emblems/eightlines-plate.svg's "gold"/
+        // "goldRing" gradients): #C4922C anchors 500, #A8761F anchors 600 —
+        // both lifted verbatim from that artwork rather than picked fresh,
+        // so the site accent stays traceable to the real logo. Still under
+        // the "amber" key so every existing amber-* call site repaints
+        // automatically.
         amber: {
-          50: '#eef1fd',
-          100: '#dbe2fb',
-          200: '#b8c5f8',
-          300: '#8fa3f2',
-          400: '#5872ea',
-          500: '#183eeb',
-          600: '#1230c4',
-          700: '#0e259d',
-          800: '#0c1e7d',
-          900: '#0a1863',
-          950: '#060f42',
+          50: '#fbf3e0',
+          100: '#f6e6c1',
+          200: '#edcb83',
+          300: '#e0ad53',
+          400: '#d2963a',
+          500: '#c4922c',
+          600: '#a8761f',
+          700: '#8a5f19',
+          800: '#6b4a14',
+          900: '#4d350f',
+          950: '#2e1f09',
         },
         // Marc8's sparing (5% usage) accent — for small highlights (promo
         // badges, urgent states), never as a dominant button/link color.

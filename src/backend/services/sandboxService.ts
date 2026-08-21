@@ -81,7 +81,18 @@ export const sandboxService = {
       },
       { headers }
     );
-    return { referenceId: res.data.data.reference_id, message: res.data.data.message };
+    const { reference_id, message } = res.data.data;
+    // Sandbox returns HTTP 200 even when no OTP was actually sent — e.g. an
+    // invalid Aadhaar number comes back as `{ reference_id, message:
+    // "Invalid Aadhaar Card" }`, identical in shape to a real send. Per
+    // Sandbox's own docs, the only way to tell them apart is this exact
+    // string — there is no separate status/boolean field.
+    if (message !== 'OTP sent successfully') {
+      const err = new Error(message) as Error & { sandboxBusinessFailure?: true };
+      err.sandboxBusinessFailure = true;
+      throw err;
+    }
+    return { referenceId: reference_id, message };
   },
 
   async verifyAadhaarOtp(referenceId: string | number, otp: string): Promise<AadhaarOtpVerifyResult> {
