@@ -14,8 +14,9 @@ import YieldBadge from '../../../components/YieldBadge';
 import { HostTripSharePanel } from '../../../components/LiveDeliveryTracker';
 import { useAuth } from '../../../lib/auth-context';
 import { useToast } from '../../../components/Toast';
-import { hostApi, carsApi, hostReviewApi, usersApi, ApiError } from '../../../lib/api';
+import { hostApi, carsApi, hostReviewApi, usersApi, settingsApi, ApiError } from '../../../lib/api';
 import { carImageSrc } from '../../../lib/carImage';
+import { isAngleComplete } from '../../../lib/carPhotoAngles';
 import type { Car, EarningsOverview, UtilizationEntry, Booking } from '../../../lib/types';
 
 const EMPTY: EarningsOverview = {
@@ -35,6 +36,11 @@ function DashboardInner() {
   const [blackoutCar, setBlackoutCar] = useState<Car | null>(null);
   const [requestCount, setRequestCount] = useState(0);
   const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
+  const [photoAngleDeadline, setPhotoAngleDeadline] = useState<string | null>(null);
+
+  useEffect(() => {
+    settingsApi.public().then((res) => setPhotoAngleDeadline(res.data.photo_angle_enforcement_date)).catch(() => {});
+  }, []);
 
   function loadRequestCount() {
     hostReviewApi.requests().then((res) => setRequestCount(res.count)).catch(() => {});
@@ -184,6 +190,15 @@ function DashboardInner() {
                 avoid booking requests you'll just have to decline.
               </div>
             )}
+            {photoAngleDeadline && cars.some((c) => !isAngleComplete(c.imageAngles)) && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-5 py-3 text-xs text-amber-300">
+                📸 {cars.filter((c) => !isAngleComplete(c.imageAngles)).length} of your {cars.length} listing
+                {cars.length === 1 ? '' : 's'} {cars.filter((c) => !isAngleComplete(c.imageAngles)).length === 1 ? 'is' : 'are'} missing
+                one or more of the 6 required angle photos (front, rear, left, right, interior front, interior rear).
+                Add them from Edit before {new Date(photoAngleDeadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })},
+                or those listings will stop appearing in search.
+              </div>
+            )}
             {cars.length === 0 ? (
               <div className="text-center py-16 border border-dashed border-gray-800 rounded-xl">
                 <p className="text-gray-400 mb-4">You haven't listed any cars yet.</p>
@@ -216,6 +231,11 @@ function DashboardInner() {
                     <span className={`text-xs font-semibold px-3 py-1 rounded-full ${car.isAvailable ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
                       {car.isAvailable ? 'Live' : 'Delisted'}
                     </span>
+                    {!isAngleComplete(car.imageAngles) && (
+                      <span className="text-xs font-semibold px-3 py-1 rounded-full bg-amber-500/10 text-amber-400">
+                        Photos incomplete
+                      </span>
+                    )}
                     {car.verificationStatus === 'REJECTED' ? (
                       <span className="text-xs font-semibold px-3 py-1 rounded-full bg-red-500/10 text-red-400" title="Re-upload corrected documents from Edit">
                         Docs rejected
