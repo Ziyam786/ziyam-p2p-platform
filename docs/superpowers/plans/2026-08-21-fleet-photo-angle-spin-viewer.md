@@ -613,8 +613,8 @@ import { isBookable } from '../utils/carPhotoAngles';
 import { config } from '../config';
 ```
 
-(Check first whether `config` is already imported in this file under a
-different alias — if so, reuse it instead of adding a duplicate import.)
+(Confirmed: `booking.routes.ts` does not currently import `config` — both
+lines above are new.)
 
 - [ ] **Step 2: Add the check right after the existing `isAvailable` check**
 
@@ -806,7 +806,9 @@ import Image from 'next/image';
 import PlateBlurEditor from './PlateBlurEditor';
 import { REQUIRED_CAR_ANGLES } from '../lib/carPhotoAngles';
 
-const ANGLE_LABELS: Record<(typeof REQUIRED_CAR_ANGLES)[number], string> = {
+type RequiredAngle = (typeof REQUIRED_CAR_ANGLES)[number];
+
+const ANGLE_LABELS: Record<RequiredAngle, string> = {
   FRONT: 'Front',
   RIGHT: 'Right side',
   REAR: 'Rear',
@@ -814,6 +816,8 @@ const ANGLE_LABELS: Record<(typeof REQUIRED_CAR_ANGLES)[number], string> = {
   INTERIOR_FRONT: 'Interior — dashboard',
   INTERIOR_REAR: 'Interior — back seats',
 };
+
+interface Photo { blurred: string; original: string; }
 
 interface CarPhotoAngleGridProps {
   images: string[];
@@ -828,32 +832,60 @@ interface CarPhotoAngleGridProps {
  * plate-blur-then-add flow ConditionPhotoCapture.tsx already established
  * for trip photos, applied here to car-listing photos instead. Any photo
  * from before this feature shipped that isn't tagged to one of the 6
- * angles (imageAngles[i] is missing or not a required angle) shows below
- * as a separate "Other photos" section — visible and removable, but new
- * photos can only be added through the 6 labeled tiles.
+ * angles shows below as a separate "Other photos" section — visible and
+ * removable, but new photos can only be added through the 6 labeled tiles.
+ *
+ * On every change the three output arrays are rebuilt from scratch in
+ * REQUIRED_CAR_ANGLES order (tagged photos first, legacy photos after) —
+ * never a naive append/filter — so images[0] is always the FRONT photo
+ * whenever FRONT is filled, regardless of the order tiles were filled in.
  */
 export default function CarPhotoAngleGrid({ images, originalImages, imageAngles, onChange }: CarPhotoAngleGridProps) {
-  const angleIndex = (angle: string) => imageAngles.findIndex((a, i) => a === angle && i < images.length);
+  const anglePhotos: Partial<Record<RequiredAngle, Photo>> = {};
+  const legacyPhotos: Photo[] = [];
+  images.forEach((blurred, i) => {
+    const original = originalImages[i] ?? '';
+    const angle = imageAngles[i];
+    if ((REQUIRED_CAR_ANGLES as readonly string[]).includes(angle) && !anglePhotos[angle as RequiredAngle]) {
+      anglePhotos[angle as RequiredAngle] = { blurred, original };
+    } else {
+      legacyPhotos.push({ blurred, original });
+    }
+  });
 
-  function setAngle(angle: (typeof REQUIRED_CAR_ANGLES)[number], blurredUrl: string, originalUrl: string) {
-    onChange({
-      images: [...images, blurredUrl],
-      originalImages: [...originalImages, originalUrl],
-      imageAngles: [...imageAngles, angle],
-    });
+  function rebuild(nextAnglePhotos: Partial<Record<RequiredAngle, Photo>>, nextLegacy: Photo[]) {
+    const nextImages: string[] = [];
+    const nextOriginals: string[] = [];
+    const nextAngles: string[] = [];
+    for (const angle of REQUIRED_CAR_ANGLES) {
+      const photo = nextAnglePhotos[angle];
+      if (photo) {
+        nextImages.push(photo.blurred);
+        nextOriginals.push(photo.original);
+        nextAngles.push(angle);
+      }
+    }
+    for (const photo of nextLegacy) {
+      nextImages.push(photo.blurred);
+      nextOriginals.push(photo.original);
+      nextAngles.push('');
+    }
+    onChange({ images: nextImages, originalImages: nextOriginals, imageAngles: nextAngles });
   }
 
-  function removeAt(index: number) {
-    onChange({
-      images: images.filter((_, i) => i !== index),
-      originalImages: originalImages.filter((_, i) => i !== index),
-      imageAngles: imageAngles.filter((_, i) => i !== index),
-    });
+  function setAngle(angle: RequiredAngle, blurredUrl: string, originalUrl: string) {
+    rebuild({ ...anglePhotos, [angle]: { blurred: blurredUrl, original: originalUrl } }, legacyPhotos);
   }
 
-  const legacyIndices = images
-    .map((_, i) => i)
-    .filter((i) => !REQUIRED_CAR_ANGLES.includes(imageAngles[i] as (typeof REQUIRED_CAR_ANGLES)[number]));
+  function removeAngle(angle: RequiredAngle) {
+    const next = { ...anglePhotos };
+    delete next[angle];
+    rebuild(next, legacyPhotos);
+  }
+
+  function removeLegacy(index: number) {
+    rebuild(anglePhotos, legacyPhotos.filter((_, i) => i !== index));
+  }
 
   return (
     <div className="space-y-4">
@@ -863,17 +895,16 @@ export default function CarPhotoAngleGrid({ images, originalImages, imageAngles,
       </p>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {REQUIRED_CAR_ANGLES.map((angle) => {
-          const idx = angleIndex(angle);
-          const filled = idx !== -1;
+          const photo = anglePhotos[angle];
           return (
             <div key={angle} className="space-y-1.5">
               <p className="text-xs font-semibold text-gray-600">{ANGLE_LABELS[angle]}</p>
-              {filled ? (
+              {photo ? (
                 <div className="relative w-full aspect-square">
-                  <Image src={images[idx]} alt={ANGLE_LABELS[angle]} fill sizes="160px" className="rounded-lg object-cover border border-emerald-300" />
+                  <Image src={photo.blurred} alt={ANGLE_LABELS[angle]} fill sizes="160px" className="rounded-lg object-cover border border-emerald-300" />
                   <button
                     type="button"
-                    onClick={() => removeAt(idx)}
+                    onClick={() => removeAngle(angle)}
                     className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center"
                     aria-label={`Remove ${ANGLE_LABELS[angle]} photo`}
                   >
@@ -890,18 +921,18 @@ export default function CarPhotoAngleGrid({ images, originalImages, imageAngles,
         })}
       </div>
 
-      {legacyIndices.length > 0 && (
+      {legacyPhotos.length > 0 && (
         <div className="border-t border-gray-100 pt-4 space-y-2">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
             Other photos (added before angle labels existed)
           </p>
           <div className="flex flex-wrap gap-3">
-            {legacyIndices.map((i) => (
-              <div key={images[i] + i} className="relative w-20 h-20">
-                <Image src={images[i]} alt="Untagged car photo" fill sizes="80px" className="rounded-lg object-cover border border-gray-200" />
+            {legacyPhotos.map((photo, i) => (
+              <div key={photo.blurred + i} className="relative w-20 h-20">
+                <Image src={photo.blurred} alt="Untagged car photo" fill sizes="80px" className="rounded-lg object-cover border border-gray-200" />
                 <button
                   type="button"
-                  onClick={() => removeAt(i)}
+                  onClick={() => removeLegacy(i)}
                   className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center"
                   aria-label="Remove photo"
                 >
