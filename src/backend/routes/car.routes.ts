@@ -10,7 +10,7 @@ import { computeYieldSuggestion, applyYieldSuggestion } from '../services/yieldE
 import { isRcVerificationConfigured, extractRcDocument, fetchDocAsBase64, assertReadableDocument } from '../services/aryaVerificationService';
 import { safeErrorMessage } from '../utils/errorResponse';
 import { config } from '../config';
-import { isBookable } from '../utils/carPhotoAngles';
+import { isBookable, isValidImageTriple } from '../utils/carPhotoAngles';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -58,12 +58,12 @@ router.get('/cars', async (req: Request, res: Response) => {
     include: { reviews: { where: { hidden: false }, select: { rating: true } }, owner: { select: { fullName: true } } },
   });
 
-  // Only the customer-facing "show me bookable cars" query is gated —
-  // availableOnly=false requests (e.g. a host viewing their own listing
-  // regardless of its bookable state) are unaffected.
-  const bookableCars = availableOnly === 'true'
-    ? cars.filter((c) => isBookable(c, config.photoAngleEnforcementDate))
-    : cars;
+  // GET /cars is only ever used for public/renter browsing — a host viewing
+  // their own listings regardless of bookable state goes through the
+  // separate GET /host/:hostId/cars route instead — so the photo-angle gate
+  // applies unconditionally here, independent of availableOnly (which still
+  // separately controls the pre-existing isAvailable filter above).
+  const bookableCars = cars.filter((c) => isBookable(c, config.photoAngleEnforcementDate));
 
   const data = bookableCars.map(withRatingSummary);
   const sorted = sort === 'rating' ? [...data].sort((a: any, b: any) => b.rating - a.rating) : data;
@@ -79,11 +79,15 @@ router.get('/cars/market-pulse', async (req: Request, res: Response) => {
   const { city } = req.query;
   const where: Prisma.CarWhereInput = city ? { city: String(city) } : {};
 
-  const [availableCount, priceAgg, categoryGroups] = await Promise.all([
-    prisma.car.count({ where: { ...where, isAvailable: true } }),
+  const [availableCandidates, priceAgg, categoryGroups] = await Promise.all([
+    // Fetched (not counted) so the photo-angle gate — which needs
+    // imageAngles, not just isAvailable — can be applied in JS, keeping
+    // this in lockstep with GET /cars' bookable-cars filter above.
+    prisma.car.findMany({ where: { ...where, isAvailable: true }, select: { imageAngles: true } }),
     prisma.car.aggregate({ where, _avg: { dailyRate: true } }),
     prisma.car.groupBy({ by: ['category'], where, _count: { category: true }, orderBy: { _count: { category: 'desc' } }, take: 1 }),
   ]);
+  const availableCount = availableCandidates.filter((c) => isBookable(c, config.photoAngleEnforcementDate)).length;
 
   res.json({
     success: true,
@@ -223,6 +227,24 @@ router.patch('/cars/:id', requireAuth, async (req: Request, res: Response) => {
   const nextInsuranceExpiry = insuranceExpiry !== undefined ? insuranceExpiry : car.insuranceExpiry;
   const nextPucExpiry = pucExpiry !== undefined ? pucExpiry : car.pucExpiry;
   const docsComplete = Boolean(nextRc && nextPollution && nextInsurance && nextRcExpiry && nextInsuranceExpiry && nextPucExpiry);
+
+  // images / originalImages / imageAngles move together — that's how the
+  // frontend's CarPhotoAngleGrid always sends them (see its onChange
+  // contract) — so a PATCH that touches imageAngles without also sending
+  // the other two would desynchronize the index-alignment invariant this
+  // whole feature depends on.
+  if (imageAngles !== undefined) {
+    if (images === undefined || originalImages === undefined) {
+      return res.status(400).json({
+        error: 'imageAngles can only be updated together with images and originalImages.',
+      });
+    }
+    if (!isValidImageTriple(images, originalImages, imageAngles)) {
+      return res.status(400).json({
+        error: 'images, originalImages, and imageAngles must be the same length, and imageAngles values must each be "" or one of the 6 required angles.',
+      });
+    }
+  }
 
   const updated = await prisma.car.update({
     where: { id },

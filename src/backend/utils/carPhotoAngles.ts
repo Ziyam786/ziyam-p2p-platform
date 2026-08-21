@@ -16,3 +16,12 @@ export function isBookable(car: { imageAngles: string[] }, enforcementDate: stri
   if (!enforcementDate) return true;
   return new Date() < new Date(enforcementDate);
 }
+
+// Guards the "images[i] / originalImages[i] / imageAngles[i] all describe the
+// same photo" invariant the whole feature depends on (see the header comment
+// above) — used before persisting any client-supplied triple of these arrays.
+export function isValidImageTriple(images: unknown, originalImages: unknown, imageAngles: unknown): boolean {
+  if (!Array.isArray(images) || !Array.isArray(originalImages) || !Array.isArray(imageAngles)) return false;
+  if (images.length !== originalImages.length || images.length !== imageAngles.length) return false;
+  return imageAngles.every((a) => a === '' || (REQUIRED_CAR_ANGLES as readonly string[]).includes(a));
+}

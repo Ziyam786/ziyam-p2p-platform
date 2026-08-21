@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { FleetService } from '../services/fleetService';
 import { requireAuth } from '../middleware/auth';
-import { isAngleComplete } from '../utils/carPhotoAngles';
+import { isAngleComplete, isValidImageTriple } from '../utils/carPhotoAngles';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -35,6 +35,11 @@ router.post('/host/:hostId/cars', requireAuth, async (req: Request, res: Respons
   if (!isAngleComplete(imageAngles)) {
     return res.status(400).json({
       error: 'All 6 required angle photos (front, rear, left, right, interior front, interior rear) are required to list a car.',
+    });
+  }
+  if (imageAngles !== undefined && !isValidImageTriple(images ?? [], originalImages ?? [], imageAngles)) {
+    return res.status(400).json({
+      error: 'images, originalImages, and imageAngles must be the same length, and imageAngles values must each be "" or one of the 6 required angles.',
     });
   }
 
