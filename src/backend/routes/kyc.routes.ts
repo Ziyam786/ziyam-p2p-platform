@@ -143,6 +143,12 @@ router.post('/kyc/aadhaar/otp', requireAuth, kycRateLimiter, async (req: Request
     res.json({ success: true, stubbed: false, referenceId: result.referenceId, message: result.message });
   } catch (err: any) {
     console.error('[KYC] Aadhaar OTP generate failed:', err.response?.data ?? err.message);
+    // A business-logic rejection (e.g. "Invalid Aadhaar Card") is the
+    // renter's input, not a transient failure on our/Sandbox's end — a 400
+    // with the real reason, not a blanket "try again shortly" 502.
+    if (err.sandboxBusinessFailure) {
+      return res.status(400).json({ error: err.message || 'That Aadhaar number could not be verified. Please check it and try again.' });
+    }
     res.status(502).json({ error: 'Could not send Aadhaar OTP right now. Please try again shortly.' });
   }
 });
