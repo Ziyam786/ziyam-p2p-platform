@@ -268,7 +268,10 @@ export default function CarDetailPage() {
               <div className="flex gap-3">
                 {car.images.filter(isValidImageSrc).map((img, i) => {
                   const thumbnailAngle = car.imageAngles?.[i] as ExteriorAngle | undefined;
-                  const isExteriorAngle = thumbnailAngle && (EXTERIOR_SPIN_ORDER as readonly string[]).includes(thumbnailAngle);
+                  const isExteriorAngle =
+                    isAngleComplete(car.imageAngles) &&
+                    thumbnailAngle &&
+                    (EXTERIOR_SPIN_ORDER as readonly string[]).includes(thumbnailAngle);
                   const isActive = isExteriorAngle ? activeAngle === thumbnailAngle : activeImg === img;
                   return (
                     <button
