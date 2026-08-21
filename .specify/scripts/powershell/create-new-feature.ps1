@@ -18,21 +18,21 @@ $maxBranchLength = 244
 
 # Show help if requested
 if ($Help) {
-    Write-Host "Usage: ./create-new-feature.ps1 [-Json] [-DryRun] [-AllowExistingBranch] [-ShortName <name>] [-Number N] [-Timestamp] <feature description>"
-    Write-Host ""
-    Write-Host "Options:"
-    Write-Host "  -Json               Output in JSON format"
-    Write-Host "  -DryRun             Compute feature name and paths without creating directories or files"
-    Write-Host "  -AllowExistingBranch  Reuse an existing feature directory if it already exists"
-    Write-Host "  -ShortName <name>   Provide a custom short name (2-4 words) for the feature"
-    Write-Host "  -Number N           Prefer a feature number (auto-corrected if its specs prefix exists)"
-    Write-Host "  -Timestamp          Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
-    Write-Host "  -Help               Show this help message"
-    Write-Host ""
-    Write-Host "Examples:"
-    Write-Host "  ./create-new-feature.ps1 'Add user authentication system' -ShortName 'user-auth'"
-    Write-Host "  ./create-new-feature.ps1 'Implement OAuth2 integration for API'"
-    Write-Host "  ./create-new-feature.ps1 -Timestamp -ShortName 'user-auth' 'Add user authentication'"
+    Write-Output "Usage: ./create-new-feature.ps1 [-Json] [-DryRun] [-AllowExistingBranch] [-ShortName <name>] [-Number N] [-Timestamp] <feature description>"
+    Write-Output ""
+    Write-Output "Options:"
+    Write-Output "  -Json               Output in JSON format"
+    Write-Output "  -DryRun             Compute feature name and paths without creating directories or files"
+    Write-Output "  -AllowExistingBranch  Reuse an existing feature directory if it already exists"
+    Write-Output "  -ShortName <name>   Provide a custom short name (2-4 words) for the feature"
+    Write-Output "  -Number N           Prefer a feature number (auto-corrected if its specs prefix exists)"
+    Write-Output "  -Timestamp          Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
+    Write-Output "  -Help               Show this help message"
+    Write-Output ""
+    Write-Output "Examples:"
+    Write-Output "  ./create-new-feature.ps1 'Add user authentication system' -ShortName 'user-auth'"
+    Write-Output "  ./create-new-feature.ps1 'Implement OAuth2 integration for API'"
+    Write-Output "  ./create-new-feature.ps1 -Timestamp -ShortName 'user-auth' 'Add user authentication'"
     exit 0
 }
 
