@@ -37,7 +37,7 @@ import damageClaimRoutes from './routes/damageClaim.routes';
 import disputeSupportRoutes from './routes/disputeSupport.routes';
 import refundRequestRoutes from './routes/refundRequest.routes';
 import hostReviewRoutes from './routes/hostReview.routes';
-
+import axonRoutes from './routes/axon.routes';
 const app = express();
 
 app.use(helmet());
@@ -143,7 +143,8 @@ api.use(damageClaimRoutes);
 api.use(disputeSupportRoutes);
 api.use(refundRequestRoutes);
 api.use(hostReviewRoutes);
-
+// Register Axon Supply Gateway API
+api.use('/axon', axonRoutes);
 // 404 handler for unmatched API routes
 api.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 

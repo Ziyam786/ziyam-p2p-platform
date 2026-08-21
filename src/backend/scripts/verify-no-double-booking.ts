@@ -22,7 +22,7 @@
  * and deletes real rows.
  */
 import { spawn, ChildProcess } from 'child_process';
-import { randomUUID } from 'crypto';
+import { randomInt, randomUUID } from 'crypto';
 import { PrismaClient } from '@prisma/client';
 
 const PORT = Number(process.env.VERIFY_PORT ?? 5099);
@@ -66,7 +66,7 @@ async function createFixtures() {
       id: randomUUID(),
       fullName: 'Verify Host',
       email: `verify-host-${randomUUID()}@example.invalid`,
-      phoneNumber: `9${Math.floor(100000000 + Math.random() * 899999999)}`,
+     phoneNumber: `9${randomInt(100000000, 999999999)}`,
       passwordHash: 'not-used',
       role: 'SELF_HOST',
       payoutAccountId: 'acct_verify_script',
@@ -97,7 +97,7 @@ async function createFixtures() {
       id: randomUUID(),
       fullName: 'Verify Customer',
       email: `verify-customer-${randomUUID()}@example.invalid`,
-      phoneNumber: `8${Math.floor(100000000 + Math.random() * 899999999)}`,
+      phoneNumber: `8${randomInt(100000000, 999999999)}`,
       passwordHash: 'not-used',
       role: 'CUSTOMER',
       isKycVerified: true,

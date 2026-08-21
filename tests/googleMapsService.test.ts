@@ -2,10 +2,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('axios');
 import axios from 'axios';
-import { geocodeDestination, haversineKm, findNearbyHotels, BENGALURU } from '../src/backend/services/googleMapsService';
+import {
+  geocodeDestination,
+  haversineKm,
+  findNearbyHotels,
+  BENGALURU,
+  __clearGoogleMapsCachesForTests,
+} from '../src/backend/services/googleMapsService';
 
 beforeEach(() => {
   vi.mocked(axios.get).mockReset();
+  // Both lookups below are cached for 24h keyed on the query text / rounded
+  // lat-lng — several tests reuse the same "Ooty" query and coordinates, so
+  // without a reset each test after the first successful one would just
+  // read a hit from an earlier test's mock instead of exercising its own.
+  __clearGoogleMapsCachesForTests();
 });
 
 describe('haversineKm', () => {
