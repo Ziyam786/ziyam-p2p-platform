@@ -1,16 +1,26 @@
 import { Router, Request, Response } from 'express';
-import { geocodeDestination, findNearbyHotels, haversineKm, BENGALURU } from '../services/googleMapsService';
+import { geocodeDestination, findNearbyHotels, haversineKm, BENGALURU, isGoogleMapsConfigured } from '../services/googleMapsService';
 import { PrismaClient } from '@prisma/client';
 import { suggestCategoryForTrip } from '../utils/carSuggestion';
+import { planRateLimiter } from '../middleware/rateLimit';
 
 const router = Router();
 const prisma = new PrismaClient();
 
 const MAX_DISTANCE_KM = 700;
 
-router.get('/plan/destination-check', async (req: Request, res: Response) => {
+router.get('/plan/destination-check', planRateLimiter, async (req: Request, res: Response) => {
   const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   if (!q) return res.status(400).json({ error: 'q is required' });
+
+  if (!isGoogleMapsConfigured()) {
+    // Not the user's fault, and it would be a lie to blame their spelling —
+    // tell them honestly instead of pretending Google couldn't find the place.
+    return res.json({
+      success: true,
+      data: { valid: false, reason: 'The trip planner is temporarily unavailable — please try browsing cars directly.' },
+    });
+  }
 
   const place = await geocodeDestination(q);
   if (!place) {
@@ -57,7 +67,7 @@ router.get('/plan/suggest-car', async (req: Request, res: Response) => {
   res.json({ success: true, data: { car, exactMatch } });
 });
 
-router.get('/plan/hotels', async (req: Request, res: Response) => {
+router.get('/plan/hotels', planRateLimiter, async (req: Request, res: Response) => {
   const lat = Number(req.query.lat);
   const lng = Number(req.query.lng);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {

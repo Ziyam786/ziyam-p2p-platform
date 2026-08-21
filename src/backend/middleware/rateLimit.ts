@@ -64,3 +64,21 @@ export const kycRateLimiter = rateLimit({
     error: 'Too many verification attempts. Please try again in an hour, or contact support if you are stuck.',
   },
 });
+
+// /plan/destination-check and /plan/hotels (plan.routes.ts) each call a
+// METERED third-party Google API — Geocoding and Places Nearby Search
+// respectively (Places is ~$32/1000 requests). Same reasoning as
+// kycRateLimiter above: an unthrottled endpoint calling a billed external
+// API is a direct billing-abuse vector, not just a DoS one. These routes are
+// public/unauthenticated (unlike KYC), so this is keyed by IP alone. 30
+// requests/15min/IP is generous for a genuine trip-planning session (a
+// handful of destination checks plus a hotel load per destination) while
+// still bounding spend from any single source. Deliberately NOT applied to
+// /plan/suggest-car, which only queries our own DB and doesn't call a paid API.
+export const planRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please slow down and try again shortly.' },
+});

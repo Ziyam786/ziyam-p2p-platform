@@ -6,6 +6,7 @@ vi.mock('../src/backend/services/googleMapsService', () => ({
   BENGALURU: { lat: 12.9716, lng: 77.5946 },
   geocodeDestination: vi.fn(),
   findNearbyHotels: vi.fn(),
+  isGoogleMapsConfigured: vi.fn(),
   haversineKm: (a: any, b: any) => {
     // Real haversine so distance-based assertions below are meaningful.
     const R = 6371;
@@ -25,7 +26,7 @@ const prismaMock = vi.hoisted(() => ({ car: { findFirst: vi.fn() } }));
 // used for the same mock in tests/payoutSplit.test.ts.
 vi.mock('@prisma/client', () => ({ PrismaClient: vi.fn(function () { return prismaMock; }) }));
 
-import { geocodeDestination, findNearbyHotels } from '../src/backend/services/googleMapsService';
+import { geocodeDestination, findNearbyHotels, isGoogleMapsConfigured } from '../src/backend/services/googleMapsService';
 import planRoutes from '../src/backend/routes/plan.routes';
 
 const app = express();
@@ -34,6 +35,10 @@ app.use('/api', planRoutes);
 
 beforeEach(() => {
   vi.mocked(geocodeDestination).mockReset();
+  vi.mocked(isGoogleMapsConfigured).mockReset();
+  // Configured by default — the one test below that needs the unconfigured
+  // fail-open path opts into it explicitly.
+  vi.mocked(isGoogleMapsConfigured).mockReturnValue(true);
 });
 
 describe('GET /plan/destination-check', () => {
@@ -67,6 +72,14 @@ describe('GET /plan/destination-check', () => {
     // discrepancy noted against the same city pair).
     expect(res.body.data.distanceKm).toBeGreaterThan(180);
     expect(res.body.data.distanceKm).toBeLessThan(220);
+  });
+
+  it('returns an honest "temporarily unavailable" reason (not a spelling-blame message) when Google Maps is not configured', async () => {
+    vi.mocked(isGoogleMapsConfigured).mockReturnValue(false);
+    const res = await request(app).get('/api/plan/destination-check?q=Ooty');
+    expect(res.body.data.valid).toBe(false);
+    expect(res.body.data.reason).toMatch(/temporarily unavailable/i);
+    expect(geocodeDestination).not.toHaveBeenCalled();
   });
 });
 
