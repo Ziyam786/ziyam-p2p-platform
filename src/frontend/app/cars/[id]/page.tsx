@@ -15,6 +15,8 @@ import { carsApi, bookingsApi, settingsApi, promoApi, ApiError } from '../../../
 import { getStickyDates } from '../../../lib/searchDates';
 import { computeDemandMultiplier, DEMAND_PRICING_FALLBACK } from '../../../lib/demandPricing';
 import { carImageSrc, isValidImageSrc } from '../../../lib/carImage';
+import CarSpinViewer from '../../../components/CarSpinViewer';
+import { isAngleComplete, EXTERIOR_SPIN_ORDER, type ExteriorAngle } from '../../../lib/carPhotoAngles';
 import type { AvailabilityRange } from '../../../lib/api';
 import type { Car, DemandPricing, LongRentalDiscount, Review } from '../../../lib/types';
 
@@ -59,6 +61,7 @@ export default function CarDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [activeImg, setActiveImg] = useState('');
+  const [activeAngle, setActiveAngle] = useState<ExteriorAngle>('FRONT');
   const [pickup, setPickup] = useState('');
   const [dropoff, setDropoff] = useState('');
   const [plan, setPlan] = useState<'BASIC' | 'STANDARD' | 'PREMIUM'>('BASIC');
@@ -243,25 +246,45 @@ export default function CarDetailPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* Hero image */}
             <div className="relative rounded-2xl overflow-hidden h-72 md:h-96 bg-gray-200">
-              {activeImg && (
-                <Image src={activeImg} alt={`${car.make} ${car.model}`} fill priority sizes="(max-width: 1024px) 100vw, 66vw" className="object-cover" />
+              {isAngleComplete(car.imageAngles) ? (
+                <CarSpinViewer
+                  images={car.images}
+                  imageAngles={car.imageAngles ?? []}
+                  alt={`${car.make} ${car.model}`}
+                  angle={activeAngle}
+                  onAngleChange={setActiveAngle}
+                  className="absolute inset-0"
+                  imgClassName="object-cover"
+                />
+              ) : (
+                activeImg && (
+                  <Image src={activeImg} alt={`${car.make} ${car.model}`} fill priority sizes="(max-width: 1024px) 100vw, 66vw" className="object-cover" />
+                )
               )}
             </div>
 
             {/* Thumbnails */}
             {car.images.filter(isValidImageSrc).length > 1 && (
               <div className="flex gap-3">
-                {car.images.filter(isValidImageSrc).map((img, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setActiveImg(img)}
-                    className={`relative w-20 h-14 rounded-xl overflow-hidden border-2 transition ${
-                      activeImg === img ? 'border-amber-500' : 'border-transparent'
-                    }`}
-                  >
-                    <Image src={img} alt="" fill sizes="80px" className="object-cover" />
-                  </button>
-                ))}
+                {car.images.filter(isValidImageSrc).map((img, i) => {
+                  const thumbnailAngle = car.imageAngles?.[i] as ExteriorAngle | undefined;
+                  const isExteriorAngle = thumbnailAngle && (EXTERIOR_SPIN_ORDER as readonly string[]).includes(thumbnailAngle);
+                  const isActive = isExteriorAngle ? activeAngle === thumbnailAngle : activeImg === img;
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        setActiveImg(img);
+                        if (isExteriorAngle) setActiveAngle(thumbnailAngle as ExteriorAngle);
+                      }}
+                      className={`relative w-20 h-14 rounded-xl overflow-hidden border-2 transition ${
+                        isActive ? 'border-amber-500' : 'border-transparent'
+                      }`}
+                    >
+                      <Image src={img} alt="" fill sizes="80px" className="object-cover" />
+                    </button>
+                  );
+                })}
               </div>
             )}
 
