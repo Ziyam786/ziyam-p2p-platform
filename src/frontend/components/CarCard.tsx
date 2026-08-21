@@ -7,6 +7,9 @@ import { useAuth } from '../lib/auth-context';
 import { useWishlist } from '../lib/wishlist-context';
 import { carImageSrc } from '../lib/carImage';
 import type { Car } from '../lib/types';
+import CarSpinViewer from './CarSpinViewer';
+import { isAngleComplete } from '../lib/carPhotoAngles';
+import type { ExteriorAngle } from '../lib/carPhotoAngles';
 
 interface CarCardProps {
   car: Car;
@@ -21,6 +24,8 @@ const FUEL_ICONS: Record<string, string> = {
 
 export default function CarCard({ car }: CarCardProps) {
   const [imgSrc, setImgSrc] = useState(() => carImageSrc(car.images));
+  const [spinAngle, setSpinAngle] = useState<ExteriorAngle>('FRONT');
+  const angleComplete = isAngleComplete(car.imageAngles);
   const { user } = useAuth();
   const { isWishlisted, toggle } = useWishlist();
   const wishlisted = isWishlisted(car.id);
@@ -39,14 +44,26 @@ export default function CarCard({ car }: CarCardProps) {
     <div className="card-elevated group bg-white rounded-2xl overflow-hidden flex flex-col border border-gray-100">
       {/* Image */}
       <div className="relative h-44 bg-gray-100 overflow-hidden">
-        <Image
-          src={imgSrc}
-          alt={`${car.make} ${car.model}`}
-          fill
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          className="object-cover transition-transform duration-500 ease-out group-hover:scale-110 will-change-transform"
-          onError={() => setImgSrc('/placeholder-car.jpg')}
-        />
+        {angleComplete ? (
+          <CarSpinViewer
+            images={car.images}
+            imageAngles={car.imageAngles ?? []}
+            alt={`${car.make} ${car.model}`}
+            angle={spinAngle}
+            onAngleChange={setSpinAngle}
+            className="absolute inset-0"
+            imgClassName="object-cover"
+          />
+        ) : (
+          <Image
+            src={imgSrc}
+            alt={`${car.make} ${car.model}`}
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            className="object-cover transition-transform duration-500 ease-out group-hover:scale-110 will-change-transform"
+            onError={() => setImgSrc('/placeholder-car.jpg')}
+          />
+        )}
         {!car.isAvailable && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
             <span className="text-white font-bold text-sm bg-red-500 px-3 py-1 rounded-full">Booked</span>
