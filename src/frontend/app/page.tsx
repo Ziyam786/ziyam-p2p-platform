@@ -1105,22 +1105,6 @@ export default function HomePage() {
       </section>
 
       <Footer />
-
-      {/* Floating WhatsApp concierge button */}
-      <motion.a
-        href={COMPANY.whatsappUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Chat with ZiyamSelfDrive on WhatsApp"
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-emerald-500 hover:bg-emerald-400 flex items-center justify-center shadow-2xl shadow-emerald-500/30"
-        initial={{ opacity: 0, scale: 0.7 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4, delay: 1 }}
-        whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.94 }}
-      >
-        <MessageCircle className="w-6 h-6 text-white" />
-      </motion.a>
     </div>
   );
 }

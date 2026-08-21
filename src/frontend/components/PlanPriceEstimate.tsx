@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { IndianRupee } from 'lucide-react';
 import { settingsApi } from '../lib/api';
 import { estimateTripPrice, defaultTripDays } from '../lib/tripPriceEstimate';
 
@@ -35,7 +36,10 @@ export default function PlanPriceEstimate({
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5">
       <div className="flex items-center justify-between mb-3">
-        <p className="text-xs font-semibold text-amber-500 uppercase tracking-wider">Estimated trip cost</p>
+        <p className="text-xs font-semibold text-amber-500 uppercase tracking-wider flex items-center gap-1.5">
+          <IndianRupee className="w-3.5 h-3.5" />
+          Estimated trip cost
+        </p>
         <label className="flex items-center gap-2 text-sm text-gray-600">
           Days
           <input
