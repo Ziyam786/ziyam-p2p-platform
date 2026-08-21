@@ -10,3 +10,9 @@ export function isAngleComplete(imageAngles: string[] | null | undefined): boole
   const present = new Set(imageAngles);
   return REQUIRED_CAR_ANGLES.every((angle) => present.has(angle));
 }
+
+export function isBookable(car: { imageAngles: string[] }, enforcementDate: string): boolean {
+  if (isAngleComplete(car.imageAngles)) return true;
+  if (!enforcementDate) return true;
+  return new Date() < new Date(enforcementDate);
+}

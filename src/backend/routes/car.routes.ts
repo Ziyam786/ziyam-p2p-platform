@@ -10,6 +10,7 @@ import { computeYieldSuggestion, applyYieldSuggestion } from '../services/yieldE
 import { isRcVerificationConfigured, extractRcDocument, fetchDocAsBase64, assertReadableDocument } from '../services/aryaVerificationService';
 import { safeErrorMessage } from '../utils/errorResponse';
 import { config } from '../config';
+import { isBookable } from '../utils/carPhotoAngles';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -57,7 +58,14 @@ router.get('/cars', async (req: Request, res: Response) => {
     include: { reviews: { where: { hidden: false }, select: { rating: true } }, owner: { select: { fullName: true } } },
   });
 
-  const data = cars.map(withRatingSummary);
+  // Only the customer-facing "show me bookable cars" query is gated —
+  // availableOnly=false requests (e.g. a host viewing their own listing
+  // regardless of its bookable state) are unaffected.
+  const bookableCars = availableOnly === 'true'
+    ? cars.filter((c) => isBookable(c, config.photoAngleEnforcementDate))
+    : cars;
+
+  const data = bookableCars.map(withRatingSummary);
   const sorted = sort === 'rating' ? [...data].sort((a: any, b: any) => b.rating - a.rating) : data;
 
   res.json({ success: true, count: sorted.length, data: sorted });
