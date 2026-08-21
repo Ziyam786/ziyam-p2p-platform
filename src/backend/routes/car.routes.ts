@@ -197,7 +197,7 @@ router.patch('/cars/:id', requireAuth, async (req: Request, res: Response) => {
   const {
     make, model, year, category, fuelType, transmission, seats,
     dailyRate, securityDeposit, kmIncludedPerDay, extraKmCharge,
-    description, images, originalImages, features, city, address, latitude, longitude, isAvailable, instantBook,
+    description, images, originalImages, imageAngles, features, city, address, latitude, longitude, isAvailable, instantBook,
     offersDelivery, deliveryFee, offersPickup, pickupFee,
     rcDocUrl, pollutionCertUrl, insuranceDocUrl, rcExpiry, insuranceExpiry, pucExpiry, onboardingStep,
     noNightBookings, nightBookingStart, nightBookingEnd,
@@ -241,6 +241,7 @@ router.patch('/cars/:id', requireAuth, async (req: Request, res: Response) => {
       ...(description !== undefined && { description }),
       ...(images !== undefined && { images }),
       ...(originalImages !== undefined && { originalImages }),
+      ...(imageAngles !== undefined && { imageAngles }),
       ...(features !== undefined && { features }),
       ...(city !== undefined && { city }),
       ...(address !== undefined && { address }),
