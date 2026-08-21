@@ -1,8 +1,36 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { AxonSupplyGateway } from '../services/axonSupplyGateway';
 import { AxonPricingEngine } from '../services/axonPricingEngine';
+import { config } from '../config';
 
 const router = Router();
+
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+}
+
+// Every route below is a B2B integration surface for external fleet
+// aggregators (Zoomcar, Revv), not an end-user session — there's no cookie
+// or JWT to check. Each partner instead gets a static key, sent as the
+// X-Axon-Api-Key header (search, pricing) or an apiKey query param (the
+// .ics calendar route, since a partner's calendar-sync job may not be able
+// to set a custom header on that GET). Fails closed: an empty configured
+// list (no AXON_PARTNER_API_KEYS set) rejects everyone rather than opening
+// the gateway to the public by omission.
+function requireAxonApiKey(req: Request, res: Response, next: NextFunction) {
+  const configuredKeys = config.axon.partnerApiKeys;
+  const suppliedKey = (req.headers['x-axon-api-key'] as string | undefined) ?? (req.query.apiKey as string | undefined);
+
+  if (configuredKeys.length === 0 || !suppliedKey || !configuredKeys.some((key) => safeEqual(key, suppliedKey))) {
+    return res.status(401).json({ error: 'Invalid or missing Axon API key' });
+  }
+  next();
+}
+
+router.use(requireAxonApiKey);
 
 // GET /api/v1/axon/search - Search available fleet in real time
 router.get('/search', async (req: Request, res: Response) => {

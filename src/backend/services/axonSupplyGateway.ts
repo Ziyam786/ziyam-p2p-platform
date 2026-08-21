@@ -26,6 +26,12 @@ export class AxonSupplyGateway {
     const requestedEndWithBuffer = new Date(requestedEnd.getTime() + this.SANITIZATION_BUFFER_MS);
 
     // 1. Fetch active vehicles in the target city
+    // Explicit select, not the whole Car row: this response goes to an
+    // external aggregator (Zoomcar/Revv), so it must exclude anything not
+    // needed for their listing/pricing display — host identity, document
+    // URLs (RC/insurance/PUC), registration number, fleet-agreement/e-sign
+    // state, telematics IMEI, and internal ops fields (pause/service/
+    // onboarding) never leave this system.
     const cars = await prisma.car.findMany({
       where: {
         city: { equals: city, mode: 'insensitive' },
@@ -33,13 +39,31 @@ export class AxonSupplyGateway {
         isAvailable: true,
         verificationStatus: 'VERIFIED',
       },
-      include: {
-        owner: {
-          select: {
-            id: true,
-            fullName: true,
-          },
-        },
+      select: {
+        id: true,
+        make: true,
+        model: true,
+        year: true,
+        category: true,
+        fuelType: true,
+        transmission: true,
+        seats: true,
+        dailyRate: true,
+        securityDeposit: true,
+        kmIncludedPerDay: true,
+        extraKmCharge: true,
+        images: true,
+        features: true,
+        city: true,
+        address: true,
+        latitude: true,
+        longitude: true,
+        isAvailable: true,
+        instantBook: true,
+        offersDelivery: true,
+        deliveryFee: true,
+        offersPickup: true,
+        pickupFee: true,
       },
     });
 
