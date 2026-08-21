@@ -68,6 +68,15 @@ enum BookingSource {
 }
 ```
 
+`User` gets one new field, for the RazorpayX payout mechanism described below:
+
+```prisma
+model User {
+  // ...existing fields...
+  razorpayxFundAccountId String? // cached RazorpayX fund_account_id, created once, reused for every subsequent payout
+}
+```
+
 Invariant enforced in application code (not a DB constraint Prisma can
 express directly): exactly one of `customerId` / `axonPartnerId` is set,
 matching `source`. Every existing query that currently assumes
@@ -121,17 +130,67 @@ Flow:
    and they know to hand over the car.
 7. Response: booking id, confirmed status, and the fare breakdown.
 
-## Payout — the one existing-code touchpoint that must change
+## Payout — a genuinely new mechanism, not a branch on an existing check
 
-Every payout checkpoint in `payoutEngine.ts` currently requires
-`booking.razorpayPaymentId` to exist (there's no captured payment for an
-invoiced partner booking). Each of those checks becomes: require
-`razorpayPaymentId` **unless** `booking.source === 'AXON_PARTNER'`, in which
-case the payout amount is computed directly from the booking's own recorded
-`totalAmount`/split rather than "whatever Razorpay actually captured." This
-is the only place existing payout logic needs a real branch — `assertPayoutEligible`
-itself (bank + PAN + agreement) is unaffected and applies identically
-regardless of booking source.
+**Correction from the original draft of this section:** `executeBankTransfer`
+calls Razorpay's `payments.transfer(razorpayPaymentId, ...)` — Razorpay
+Route's mechanism for splitting a *specific, already-captured payment*
+sitting in Ziyam's own Razorpay account out to a host's linked sub-account.
+An invoiced Axon booking has no such payment to split from at all (the
+partner pays via a periodic invoice, never through Razorpay), so this isn't
+a one-line branch on `razorpayPaymentId` — it needs a real, separate payout
+mechanism: **RazorpayX Payouts**, a standalone bank-transfer API (distinct
+product from Razorpay Payments) that pays out of Ziyam's own RazorpayX
+account balance directly, independent of any specific captured payment.
+
+**External prerequisite (your action, not something I can do):** RazorpayX
+requires its own account signup, KYC/activation, a funded balance to pay
+out from, and (per Razorpay's docs) IP allowlisting for the API. This is
+the same category of blocker as the Google Maps billing / Anthropic credits
+situations — the code can be built and will be ready, but it cannot be
+exercised end-to-end until the RazorpayX account exists and is funded.
+Whether it uses the same `RAZORPAY_KEY_ID`/`SECRET` pair as existing
+payment collection or a separate RazorpayX-specific key needs confirming
+once the account exists.
+
+**New service, `razorpayxPayoutService.ts`** (kept separate from
+`razorpayPaymentHandler.ts` — collecting a guest's payment and disbursing a
+host's payout are different products with different lifecycles, not one
+responsibility):
+
+- `getOrCreateFundAccount(host)`: creates a RazorpayX **Contact**
+  (`POST /v1/contacts`, `type: 'vendor'`, `reference_id: host.id`) then a
+  **Fund Account** (`POST /v1/fund_accounts`, `account_type: 'bank_account'`,
+  using the host's *already Sandbox-verified* `bankAccountNumber`/`bankIfsc`/
+  `bankNameAtBank`) — both calls are naturally idempotent per Razorpay's own
+  docs (matching details return the existing record instead of erroring), so
+  no local existence-check is needed before calling. The resulting
+  `fund_account_id` is cached on a new `User.razorpayxFundAccountId String?`
+  field so repeat payouts to the same host skip straight to the payout call.
+- `createPayout(fundAccountId, amountRupees, ledgerId)`: `POST /v1/payouts`
+  with `mode: 'IMPS'`, `purpose: 'payout'`, `queue_if_low_balance: true` (a
+  temporarily low RazorpayX balance queues the payout instead of hard-failing
+  it), `reference_id: ledgerId`, and an `X-Payout-Idempotency` header derived
+  from `ledgerId` (safe against retries). Returns the Razorpay payout `id`
+  and `status`.
+
+Each of the payout checkpoints in `payoutEngine.ts` (the cron release loop,
+`retryPayout`, the damage-claim path) branches on `booking.source`: guest
+bookings keep calling `executeBankTransfer` exactly as today;
+`AXON_PARTNER` bookings call `getOrCreateFundAccount` then `createPayout`
+instead. `assertPayoutEligible` (bank + PAN + Host Onboarding Agreement) is
+unaffected and applies identically regardless of source — a host still
+needs a Sandbox-verified bank account and PAN on file; RazorpayX just pays
+out to that same verified account through a different rail.
+
+A RazorpayX payout can land in `queued`/`pending`/`processing` before
+`processed` (or `failed`/`reversed`) — unlike the Route-transfer path, this
+isn't synchronous-or-failed. The payout ledger entry's `status` should move
+to `SETTLED` only once confirmed `processed`; a webhook (`payout.processed`/
+`payout.failed`/`payout.reversed`) is the correct way to learn the outcome
+rather than polling, matching how `razorpayWebhook.routes.ts` already
+handles payment-side webhooks. This adds one more webhook route to build,
+scoped inside this same task since the payout flow is incomplete without it.
 
 ## Admin UI
 
