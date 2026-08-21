@@ -15,7 +15,7 @@ export type DamageClaimStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'BILL_SUBMITTED' 
 export type TripIssueType = 'DAMAGE' | 'FUEL' | 'FASTAG';
 export type CancelledBy = 'CUSTOMER' | 'HOST' | 'SYSTEM' | 'ADMIN';
 export type TripStage = 'PRE_TRIP' | 'POST_TRIP';
-export type PhotoAngle = 'FRONT' | 'REAR' | 'LEFT' | 'RIGHT' | 'MIRROR_LEFT' | 'MIRROR_RIGHT' | 'ODOMETER' | 'OTHER';
+export type PhotoAngle = 'FRONT' | 'REAR' | 'LEFT' | 'RIGHT' | 'MIRROR_LEFT' | 'MIRROR_RIGHT' | 'ODOMETER' | 'INTERIOR_FRONT' | 'INTERIOR_REAR' | 'OTHER';
 
 export type CarVerificationStatus = 'PENDING' | 'PENDING_REVIEW' | 'VERIFIED' | 'REJECTED';
 
@@ -67,9 +67,11 @@ export interface Car {
   extraKmCharge: number;
   description?: string | null;
   images: string[];
-  // Admin-only unblurred originals, same array index as `images` — never
-  // rendered by any customer-facing page/component (see PlateBlurEditor.tsx).
+  // Admin-only unblurred originals, same array index as `images` (see PlateBlurEditor.tsx).
   originalImages?: string[];
+  // Angle label for the photo at the same index in `images` — see
+  // lib/carPhotoAngles.ts's isAngleComplete().
+  imageAngles?: string[];
   features: string[];
   city: string;
   address?: string | null;
@@ -326,6 +328,7 @@ export interface PublicSettings {
   smart_pricing: SmartPricing;
   demand_pricing: DemandPricing;
   fuel_price_per_litre: number;
+  photo_angle_enforcement_date: string | null;
 }
 
 export interface PromoCode {

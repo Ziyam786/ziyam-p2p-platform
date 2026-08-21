@@ -20,6 +20,7 @@ import ScrollReveal, { StaggerGroup, StaggerItem } from '../components/ScrollRev
 import MotionButton from '../components/MotionButton';
 import TiltCard from '../components/TiltCard';
 import { carsApi, settingsApi } from '../lib/api';
+import { isAngleComplete } from '../lib/carPhotoAngles';
 import { COMPANY } from '../lib/companyInfo';
 import { setStickyDates } from '../lib/searchDates';
 import type { Car, CategoryDef, CityDef, Testimonial, TrustBadge } from '../lib/types';
@@ -669,7 +670,7 @@ export default function HomePage() {
               <div>
                 <span className="text-amber-400 text-xs font-bold uppercase tracking-widest">Live Fleet</span>
                 <h2 className="text-3xl font-extrabold text-white mt-2">Explore the fleet in 3D</h2>
-                <p className="text-slate-400 text-sm mt-1">Tilt any card — real listings, filtered by real specs.</p>
+                <p className="text-slate-400 text-sm mt-1">Tilt or drag to spin — real listings, filtered by real specs.</p>
               </div>
               <a href="/cars" className="text-amber-400 hover:text-amber-300 text-sm font-semibold transition inline-flex items-center gap-1 shrink-0">
                 View full fleet <ArrowRight className="w-4 h-4" />
@@ -711,21 +712,35 @@ export default function HomePage() {
               )
               : filteredFleet.map((car) => (
                 <StaggerItem key={car.id}>
-                  <TiltCard maxTilt={6} className="relative h-full">
-                    {/* Badge lives inside the same translateZ(20px) plane as the
-                        card, not as a z=0 sibling of it — TiltCard's parent has
-                        transform-style: preserve-3d, and inside a preserve-3d
-                        context, 3D depth (translateZ) determines paint order
-                        ahead of z-index. A z=0 badge next to a z=20px card gets
-                        painted behind the card regardless of z-index, which is
-                        why it showed up as a sliver clipped behind the card. */}
-                    <div className="relative h-full [transform:translateZ(20px)]">
+                  {isAngleComplete(car.imageAngles) ? (
+                    // Angle-complete cars already deliver a real drag-to-spin
+                    // interaction inside CarCard (CarSpinViewer) — stacking
+                    // TiltCard's mouse-tilt effect on top would fight the drag
+                    // gesture and be redundant, so these render without the
+                    // TiltCard wrapper.
+                    <div className="relative h-full">
                       <span className="absolute -top-3 left-4 z-20 inline-flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg">
                         <BadgeCheck className="w-3 h-3" /> Verified &amp; Inspected
                       </span>
                       <CarCard car={car} />
                     </div>
-                  </TiltCard>
+                  ) : (
+                    <TiltCard maxTilt={6} className="relative h-full">
+                      {/* Badge lives inside the same translateZ(20px) plane as the
+                          card, not as a z=0 sibling of it — TiltCard's parent has
+                          transform-style: preserve-3d, and inside a preserve-3d
+                          context, 3D depth (translateZ) determines paint order
+                          ahead of z-index. A z=0 badge next to a z=20px card gets
+                          painted behind the card regardless of z-index, which is
+                          why it showed up as a sliver clipped behind the card. */}
+                      <div className="relative h-full [transform:translateZ(20px)]">
+                        <span className="absolute -top-3 left-4 z-20 inline-flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg">
+                          <BadgeCheck className="w-3 h-3" /> Verified &amp; Inspected
+                        </span>
+                        <CarCard car={car} />
+                      </div>
+                    </TiltCard>
+                  )}
                 </StaggerItem>
               ))}
           </StaggerGroup>

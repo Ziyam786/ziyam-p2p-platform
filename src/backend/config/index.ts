@@ -171,6 +171,13 @@ export const config = {
       .map((k) => k.trim())
       .filter(Boolean),
   },
+
+  // Global cutover date for the fleet photo-angle requirement (see
+  // utils/carPhotoAngles.ts). Cars missing any of the 6 required angle
+  // photos stay bookable until this date, then drop out of search/booking
+  // until the host backfills them — a one-time grace period for the
+  // existing fleet, not a per-car deadline. Leave unset to never enforce.
+  photoAngleEnforcementDate: process.env.PHOTO_ANGLE_ENFORCEMENT_DATE ?? '',
 };
 
 export { requireEnv };

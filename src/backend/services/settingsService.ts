@@ -225,5 +225,6 @@ export async function getPublicSettings() {
   for (const key of PUBLIC_KEYS) {
     result[key] = map.has(key) ? map.get(key) : DEFAULT_SETTINGS[key];
   }
+  result.photo_angle_enforcement_date = config.photoAngleEnforcementDate || null;
   return result;
 }

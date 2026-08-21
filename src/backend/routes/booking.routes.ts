@@ -41,6 +41,9 @@ function mirrorBookingParticipants(bookingId: string, customerId: string, hostId
 const WASH_SERVICE_PRICE = 349;
 
 import { isBookingOverlapViolation, BOOKING_OVERLAP_MESSAGE } from '../utils/bookingOverlap';
+import { isBookable } from '../utils/carPhotoAngles';
+import { config } from '../config';
+
 const router = Router();
 const prisma = new PrismaClient();
 
@@ -138,6 +141,9 @@ router.post('/booking', requireAuth, async (req: Request, res: Response) => {
     const car = await prisma.car.findUnique({ where: { id: carId }, include: { owner: true } });
     if (!car) return res.status(404).json({ error: 'Car not found' });
     if (!car.isAvailable) return res.status(409).json({ error: 'Car is no longer available' });
+    if (!isBookable(car, config.photoAngleEnforcementDate)) {
+      return res.status(409).json({ error: 'This car is missing required listing photos and is not currently bookable.' });
+    }
     // Verification existing (PENDING_REVIEW badge, admin review queue) means
     // nothing if an unreviewed car can still be booked — this is the actual
     // enforcement point. Cars auto-VERIFIED before this gate existed stay
