@@ -159,6 +159,18 @@ export const config = {
     url: process.env.SUPABASE_URL ?? '',
     publishableKey: process.env.SUPABASE_PUBLISHABLE_KEY ?? '',
   },
+
+  // Axon Supply Gateway (routes/axon.routes.ts) — B2B endpoints external
+  // fleet aggregators (Zoomcar, Revv) call directly for live inventory,
+  // pricing, and calendar sync. There's no user session on their side, so
+  // each partner gets a static key instead; comma-separated so one
+  // compromised/retired partner key can be rotated without affecting others.
+  axon: {
+    partnerApiKeys: (process.env.AXON_PARTNER_API_KEYS ?? '')
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean),
+  },
 };
 
 export { requireEnv };
