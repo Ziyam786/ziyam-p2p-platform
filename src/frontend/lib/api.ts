@@ -264,7 +264,9 @@ export const disputeSupportApi = {
 };
 
 /* ── Itinerary unlocks ────────────────────────────────────────────── */
-export type ItineraryDestination = 'Ooty' | 'Coorg' | 'Chikmagalur' | 'Gokarna';
+// Was a fixed 4-value union; the road-trip planner takes free-text
+// destination input now (see docs/superpowers/specs/2026-08-20-interactive-road-trip-planner-design.md).
+export type ItineraryDestination = string;
 
 export interface ItineraryUnlock {
   id: string;
@@ -282,6 +284,42 @@ export const itinerariesApi = {
   unlock: (data: { destination: ItineraryDestination; customerName: string; customerEmail: string; customerPhone: string }) =>
     post<{ success: true; data: RazorpayCheckoutSession & { id: string } }>('/itineraries/unlock', data),
   get: (id: string) => get<{ success: true; data: ItineraryUnlock }>(`/itineraries/${id}`),
+};
+
+/* ── Road-trip planner (plan, search, suggest) ──────────────────────── */
+export interface DestinationCheckResult {
+  valid: boolean;
+  reason?: string;
+  placeName?: string;
+  lat?: number;
+  lng?: number;
+  distanceKm?: number;
+}
+
+export interface PlanCar {
+  id: string;
+  make: string;
+  model: string;
+  city: string;
+  category: string;
+  dailyRate: number;
+  seats: number;
+  transmission: string;
+  fuelType: string;
+}
+
+export interface HotelSuggestion {
+  name: string;
+  rating: number | null;
+  priceLevel: number | null;
+  address: string;
+}
+
+export const planApi = {
+  destinationCheck: (q: string) => get<{ success: true; data: DestinationCheckResult }>(`/plan/destination-check?q=${encodeURIComponent(q)}`),
+  suggestCar: (distanceKm: number, city = 'Bengaluru') =>
+    get<{ success: true; data: { car: PlanCar | null; exactMatch: boolean } }>(`/plan/suggest-car?distanceKm=${distanceKm}&city=${encodeURIComponent(city)}`),
+  hotels: (lat: number, lng: number) => get<{ success: true; data: HotelSuggestion[] }>(`/plan/hotels?lat=${lat}&lng=${lng}`),
 };
 
 /* ── Payments ─────────────────────────────────────────────────────── */

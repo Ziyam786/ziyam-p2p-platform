@@ -8,3 +8,4 @@ process.env.JWT_SECRET ??= 'test-jwt-secret-not-used-in-production';
 process.env.RAZORPAY_KEY_ID ??= 'rzp_test_key_id';
 process.env.RAZORPAY_KEY_SECRET ??= 'rzp_test_key_secret';
 process.env.RAZORPAY_WEBHOOK_SECRET ??= 'rzp_test_webhook_secret';
+process.env.GOOGLE_MAPS_SERVER_API_KEY ??= 'test-google-maps-key';

@@ -54,6 +54,15 @@ export const config = {
     apiKey: process.env.TELEMATICS_API_KEY ?? '',
   },
 
+  // Server-side Geocoding API + Places API calls for the road-trip planner
+  // (src/backend/services/googleMapsService.ts). Separate from the
+  // frontend's NEXT_PUBLIC_GOOGLE_MAPS_API_KEY (a browser key restricted to
+  // website domains) — a server-to-server call has no Referer header, so it
+  // needs its own key, restricted to this server's IP in Cloud Console.
+  googleMaps: {
+    serverApiKey: process.env.GOOGLE_MAPS_SERVER_API_KEY ?? '',
+  },
+
   kyc: {
     provider: process.env.KYC_PROVIDER ?? 'digilocker',
     apiKey: process.env.KYC_API_KEY ?? '',
