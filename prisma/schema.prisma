@@ -192,6 +192,13 @@ model User {
   bankNameAtBank      String?
   bankAccountVerified Boolean @default(false)
 
+  // Sandbox PAN verification — required for hosts before payouts release
+  // (assertPayoutEligible in payoutEngine.ts), same provider/pattern as the
+  // bank penny-drop check above.
+  panNumber     String?
+  panCategory   String?
+  isPanVerified Boolean @default(false)
+
   // Extended verification checklist (matches host-app profile: signature for
   // lease agreements, alternate contact, liveness selfie)
   signatureUrl         String?

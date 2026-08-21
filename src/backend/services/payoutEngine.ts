@@ -32,14 +32,31 @@ export class PayoutEngine {
    * completed." Computed at check-time, matching house style elsewhere
    * (docsComplete/stepsCompleted in CarOnboardingWizard) — never persisted as
    * a boolean since the underlying fields can change at any time.
+   *
+   * Also the single gate for the Sandbox-verified bank account and PAN
+   * (Aug-2026 policy) — previously the bank check was duplicated across
+   * three separate call sites; centralized here alongside PAN so there's one
+   * place that decides "is this host actually payable."
    */
-  private static assertPayoutEligible(host: { partnerAgreementWetSignedUrl: string | null; partnerAgreementEsignStatus: string | null }) {
+  private static assertPayoutEligible(host: {
+    partnerAgreementWetSignedUrl: string | null;
+    partnerAgreementEsignStatus: string | null;
+    payoutAccountId: string | null;
+    bankAccountVerified: boolean;
+    isPanVerified: boolean;
+  }) {
     const eligible = Boolean(host.partnerAgreementWetSignedUrl) && host.partnerAgreementEsignStatus === 'sign_complete';
     if (!eligible) {
       throw new Error(
         'Payout blocked: this host has not completed the Host Onboarding Agreement (both wet and e-signature required). ' +
         'Ask them to finish it from Account → Host Agreement.'
       );
+    }
+    if (!host.payoutAccountId || !host.bankAccountVerified) {
+      throw new Error('Host has no linked, Sandbox-verified payout account');
+    }
+    if (!host.isPanVerified) {
+      throw new Error('Payout blocked: this host has not completed PAN verification. Ask them to verify it from their dashboard.');
     }
   }
 
@@ -203,14 +220,12 @@ export class PayoutEngine {
 
       for (const payout of maturePayouts) {
         try {
-          if (!payout.host.payoutAccountId || !payout.host.bankAccountVerified) {
-            throw new Error('Host has no linked, Sandbox-verified payout account');
-          }
+          this.assertPayoutEligible(payout.host);
           if (!payout.booking.razorpayPaymentId) {
             throw new Error('Underlying booking has no captured Razorpay payment to split from');
           }
           const payoutTxnId = await this.executeBankTransfer(
-            payout.host.payoutAccountId,
+            payout.host.payoutAccountId!,
             payout.netPayout,
             payout.booking.razorpayPaymentId,
             payout.id
@@ -390,12 +405,12 @@ export class PayoutEngine {
     const payout = await prisma.payoutLedger.findUnique({ where: { id: ledgerId }, include: { host: true, booking: true } });
     if (!payout) throw new Error('Payout ledger entry not found');
     if (payout.status !== PayoutStatus.FAILED) throw new Error(`Cannot retry a payout in status ${payout.status}`);
-    if (!payout.host.payoutAccountId || !payout.host.bankAccountVerified) throw new Error('Host has no linked, Sandbox-verified payout account');
+    this.assertPayoutEligible(payout.host);
     if (!payout.booking.razorpayPaymentId) throw new Error('Underlying booking has no captured Razorpay payment to split from');
 
     try {
       const payoutTxnId = await this.executeBankTransfer(
-        payout.host.payoutAccountId,
+        payout.host.payoutAccountId!,
         payout.netPayout,
         payout.booking.razorpayPaymentId,
         payout.id
@@ -442,7 +457,6 @@ export class PayoutEngine {
     const host = await prisma.user.findUnique({ where: { id: booking.car.ownerId } });
     if (!host) throw new Error('Host account not found');
     this.assertPayoutEligible(host);
-    if (!host.payoutAccountId || !host.bankAccountVerified) throw new Error('Host has no linked, Sandbox-verified payout account');
     if (!booking.razorpayPaymentId) throw new Error('Underlying booking has no captured Razorpay payment to split from');
 
     const depositPortion = Math.min(claim.approvedDeduction, booking.depositAmount);
@@ -477,11 +491,11 @@ export class PayoutEngine {
       const txnIds: string[] = [];
       if (depositPortion > 0) {
         const amount = excessPortion > 0 ? depositPortion : netPayout; // single-leg case carries the fee-adjusted total
-        txnIds.push(await this.executeBankTransfer(host.payoutAccountId, amount, booking.razorpayPaymentId, ledger.id));
+        txnIds.push(await this.executeBankTransfer(host.payoutAccountId!, amount, booking.razorpayPaymentId, ledger.id));
       }
       if (excessPortion > 0) {
         const amount = depositPortion > 0 ? netPayout - depositPortion : netPayout;
-        txnIds.push(await this.executeBankTransfer(host.payoutAccountId, amount, claim.excessChargeRazorpayPaymentId!, ledger.id));
+        txnIds.push(await this.executeBankTransfer(host.payoutAccountId!, amount, claim.excessChargeRazorpayPaymentId!, ledger.id));
       }
       await prisma.payoutLedger.update({ where: { id: ledger.id }, data: { status: PayoutStatus.SETTLED, payoutTxnId: txnIds.join(',') } });
       await notify(
