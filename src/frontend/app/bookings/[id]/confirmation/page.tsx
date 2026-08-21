@@ -8,6 +8,7 @@ import Footer from '../../../../components/Footer';
 import ProtectedRoute from '../../../../components/ProtectedRoute';
 import { bookingsApi } from '../../../../lib/api';
 import { trackEvent } from '../../../../lib/mixpanel';
+import { carImageSrc } from '../../../../lib/carImage';
 import type { Booking } from '../../../../lib/types';
 
 const PAID_BOOKING_STATUSES = new Set(['RESERVED', 'PENDING_HOST_REVIEW', 'CONFIRMED']);
@@ -77,7 +78,7 @@ function ConfirmationInner() {
           <div className="bg-white rounded-2xl border border-gray-100 p-6 text-left mb-8">
             <div className="flex items-center gap-4">
               <div className="relative w-20 h-14 rounded-lg overflow-hidden bg-gray-100 shrink-0">
-                <Image src={booking.car?.images?.[0] ?? '/placeholder-car.jpg'} alt="" fill sizes="80px" className="object-cover" />
+                <Image src={carImageSrc(booking.car?.images)} alt="" fill sizes="80px" className="object-cover" />
               </div>
               <div>
                 <p className="font-bold text-gray-900">{booking.car?.make} {booking.car?.model}</p>

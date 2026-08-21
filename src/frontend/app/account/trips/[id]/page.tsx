@@ -16,6 +16,7 @@ import TripCountdownCard from '../../../../components/TripCountdownCard';
 import HandoverChecklistCard from '../../../../components/HandoverChecklistCard';
 import { bookingsApi, reviewsApi, damageClaimApi, disputeSupportApi, paymentsApi } from '../../../../lib/api';
 import { openRazorpayCheckout } from '../../../../lib/razorpayCheckout';
+import { carImageSrc } from '../../../../lib/carImage';
 import type { Booking, BookingConditionPhoto, DamageClaim, DisputeSupportRequest, PhotoAngle, TripStage } from '../../../../lib/types';
 
 const REQUIRED_PHOTO_ANGLES: PhotoAngle[] = ['FRONT', 'REAR', 'LEFT', 'RIGHT'];
@@ -278,7 +279,7 @@ function TripDetailInner() {
 
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
           <div className="relative w-full h-56">
-            <Image src={trip.car?.images?.[0] ?? '/placeholder-car.jpg'} alt="" fill sizes="(max-width: 768px) 100vw, 700px" className="object-cover" />
+            <Image src={carImageSrc(trip.car?.images)} alt="" fill sizes="(max-width: 768px) 100vw, 700px" className="object-cover" />
           </div>
           <div className="p-6">
             <div className="flex justify-between items-start flex-wrap gap-3">

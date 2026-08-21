@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Rating from './Rating';
 import { useAuth } from '../lib/auth-context';
 import { useWishlist } from '../lib/wishlist-context';
+import { carImageSrc } from '../lib/carImage';
 import type { Car } from '../lib/types';
 
 interface CarCardProps {
@@ -19,7 +20,7 @@ const FUEL_ICONS: Record<string, string> = {
 };
 
 export default function CarCard({ car }: CarCardProps) {
-  const image = car.images?.[0] ?? '/placeholder-car.jpg';
+  const image = carImageSrc(car.images);
   const { user } = useAuth();
   const { isWishlisted, toggle } = useWishlist();
   const wishlisted = isWishlisted(car.id);
