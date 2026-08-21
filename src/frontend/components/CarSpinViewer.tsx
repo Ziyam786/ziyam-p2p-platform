@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { EXTERIOR_SPIN_ORDER, type ExteriorAngle } from '../lib/carPhotoAngles';
 
@@ -33,15 +33,24 @@ export default function CarSpinViewer({ images, imageAngles, alt, angle, onAngle
   }
   const currentSrc = imgSrc ?? angleToUrl[angle] ?? '/placeholder-car.jpg';
 
-  React.useEffect(() => {
+  useEffect(() => {
     const timer = setTimeout(() => setShowHint(false), 2500);
     return () => clearTimeout(timer);
   }, []);
 
+  // Reset the error-fallback override whenever the angle prop itself changes,
+  // whether driven by this component's own advance() or by an external
+  // caller (e.g. a thumbnail row) setting `angle` directly. Without this,
+  // a placeholder shown for one angle would leak onto every subsequent
+  // angle, since currentSrc's `imgSrc ??` check short-circuits before ever
+  // looking at the new angle's real URL.
+  useEffect(() => {
+    setImgSrc(null);
+  }, [angle]);
+
   function advance(direction: 1 | -1) {
     const currentIndex = EXTERIOR_SPIN_ORDER.indexOf(angle);
     const nextIndex = (currentIndex + direction + EXTERIOR_SPIN_ORDER.length) % EXTERIOR_SPIN_ORDER.length;
-    setImgSrc(null);
     onAngleChange(EXTERIOR_SPIN_ORDER[nextIndex]);
   }
 
