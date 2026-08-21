@@ -346,7 +346,7 @@ export class PayoutEngine {
             }),
           ]);
           await notify(
-            booking.customerId,
+            booking.customerId!,
             'GENERIC',
             'Booking declined',
             `The host didn't respond in time for your ${booking.car.make} ${booking.car.model} booking — you've been fully refunded.`,
@@ -386,7 +386,7 @@ export class PayoutEngine {
             },
           });
           await notify(
-            booking.customerId,
+            booking.customerId!,
             'GENERIC',
             'Reservation expired',
             `Your reservation for the ${booking.car.make} ${booking.car.model} expired before the balance was paid — the ₹${booking.reservationFeeAmount} reservation fee isn't refundable, and the dates are open to other guests now.`,

@@ -56,7 +56,7 @@ export async function processCapturedPayment(orderId: string, paymentId: string,
           include: { car: true },
         });
         await notify(
-          updated.customerId,
+          updated.customerId!,
           'GENERIC',
           'Reservation confirmed',
           `You've reserved the ${updated.car.make} ${updated.car.model} — pay the balance within ${RESERVATION_WINDOW_HOURS}h to lock in your trip.`,
@@ -89,7 +89,7 @@ export async function processCapturedPayment(orderId: string, paymentId: string,
           await prisma.promoCode.update({ where: { code: booking.promoCode }, data: { usedCount: { increment: 1 } } });
         }
         await notify(
-          updated.customerId,
+          updated.customerId!,
           'GENERIC',
           'Booking request sent',
           `Your request for the ${updated.car.make} ${updated.car.model} is awaiting host confirmation.`,

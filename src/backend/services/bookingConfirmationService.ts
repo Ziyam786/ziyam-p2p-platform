@@ -41,12 +41,12 @@ export async function sendBookingConfirmedNotifications(bookingId: string): Prom
   const hostVars = { carName, dates, link: tripLink };
 
   await Promise.all([
-    sendTemplateSms(booking.customer.phoneNumber, config.sms.bookingConfirmedTemplateId, guestVars),
+    sendTemplateSms(booking.customer!.phoneNumber, config.sms.bookingConfirmedTemplateId, guestVars),
     sendTemplateSms(booking.car.owner.phoneNumber, config.sms.bookingConfirmedTemplateId, hostVars),
-    sendTemplateWhatsapp(booking.customer.phoneNumber, 'booking_confirmed_guest', guestVars),
+    sendTemplateWhatsapp(booking.customer!.phoneNumber, 'booking_confirmed_guest', guestVars),
     sendTemplateWhatsapp(booking.car.owner.phoneNumber, 'booking_confirmed_host', hostVars),
     sendEmail(
-      booking.customer.email,
+      booking.customer!.email,
       `Booking confirmed — ${carName}`,
       emailShell(
         'Your trip is booked!',
@@ -61,7 +61,7 @@ export async function sendBookingConfirmedNotifications(bookingId: string): Prom
       `Booking confirmed — ${carName}`,
       emailShell(
         'You confirmed a booking',
-        `<p><strong>${carName}</strong><br>${dates}<br>Guest: ${booking.customer.fullName}</p>
+        `<p><strong>${carName}</strong><br>${dates}<br>Guest: ${booking.customer!.fullName}</p>
          <p><a href="${hostDashboardLink}" style="color:#d97706;">View on your dashboard</a></p>
          <p><a href="${agreementLink}" style="color:#d97706;">View the lease agreement</a></p>`
       )

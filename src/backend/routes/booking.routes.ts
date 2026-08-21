@@ -448,7 +448,7 @@ router.post('/booking/:id/complete', requireAuth, async (req: Request, res: Resp
     });
     if (lateFeeAmount > 0) {
       await notify(
-        booking.customerId,
+        booking.customerId!,
         'GENERIC',
         'Late return fee applied',
         `Returning the ${existing.car.make} ${existing.car.model} ${Math.round(hoursLate)}h late added a ₹${lateFeeAmount.toLocaleString('en-IN')} fee, deducted from your security deposit.`,
@@ -462,7 +462,7 @@ router.post('/booking/:id/complete', requireAuth, async (req: Request, res: Resp
         '/host/dashboard'
       );
     }
-    await creditReferralRewardIfFirstTrip(booking.customerId);
+    await creditReferralRewardIfFirstTrip(booking.customerId!);
 
     // Fleet-managed cars don't schedule a payout here — that only happens once
     // the fleet operator confirms receipt (see /booking/:id/fleet-receipt below).
@@ -694,7 +694,7 @@ router.post('/bookings/:id/delivery-location', requireAuth, async (req: Request,
     data: { deliveryLatitude: latitude, deliveryLongitude: longitude, deliveryLocationUpdatedAt: new Date() },
     select: { deliveryLatitude: true, deliveryLongitude: true, deliveryLocationUpdatedAt: true },
   });
-  mirrorBookingParticipants(id, booking.customerId, booking.car.ownerId);
+  mirrorBookingParticipants(id, booking.customerId!, booking.car.ownerId);
   mirrorToFirestore('deliveryTracking', id, {
     latitude: updated.deliveryLatitude,
     longitude: updated.deliveryLongitude,
@@ -759,7 +759,7 @@ router.post('/bookings/:id/live-location', requireAuth, async (req: Request, res
     data: { liveLatitude: latitude, liveLongitude: longitude, liveLocationUpdatedAt: new Date() },
     select: { liveLatitude: true, liveLongitude: true, liveLocationUpdatedAt: true },
   });
-  mirrorBookingParticipants(id, booking.customerId, booking.car.ownerId);
+  mirrorBookingParticipants(id, booking.customerId!, booking.car.ownerId);
   mirrorToFirestore('tripTracking', id, {
     latitude: updated.liveLatitude,
     longitude: updated.liveLongitude,
@@ -835,7 +835,7 @@ router.post('/bookings/:id/messages', requireAuth, async (req: Request, res: Res
     data: { bookingId: id, senderId: req.user!.userId, body: String(body).trim() },
     include: { sender: { select: { id: true, fullName: true, avatarUrl: true } } },
   });
-  mirrorBookingParticipants(id, booking.customerId, booking.car.ownerId);
+  mirrorBookingParticipants(id, booking.customerId!, booking.car.ownerId);
   mirrorToFirestore(`tripChats/${id}/messages`, message.id, {
     id: message.id,
     body: message.body,
@@ -845,7 +845,7 @@ router.post('/bookings/:id/messages', requireAuth, async (req: Request, res: Res
     senderAvatarUrl: message.sender.avatarUrl ?? null,
   });
 
-  const recipientId = isCustomer ? booking.car.ownerId : booking.customerId;
+  const recipientId = isCustomer ? booking.car.ownerId : booking.customerId!;
   await notify(
     recipientId,
     'GENERIC',
