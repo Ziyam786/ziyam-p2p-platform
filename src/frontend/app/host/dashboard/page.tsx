@@ -49,6 +49,7 @@ function DashboardInner() {
   const [bankIfsc, setBankIfsc] = useState('');
   const [bankAccountNumber, setBankAccountNumber] = useState('');
   const [verifyingBank, setVerifyingBank] = useState(false);
+  const [editingBank, setEditingBank] = useState(false);
 
   async function handleVerifyBank(e: React.FormEvent) {
     e.preventDefault();
@@ -58,11 +59,36 @@ function DashboardInner() {
       show('Bank account verified — payouts are now enabled on your cars', 'success');
       setBankIfsc('');
       setBankAccountNumber('');
+      setEditingBank(false);
       await refresh();
     } catch (err) {
       show(err instanceof ApiError ? err.message : 'Could not verify bank account', 'error');
     } finally {
       setVerifyingBank(false);
+    }
+  }
+
+  const [pan, setPan] = useState('');
+  const [panName, setPanName] = useState('');
+  const [panDob, setPanDob] = useState('');
+  const [verifyingPan, setVerifyingPan] = useState(false);
+  const [editingPan, setEditingPan] = useState(false);
+
+  async function handleVerifyPan(e: React.FormEvent) {
+    e.preventDefault();
+    setVerifyingPan(true);
+    try {
+      await usersApi.verifyPan(pan.trim().toUpperCase(), panName.trim(), panDob.trim());
+      show('PAN verified — payouts are now enabled on your cars', 'success');
+      setPan('');
+      setPanName('');
+      setPanDob('');
+      setEditingPan(false);
+      await refresh();
+    } catch (err) {
+      show(err instanceof ApiError ? err.message : 'Could not verify PAN', 'error');
+    } finally {
+      setVerifyingPan(false);
     }
   }
 
@@ -81,11 +107,20 @@ function DashboardInner() {
       })
       .catch((err) => show(err.message ?? 'Failed to load dashboard data', 'error'))
       .finally(() => active && setLoading(false));
-    loadRequestCount();
     return () => {
       active = false;
     };
   }, [user, show]);
+
+  useEffect(() => {
+    if (!user) return;
+    loadRequestCount();
+    // A host sitting on this dashboard otherwise never sees the "(N)" tab
+    // badge update until they navigate away and back — same 60s cadence as
+    // NotificationBell and BookingRequestsPanel's own poll.
+    const interval = setInterval(loadRequestCount, 60000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   async function toggleAvailability(car: Car) {
     try {
@@ -344,13 +379,21 @@ function DashboardInner() {
           <div className="space-y-6">
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
               <h3 className="text-xl font-bold mb-1">Payout Bank Account</h3>
-              {user?.payoutAccountId ? (
-                <div className="mt-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-3 flex items-center gap-3">
-                  <span className="text-emerald-400 text-lg">✓</span>
-                  <div>
-                    <p className="text-sm font-semibold text-emerald-300">Verified — payouts are enabled</p>
-                    {user.bankNameAtBank && <p className="text-xs text-gray-400 mt-0.5">{user.bankNameAtBank} · account ending {user.bankAccountNumber?.slice(-4)}</p>}
+              {user?.payoutAccountId && !editingBank ? (
+                <div className="mt-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-emerald-400 text-lg">✓</span>
+                    <div>
+                      <p className="text-sm font-semibold text-emerald-300">Verified — payouts are enabled</p>
+                      {user.bankNameAtBank && <p className="text-xs text-gray-400 mt-0.5">{user.bankNameAtBank} · account ending {user.bankAccountNumber?.slice(-4)}</p>}
+                    </div>
                   </div>
+                  <button
+                    onClick={() => setEditingBank(true)}
+                    className="text-xs font-semibold text-amber-400 hover:text-amber-300 shrink-0"
+                  >
+                    Update
+                  </button>
                 </div>
               ) : (
                 <>
@@ -371,12 +414,82 @@ function DashboardInner() {
                         className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
                       />
                     </label>
-                    <button
-                      type="submit" disabled={verifyingBank}
-                      className="sm:col-span-2 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold py-2.5 rounded-lg transition disabled:opacity-60"
-                    >
-                      {verifyingBank ? 'Verifying…' : 'Verify Bank Account'}
-                    </button>
+                    <div className="sm:col-span-2 flex gap-3">
+                      <button
+                        type="submit" disabled={verifyingBank}
+                        className="flex-1 btn-gradient text-white font-semibold py-2.5 rounded-lg transition disabled:opacity-60"
+                      >
+                        {verifyingBank ? 'Verifying…' : 'Verify Bank Account'}
+                      </button>
+                      {editingBank && (
+                        <button type="button" onClick={() => setEditingBank(false)} className="px-4 text-sm font-semibold text-gray-400 hover:text-gray-200">
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                  </form>
+                </>
+              )}
+            </div>
+
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+              <h3 className="text-xl font-bold mb-1">PAN Verification</h3>
+              {user?.isPanVerified && !editingPan ? (
+                <div className="mt-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-emerald-400 text-lg">✓</span>
+                    <div>
+                      <p className="text-sm font-semibold text-emerald-300">PAN verified</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{user.panNumber}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setEditingPan(true)}
+                    className="text-xs font-semibold text-amber-400 hover:text-amber-300 shrink-0"
+                  >
+                    Update
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-400 mb-4">Also required before payouts release — verified via Sandbox.</p>
+                  <form onSubmit={handleVerifyPan} className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
+                    <label className="block sm:col-span-2">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block">PAN Number</span>
+                      <input
+                        required value={pan} onChange={(e) => setPan(e.target.value.toUpperCase())}
+                        placeholder="ABCDE1234F" maxLength={10}
+                        className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block">Name (as per PAN)</span>
+                      <input
+                        required value={panName} onChange={(e) => setPanName(e.target.value)}
+                        className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block">Date of Birth</span>
+                      <input
+                        required value={panDob} onChange={(e) => setPanDob(e.target.value)}
+                        placeholder="DD/MM/YYYY"
+                        className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </label>
+                    <div className="sm:col-span-2 flex gap-3">
+                      <button
+                        type="submit" disabled={verifyingPan}
+                        className="flex-1 btn-gradient text-white font-semibold py-2.5 rounded-lg transition disabled:opacity-60"
+                      >
+                        {verifyingPan ? 'Verifying…' : 'Verify PAN'}
+                      </button>
+                      {editingPan && (
+                        <button type="button" onClick={() => setEditingPan(false)} className="px-4 text-sm font-semibold text-gray-400 hover:text-gray-200">
+                          Cancel
+                        </button>
+                      )}
+                    </div>
                   </form>
                 </>
               )}

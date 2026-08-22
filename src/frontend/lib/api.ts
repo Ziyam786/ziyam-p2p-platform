@@ -352,6 +352,8 @@ export const usersApi = {
     get<{ success: true; data: { status: string | null; downloadUrl?: string } }>('/users/me/partner-agreement/esign/status'),
   verifyBankAccount: (ifsc: string, accountNumber: string) =>
     post<{ success: true; data: PublicUser }>('/users/me/bank/verify', { ifsc, accountNumber }),
+  verifyPan: (pan: string, nameAsPerPan: string, dateOfBirth: string) =>
+    post<{ success: true; data: PublicUser }>('/users/me/pan/verify', { pan, nameAsPerPan, dateOfBirth }),
   registerPushToken: (token: string, platform?: string) =>
     post<{ success: true }>('/users/me/push-token', { token, platform }),
   unregisterPushToken: (token: string) =>

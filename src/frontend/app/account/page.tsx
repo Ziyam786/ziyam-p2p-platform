@@ -7,6 +7,7 @@ import ProtectedRoute from '../../components/ProtectedRoute';
 import { useAuth } from '../../lib/auth-context';
 import { useToast } from '../../components/Toast';
 import BankVerification from '../../components/BankVerification';
+import PanVerification from '../../components/PanVerification';
 import VerificationChecklist from '../../components/VerificationChecklist';
 import ReferAndEarn from '../../components/ReferAndEarn';
 import { usersApi } from '../../lib/api';
@@ -113,8 +114,9 @@ function AccountInner() {
         </div>
 
         {(user.role === 'SELF_HOST' || user.role === 'FLEET_OPERATOR') && (
-          <div className="mt-6">
+          <div className="mt-6 space-y-6">
             <BankVerification />
+            <PanVerification />
           </div>
         )}
       </div>

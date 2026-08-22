@@ -67,6 +67,13 @@ export interface BankVerifyResult {
   message: string;
 }
 
+export interface PanVerifyResult {
+  category: string;
+  nameMatch: boolean;
+  dateOfBirthMatch: boolean;
+  aadhaarSeedingStatus: string;
+}
+
 export const sandboxService = {
   async generateAadhaarOtp(aadhaarNumber: string, reason: string): Promise<AadhaarOtpGenerateResult> {
     assertConfigured();
@@ -115,12 +122,65 @@ export const sandboxService = {
       params: name ? { name } : undefined,
     });
     const d = res.data.data;
+    // Diagnostic only — logs the response shape/message, not the account
+    // number itself, so we can confirm `account_exists` is really the field
+    // name the LIVE endpoint uses (the Aadhaar-OTP flow had exactly this
+    // "field doesn't mean what the code assumed" bug — see generateAadhaarOtp
+    // above). Remove once confirmed against a real verification attempt.
+    console.log('[SANDBOX] bank verify response:', {
+      topLevelKeys: Object.keys(d ?? {}),
+      account_exists: d?.account_exists,
+      message: d?.message,
+    });
     return {
       accountExists: Boolean(d.account_exists),
       nameAtBank: d.name_at_bank ?? null,
       utr: d.utr ?? null,
       amountDeposited: d.amount_deposited ?? null,
       message: d.message,
+    };
+  },
+
+  async verifyPan(pan: string, nameAsPerPan: string, dateOfBirthDDMMYYYY: string, reason: string): Promise<PanVerifyResult> {
+    assertConfigured();
+    const headers = await authedHeaders();
+    const res = await client().post(
+      '/kyc/pan/verify',
+      {
+        '@entity': 'in.co.sandbox.kyc.pan_verification.request',
+        pan,
+        name_as_per_pan: nameAsPerPan,
+        date_of_birth: dateOfBirthDDMMYYYY,
+        consent: 'Y',
+        reason,
+      },
+      { headers }
+    );
+    const d = res.data.data;
+    // Per Sandbox's documented contract, a well-formed-but-real-world-invalid
+    // PAN can still come back HTTP 200 with `status` set to something other
+    // than "valid" — same "200 masks a business rejection" pattern already
+    // hardened in generateAadhaarOtp above. A genuinely malformed PAN pattern
+    // is the one case Sandbox itself rejects with a real HTTP 422.
+    if (d?.status !== 'valid') {
+      const err = new Error(d?.remarks || `PAN verification failed (status: ${d?.status ?? 'unknown'})`) as Error & {
+        sandboxBusinessFailure?: true;
+      };
+      err.sandboxBusinessFailure = true;
+      throw err;
+    }
+    if (!d.name_as_per_pan_match || !d.date_of_birth_match) {
+      const err = new Error('The name or date of birth you entered does not match this PAN.') as Error & {
+        sandboxBusinessFailure?: true;
+      };
+      err.sandboxBusinessFailure = true;
+      throw err;
+    }
+    return {
+      category: d.category,
+      nameMatch: d.name_as_per_pan_match,
+      dateOfBirthMatch: d.date_of_birth_match,
+      aadhaarSeedingStatus: d.aadhaar_seeding_status,
     };
   },
 

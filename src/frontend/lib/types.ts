@@ -36,6 +36,9 @@ export interface PublicUser {
   bankIfsc?: string | null;
   bankNameAtBank?: string | null;
   bankAccountVerified?: boolean;
+  panNumber?: string | null;
+  panCategory?: string | null;
+  isPanVerified?: boolean;
   signatureUrl?: string | null;
   selfieUrl?: string | null;
   alternatePhoneNumber?: string | null;
