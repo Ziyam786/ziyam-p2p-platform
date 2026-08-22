@@ -36,7 +36,14 @@ export default function BookingDetailModal({ booking, onClose }: { booking: Admi
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <p className="text-xs text-slate-500">Customer</p>
-              <p className="text-slate-200">{booking.customer?.fullName ?? '—'}</p>
+              {booking.source === 'AXON_PARTNER' ? (
+                <p className="text-slate-200 flex items-center gap-1.5">
+                  <span className="bg-sky-500/10 text-sky-300 text-[10px] font-bold px-2 py-0.5 rounded-full">AXON</span>
+                  {booking.axonPartner?.companyName ?? 'Partner'}
+                </p>
+              ) : (
+                <p className="text-slate-200">{booking.customer?.fullName ?? '—'}</p>
+              )}
             </div>
             <div>
               <p className="text-xs text-slate-500">Dates</p>

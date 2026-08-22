@@ -372,12 +372,29 @@ router.post('/booking/:id/start', requireAuth, async (req: Request, res: Respons
   const { otp } = req.body;
   const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
   if (!booking) return res.status(404).json({ error: 'Booking not found' });
-  if (booking.customerId !== req.user!.userId) return res.status(403).json({ error: 'Not your booking' });
+
+  // AXON_PARTNER bookings have no real Ziyam-side guest (customerId is null —
+  // the partner's own end-customer is the actual driver, off-platform). The
+  // two-party OTP handshake below exists to stop a host from unilaterally
+  // starting/billing a *real* guest's trip; that protection doesn't apply
+  // here since the partner is the customer of record and owns that
+  // relationship with their end-customer. So the host alone may start it,
+  // and the OTP check is skipped — but the pre-trip condition photos are
+  // still required, since that's host-driven, evidence-based proof of
+  // vehicle condition regardless of who the renter is.
+  const isAxonPartnerBooking = booking.source === 'AXON_PARTNER';
+  if (isAxonPartnerBooking) {
+    if (booking.car.ownerId !== req.user!.userId) return res.status(403).json({ error: 'Not your booking' });
+  } else {
+    if (booking.customerId !== req.user!.userId) return res.status(403).json({ error: 'Not your booking' });
+  }
   if (booking.status !== BookingStatus.CONFIRMED) {
     return res.status(400).json({ error: `Cannot start trip from status ${booking.status}` });
   }
-  if (!booking.startOtp || otp !== booking.startOtp) {
-    return res.status(400).json({ error: 'Incorrect pickup code. Ask the host for the code shown in their app.' });
+  if (!isAxonPartnerBooking) {
+    if (!booking.startOtp || otp !== booking.startOtp) {
+      return res.status(400).json({ error: 'Incorrect pickup code. Ask the host for the code shown in their app.' });
+    }
   }
   if (!(await hasRequiredConditionPhotos(id, TripStage.PRE_TRIP))) {
     return res.status(400).json({ error: 'Upload all 4 required pickup photos (front, rear, left, right) before starting the trip.' });
@@ -424,8 +441,14 @@ router.post('/booking/:id/complete', requireAuth, async (req: Request, res: Resp
     if (existing.status !== BookingStatus.ACTIVE) {
       return res.status(400).json({ error: `Cannot complete trip from status ${existing.status}` });
     }
-    if (!existing.endOtp || otp !== existing.endOtp) {
-      return res.status(400).json({ error: 'Incorrect trip-end code. Ask the host for the code shown in their app.' });
+    // See /start above — an AXON_PARTNER booking has no real Ziyam-side guest
+    // to relay an end-otp to/from, so that handshake is skipped for this
+    // source. Post-trip condition photos are still required.
+    const isAxonPartnerBooking = existing.source === 'AXON_PARTNER';
+    if (!isAxonPartnerBooking) {
+      if (!existing.endOtp || otp !== existing.endOtp) {
+        return res.status(400).json({ error: 'Incorrect trip-end code. Ask the host for the code shown in their app.' });
+      }
     }
     if (!(await hasRequiredConditionPhotos(id, TripStage.POST_TRIP))) {
       return res.status(400).json({ error: 'Upload all 4 required drop-off photos (front, rear, left, right) before completing the trip.' });
@@ -447,13 +470,18 @@ router.post('/booking/:id/complete', requireAuth, async (req: Request, res: Resp
       data: { status: BookingStatus.COMPLETED, lateFeeAmount, lateFeeHours: Math.max(0, hoursLate) },
     });
     if (lateFeeAmount > 0) {
-      await notify(
-        booking.customerId!,
-        'GENERIC',
-        'Late return fee applied',
-        `Returning the ${existing.car.make} ${existing.car.model} ${Math.round(hoursLate)}h late added a ₹${lateFeeAmount.toLocaleString('en-IN')} fee, deducted from your security deposit.`,
-        `/account/trips/${booking.id}`
-      );
+      // No Ziyam-side guest to notify for an AXON_PARTNER booking — a late fee
+      // on one of these is presumably invoiced to the partner separately,
+      // outside this route's scope. Just skip that half of the notification.
+      if (!isAxonPartnerBooking) {
+        await notify(
+          booking.customerId!,
+          'GENERIC',
+          'Late return fee applied',
+          `Returning the ${existing.car.make} ${existing.car.model} ${Math.round(hoursLate)}h late added a ₹${lateFeeAmount.toLocaleString('en-IN')} fee, deducted from your security deposit.`,
+          `/account/trips/${booking.id}`
+        );
+      }
       await notify(
         existing.car.ownerId,
         'GENERIC',
@@ -462,7 +490,11 @@ router.post('/booking/:id/complete', requireAuth, async (req: Request, res: Resp
         '/host/dashboard'
       );
     }
-    await creditReferralRewardIfFirstTrip(booking.customerId!);
+    // No Ziyam-side customer account exists for an AXON_PARTNER booking, so
+    // there's no referral relationship to credit.
+    if (!isAxonPartnerBooking) {
+      await creditReferralRewardIfFirstTrip(booking.customerId!);
+    }
 
     // Fleet-managed cars don't schedule a payout here — that only happens once
     // the fleet operator confirms receipt (see /booking/:id/fleet-receipt below).

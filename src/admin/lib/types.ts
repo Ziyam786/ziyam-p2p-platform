@@ -108,6 +108,8 @@ export interface AdminBooking {
   car?: { make: string; model: string; city: string };
   customerId: string;
   customer?: { fullName: string; email: string };
+  source?: 'GUEST' | 'AXON_PARTNER';
+  axonPartner?: { companyName: string } | null;
   startTime: string;
   endTime: string;
   totalAmount: number;

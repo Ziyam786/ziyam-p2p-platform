@@ -446,7 +446,11 @@ router.get('/cars/:id/bookings', requireAuth, async (req: Request, res: Response
 
   const bookings = await prisma.booking.findMany({
     where: { carId: id, status: { in: ['ACTIVE', 'COMPLETED'] } },
-    include: { customer: { select: { id: true, fullName: true } }, damageClaims: true },
+    include: {
+      customer: { select: { id: true, fullName: true } },
+      axonPartner: { select: { companyName: true } },
+      damageClaims: true,
+    },
     orderBy: { startTime: 'desc' },
     take: 50,
   });

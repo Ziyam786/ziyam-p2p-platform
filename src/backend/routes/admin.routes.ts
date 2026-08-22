@@ -45,6 +45,7 @@ router.get('/admin/bookings', async (req: Request, res: Response) => {
     include: {
       car: { select: { make: true, model: true, city: true } },
       customer: { select: { fullName: true, email: true } },
+      axonPartner: { select: { companyName: true } },
       refundRequests: { orderBy: { createdAt: 'desc' }, take: 1 },
     },
     orderBy: { createdAt: 'desc' },

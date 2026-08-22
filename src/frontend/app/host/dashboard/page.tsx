@@ -302,7 +302,10 @@ function DashboardInner() {
                   <div key={b.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <p className="font-semibold">{car ? `${car.make} ${car.model}` : 'Car'} · {b.customer?.fullName ?? 'Guest'}</p>
+                        <p className="font-semibold">
+                          {car ? `${car.make} ${car.model}` : 'Car'} ·{' '}
+                          {b.source === 'AXON_PARTNER' ? (b.axonPartner?.companyName ?? 'Axon Partner') : (b.customer?.fullName ?? 'Guest')}
+                        </p>
                         <p className="text-xs text-gray-400 mt-1">
                           {new Date(b.startTime).toLocaleDateString('en-IN')} – {new Date(b.endTime).toLocaleDateString('en-IN')}
                           {' · '}₹{b.hostPayoutAmount.toLocaleString('en-IN')} host share
