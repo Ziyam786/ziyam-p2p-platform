@@ -16,6 +16,28 @@ export class AxonSupplyGateway {
   private static readonly SANITIZATION_BUFFER_MS = 2 * 60 * 60 * 1000;
 
   /**
+   * True if no CONFIRMED/ACTIVE/PENDING_PAYMENT booking (plus the 2-hour
+   * sanitization buffer) overlaps the requested window for this one car.
+   * Extracted from searchAvailableFleet's inline query so the booking-write
+   * endpoint can re-check the exact same rule atomically, immediately before
+   * insert — a partner's search and book calls aren't the same request, so
+   * availability can have changed in between.
+   */
+  public static async isCarAvailableForWindow(carId: string, pickupTime: Date, dropTime: Date): Promise<boolean> {
+    const requestedEndWithBuffer = new Date(dropTime.getTime() + this.SANITIZATION_BUFFER_MS);
+    const conflict = await prisma.booking.findFirst({
+      where: {
+        carId,
+        status: { in: ['CONFIRMED', 'ACTIVE', 'PENDING_PAYMENT'] },
+        startTime: { lte: requestedEndWithBuffer },
+        endTime: { gte: pickupTime },
+      },
+      select: { id: true },
+    });
+    return !conflict;
+  }
+
+  /**
    * Finds available vehicles taking into account existing bookings,
    * blackout dates, and the 2-hour sanitization buffer.
    */
@@ -24,8 +46,6 @@ export class AxonSupplyGateway {
 
     const requestedStart = new Date(pickupTime);
     const requestedEnd = new Date(dropTime);
-    // Buffer window for the new booking
-    const requestedEndWithBuffer = new Date(requestedEnd.getTime() + this.SANITIZATION_BUFFER_MS);
 
     // 1. Fetch active vehicles in the target city
     // Explicit select, not the whole Car row: this response goes to an
@@ -76,35 +96,14 @@ export class AxonSupplyGateway {
 
     if (!bookableCars.length) return [];
 
-    const carIds = bookableCars.map((c) => c.id);
-
-    // 2. Find conflicting bookings that overlap with the requested window + buffer
-    const conflictingBookings = await prisma.booking.findMany({
-      where: {
-        carId: { in: carIds },
-        status: { in: ['CONFIRMED', 'ACTIVE', 'PENDING_PAYMENT'] },
-        OR: [
-          {
-            // Existing trip overlaps with requested start
-            startTime: { lte: requestedEndWithBuffer },
-            endTime: { gte: requestedStart },
-          },
-        ],
-      },
-      select: {
-        carId: true,
-      },
-    });
-
-    const bookedCarIds = new Set(conflictingBookings.map((b) => b.carId));
-
-    // 3. Filter out booked cars. imageAngles was only selected above to
-    // drive the isBookable() gate — strip it back out here so it doesn't
-    // leak to the aggregator alongside the fields already excluded in the
-    // select above.
-    return bookableCars
-      .filter((car) => !bookedCarIds.has(car.id))
-      .map(({ imageAngles, ...rest }) => rest);
+    // 2. Filter out cars with a conflicting booking in the requested window + buffer.
+    // 3. imageAngles was only selected above to drive the isBookable() gate —
+    // strip it back out here so it doesn't leak to the aggregator alongside
+    // the fields already excluded in the select above.
+    const availability = await Promise.all(
+      bookableCars.map(async (car) => ({ car, available: await this.isCarAvailableForWindow(car.id, requestedStart, requestedEnd) }))
+    );
+    return availability.filter((a) => a.available).map(({ car: { imageAngles, ...rest } }) => rest);
   }
 
   /**
