@@ -1,11 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { PrismaClient, AxonPartnerStatus } from '@prisma/client';
+import { Prisma, PrismaClient, AxonPartnerStatus } from '@prisma/client';
 import { AxonSupplyGateway } from '../services/axonSupplyGateway';
 import { AxonPricingEngine } from '../services/axonPricingEngine';
 import { PayoutEngine } from '../services/payoutEngine';
 import { comparePassword } from '../utils/password';
 import { isBookable } from '../utils/carPhotoAngles';
 import { notify } from '../services/notificationService';
+import { isBookingOverlapViolation, BOOKING_OVERLAP_MESSAGE } from '../utils/bookingOverlap';
 import { config } from '../config';
 
 declare global {
@@ -16,6 +17,9 @@ declare global {
     }
   }
 }
+
+/** Thrown inside the booking-creation transaction below to distinguish an intentional 409 conflict from any other transaction failure — mirrors booking.routes.ts's BookingConflictError (not exported there, so not reused directly). */
+class AxonBookingConflictError extends Error {}
 
 const prisma = new PrismaClient();
 
@@ -132,9 +136,6 @@ router.post('/bookings', async (req: Request, res: Response) => {
       return res.status(422).json({ error: 'This car is not currently bookable' });
     }
 
-    const available = await AxonSupplyGateway.isCarAvailableForWindow(carId, pickup, drop);
-    if (!available) return res.status(409).json({ error: 'This car is already booked for the requested window' });
-
     const fare = AxonPricingEngine.calculateFare({ dailyRate: car.dailyRate, pickupTime: pickup, dropTime: drop });
 
     // Booking.platformFee/hostPayoutAmount are the same Ziyam-commission
@@ -144,28 +145,86 @@ router.post('/bookings', async (req: Request, res: Response) => {
     // so an Axon booking must populate it the same way, not leave it at 0.
     const { platformFee, hostPayout } = await PayoutEngine.splitAmount(fare.baseFare, 0);
 
-    const booking = await prisma.booking.create({
-      data: {
-        carId,
-        customerId: null,
-        axonPartnerId: req.axonPartner!.id,
-        source: 'AXON_PARTNER',
-        startTime: pickup,
-        endTime: drop,
-        totalAmount: fare.baseFare,
-        platformFee,
-        hostPayoutAmount: hostPayout,
-        deliveryFeeAmount: 0,
-        depositAmount: 0,
-        status: 'CONFIRMED',
-      },
-    });
+    // The availability check and the create must happen as one atomic unit
+    // — a plain check-then-create (this route's original shape) lets two
+    // concurrent partner requests both pass the check before either
+    // commits, double-booking the car. Mirrors booking.routes.ts's fix for
+    // the identical race: Serializable isolation makes Postgres detect the
+    // write-write conflict and abort the loser with P2034, which we
+    // translate back into the same 409 the plain check used to return. The
+    // DB-level exclusion constraint (isBookingOverlapViolation) is the
+    // backstop that still holds even if this is ever weakened to a lower
+    // isolation level.
+    let bookingId: string;
+    try {
+      bookingId = await prisma.$transaction(
+        async (tx) => {
+          // Same rule as AxonSupplyGateway.isCarAvailableForWindow (same
+          // statuses, same 2-hour Mechanix Pro sanitization buffer),
+          // inlined here rather than called out to, so the check runs
+          // against `tx` — Serializable isolation only protects a
+          // check-then-write pair when both run on the same transaction
+          // client, not the bare module-level `prisma`.
+          const SANITIZATION_BUFFER_MS = 2 * 60 * 60 * 1000;
+          const requestedEndWithBuffer = new Date(drop.getTime() + SANITIZATION_BUFFER_MS);
+          const conflict = await tx.booking.findFirst({
+            where: {
+              carId,
+              status: { in: ['CONFIRMED', 'ACTIVE', 'PENDING_PAYMENT'] },
+              startTime: { lte: requestedEndWithBuffer },
+              endTime: { gte: pickup },
+            },
+            select: { id: true },
+          });
+          if (conflict) {
+            throw new AxonBookingConflictError('This car is already booked for the requested window');
+          }
+
+          const created = await tx.booking.create({
+            data: {
+              carId,
+              customerId: null,
+              axonPartnerId: req.axonPartner!.id,
+              source: 'AXON_PARTNER',
+              startTime: pickup,
+              endTime: drop,
+              totalAmount: fare.baseFare,
+              platformFee,
+              hostPayoutAmount: hostPayout,
+              deliveryFeeAmount: 0,
+              depositAmount: 0,
+              status: 'CONFIRMED',
+            },
+          });
+          return created.id;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error: any) {
+      if (error instanceof AxonBookingConflictError) {
+        return res.status(409).json({ error: error.message });
+      }
+      // P2034: Prisma/Postgres detected the serialization conflict itself —
+      // the losing request's inline conflict check above would have
+      // passed, so this IS a double-booking attempt, not a generic failure.
+      if (error?.code === 'P2034') {
+        return res.status(409).json({ error: BOOKING_OVERLAP_MESSAGE });
+      }
+      // Belt and braces: the serializable transaction above should already
+      // have caught any real race as P2034, but the database's exclusion
+      // constraint is the backstop that holds even if this path is ever
+      // refactored to a weaker isolation level.
+      if (isBookingOverlapViolation(error)) {
+        return res.status(409).json({ error: BOOKING_OVERLAP_MESSAGE });
+      }
+      throw error;
+    }
 
     await notify(car.ownerId, 'GENERIC', 'New booking (Axon partner)', `A partner booking is confirmed for your ${car.make} ${car.model}.`, '/host/dashboard');
 
     return res.json({
       success: true,
-      data: { bookingId: booking.id, status: booking.status, fare },
+      data: { bookingId, status: 'CONFIRMED', fare },
     });
   } catch (error: any) {
     return res.status(500).json({ error: error.message || 'Axon booking failed' });
