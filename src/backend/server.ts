@@ -22,6 +22,7 @@ import settingsRoutes from './routes/settings.routes';
 import aiRoutes from './routes/ai.routes';
 import promoCodeRoutes from './routes/promoCode.routes';
 import razorpayWebhookRoutes from './routes/razorpayWebhook.routes';
+import razorpayxWebhookRoutes from './routes/razorpayxWebhook.routes';
 import razorpayVerifyRoutes from './routes/razorpayVerify.routes';
 import wishlistRoutes from './routes/wishlist.routes';
 import notificationRoutes from './routes/notification.routes';
@@ -52,6 +53,7 @@ app.use(express.urlencoded({ extended: true }));
 // origin check to reject it, and ahead of express.json() since the webhook
 // route parses its own raw body for signature verification.
 app.use('/api', razorpayWebhookRoutes);
+app.use('/api', razorpayxWebhookRoutes);
 
 // CORS configuration - allow multiple origins
 const allowedOrigins = [

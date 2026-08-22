@@ -34,3 +34,13 @@ export function verifyWebhookSignature(rawBody: Buffer | string, signature: stri
   const expected = hmacSha256Hex(typeof rawBody === 'string' ? rawBody : rawBody.toString('utf8'), config.razorpay.webhookSecret);
   return timingSafeEqualHex(expected, signature);
 }
+
+/**
+ * Same HMAC-SHA256-of-raw-body scheme as verifyWebhookSignature, but against
+ * the separate secret configured in the RazorpayX dashboard (a distinct
+ * product from Razorpay Payments, with its own webhook config).
+ */
+export function verifyRazorpayXWebhookSignature(rawBody: Buffer | string, signature: string): boolean {
+  const expected = hmacSha256Hex(typeof rawBody === 'string' ? rawBody : rawBody.toString('utf8'), config.razorpayx.webhookSecret);
+  return timingSafeEqualHex(expected, signature);
+}
