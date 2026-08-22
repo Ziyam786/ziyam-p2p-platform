@@ -4,6 +4,7 @@ import crypto, { randomInt, randomUUID } from 'crypto';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { recordAudit } from '../middleware/auditLog';
 import { PayoutEngine } from '../services/payoutEngine';
+import { TelematicsService } from '../services/telematicsService';
 import { hashPassword } from '../utils/password';
 import { notify } from '../services/notificationService';
 import { safeErrorMessage } from '../utils/errorResponse';
@@ -43,8 +44,8 @@ router.get('/admin/bookings', async (req: Request, res: Response) => {
   const bookings = await prisma.booking.findMany({
     where: status ? { status: status as BookingStatus } : undefined,
     include: {
-      car: { select: { make: true, model: true, city: true } },
-      customer: { select: { fullName: true, email: true } },
+      car: { select: { make: true, model: true, city: true, registrationNo: true, telematicsImei: true } },
+      customer: { select: { fullName: true, email: true, phoneNumber: true } },
       axonPartner: { select: { companyName: true } },
       refundRequests: { orderBy: { createdAt: 'desc' }, take: 1 },
     },
@@ -52,6 +53,33 @@ router.get('/admin/bookings', async (req: Request, res: Response) => {
     take: 200,
   });
   res.json({ success: true, count: bookings.length, data: bookings });
+});
+
+// Admin-wide read of the same in-trip GPS ping the renter/host trip tracker
+// uses (see /bookings/:id/live-location in booking.routes.ts) — no
+// customer/host ownership check needed since this router already requires
+// ADMIN at the top, so ops can look up any ACTIVE trip's position.
+router.get('/admin/bookings/:id/live-location', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { car: true } });
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+  if (booking.car.telematicsImei) {
+    try {
+      const state = await TelematicsService.getVehicleState(booking.car.telematicsImei);
+      return res.json({ success: true, data: { latitude: state.latitude, longitude: state.longitude, updatedAt: new Date(), source: 'TELEMATICS' } });
+    } catch {
+      // Fall through to the host-reported position below.
+    }
+  }
+
+  if (booking.liveLatitude == null || booking.liveLongitude == null) {
+    return res.json({ success: true, data: null });
+  }
+  res.json({
+    success: true,
+    data: { latitude: booking.liveLatitude, longitude: booking.liveLongitude, updatedAt: booking.liveLocationUpdatedAt, source: 'HOST_APP' },
+  });
 });
 
 router.get('/admin/bookings/:id/condition-photos', async (req: Request, res: Response) => {

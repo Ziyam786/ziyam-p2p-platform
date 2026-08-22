@@ -26,6 +26,9 @@ const PUBLIC_USER_SELECT = {
   bankIfsc: true,
   bankNameAtBank: true,
   bankAccountVerified: true,
+  panNumber: true,
+  panCategory: true,
+  isPanVerified: true,
   signatureUrl: true,
   selfieUrl: true,
   alternatePhoneNumber: true,
@@ -132,6 +135,44 @@ router.post('/users/me/bank/verify', requireAuth, async (req: Request, res: Resp
   } catch (err: any) {
     console.error('[BANK VERIFY] failed:', err.response?.data ?? err.message);
     res.status(502).json({ error: 'Could not verify bank account right now. Please try again shortly.' });
+  }
+});
+
+// PAN verification — required for hosts before payouts release (see
+// assertPayoutEligible in payoutEngine.ts), same Sandbox provider/pattern as
+// the bank penny-drop check above.
+router.post('/users/me/pan/verify', requireAuth, async (req: Request, res: Response) => {
+  const { pan, nameAsPerPan, dateOfBirth } = req.body;
+  if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(String(pan ?? '').toUpperCase())) {
+    return res.status(400).json({ error: 'Invalid PAN format — should look like ABCDE1234F' });
+  }
+  if (!nameAsPerPan || String(nameAsPerPan).trim().length < 2) {
+    return res.status(400).json({ error: 'Name as per PAN is required' });
+  }
+  if (!/^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/[0-9]{4}$/.test(dateOfBirth ?? '')) {
+    return res.status(400).json({ error: 'Date of birth is required, in DD/MM/YYYY format' });
+  }
+
+  if (!sandboxService.isConfigured()) {
+    return res.status(503).json({ error: 'PAN verification is not configured yet (SANDBOX_API_KEY / SANDBOX_API_SECRET)' });
+  }
+
+  const panUpper = String(pan).toUpperCase();
+
+  try {
+    const result = await sandboxService.verifyPan(panUpper, nameAsPerPan, dateOfBirth, 'Ziyam host payout eligibility verification');
+    const user = await prisma.user.update({
+      where: { id: req.user!.userId },
+      data: { panNumber: panUpper, panCategory: result.category, isPanVerified: true },
+      select: PUBLIC_USER_SELECT,
+    });
+    res.json({ success: true, data: user });
+  } catch (err: any) {
+    if (err.sandboxBusinessFailure) {
+      return res.status(422).json({ error: err.message || 'This PAN could not be verified.' });
+    }
+    console.error('[PAN VERIFY] failed:', err.response?.data ?? err.message);
+    res.status(502).json({ error: 'Could not verify PAN right now. Please try again shortly.' });
   }
 });
 

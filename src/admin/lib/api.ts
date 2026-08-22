@@ -82,6 +82,8 @@ export const adminApi = {
 
   bookings: (status?: string) => get<{ success: true; data: AdminBooking[] }>(`/admin/bookings${status ? `?status=${status}` : ''}`),
   updateBooking: (id: string, status: string) => patch<{ success: true; data: AdminBooking }>(`/admin/bookings/${id}`, { status }),
+  bookingLiveLocation: (id: string) =>
+    get<{ success: true; data: { latitude: number; longitude: number; updatedAt: string | null; source: 'TELEMATICS' | 'HOST_APP' } | null }>(`/admin/bookings/${id}/live-location`),
   bookingConditionPhotos: (id: string) => get<{ success: true; data: BookingConditionPhoto[] }>(`/admin/bookings/${id}/condition-photos`),
   kycLog: (userId: string) => get<{ success: true; data: KycVerificationLogRow[] }>(`/admin/users/${userId}/kyc-log`),
   createBooking: (data: {

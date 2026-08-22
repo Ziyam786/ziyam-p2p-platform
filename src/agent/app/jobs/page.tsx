@@ -99,6 +99,10 @@ function JobCard({
   onUpdate?: (id: string, status: 'CONFIRMED' | 'COMPLETED' | 'CANCELLED') => void;
 }) {
   const when = new Date(job.scheduledDate).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+  const liveBooking = job.booking?.status === 'ACTIVE' && job.booking.liveLatitude != null && job.booking.liveLongitude != null ? job.booking : null;
+  const liveAgeMin = liveBooking?.liveLocationUpdatedAt
+    ? Math.max(0, Math.round((Date.now() - new Date(liveBooking.liveLocationUpdatedAt).getTime()) / 60000))
+    : null;
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
@@ -117,6 +121,20 @@ function JobCard({
         Requested by {job.requestedBy.fullName} · {job.requestedBy.phoneNumber}
       </p>
       {job.notes && <p className="text-xs text-slate-500">{job.notes}</p>}
+      {liveBooking && (
+        <p className="text-xs">
+          <span className="text-emerald-400 font-semibold">🛰 Trip in progress</span>
+          <span className="text-slate-500">{liveAgeMin != null ? ` · updated ${liveAgeMin}m ago` : ''} · </span>
+          <a
+            href={`https://www.google.com/maps?q=${liveBooking.liveLatitude},${liveBooking.liveLongitude}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-brand-400 hover:text-brand-300 font-semibold"
+          >
+            Locate car ↗
+          </a>
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
         <button
           type="button"

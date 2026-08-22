@@ -6,6 +6,7 @@ import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import SearchBar from '../../components/SearchBar';
 import CarCard from '../../components/CarCard';
+import Modal from '../../components/Modal';
 import { CarCardSkeleton } from '../../components/Skeleton';
 import { carsApi, settingsApi } from '../../lib/api';
 import type { Car } from '../../lib/types';
@@ -18,6 +19,15 @@ const SORT_OPTIONS = [
   { label: 'Price: Low to High', value: 'price_asc' },
   { label: 'Price: High to Low', value: 'price_desc' },
   { label: 'Top Rated', value: 'rating' },
+];
+
+// Curated shortcuts onto the same sort options above — a friendlier browsing
+// entry point than the raw dropdown, not a new dimension of data.
+const BROWSE_LENSES = [
+  { label: 'All', icon: '', sort: 'relevance' },
+  { label: 'Trending', icon: '🔥', sort: 'rating' },
+  { label: 'Premium', icon: '💎', sort: 'price_desc' },
+  { label: 'Budget', icon: '💰', sort: 'price_asc' },
 ];
 
 function CarsPageInner() {
@@ -35,6 +45,7 @@ function CarsPageInner() {
   const [sortBy, setSortBy] = useState('relevance');
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
   const [categories, setCategories] = useState<string[]>(CATEGORIES_FALLBACK);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   useEffect(() => {
     settingsApi
@@ -82,24 +93,9 @@ function CarsPageInner() {
     [city, category, transmission, fuel, maxPrice, showAvailableOnly]
   );
 
-  return (
-    <div className="min-h-screen bg-gray-50 font-sans">
-      <Navbar />
-
-      {/* Search bar strip */}
-      <div className="bg-gray-900 pt-20 pb-6 px-4">
-        <div className="max-w-5xl mx-auto">
-          <SearchBar compact />
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 py-8 flex gap-8">
-        {/* ── FILTERS SIDEBAR ──────────────────────────────────── */}
-        <aside className="hidden lg:block w-64 shrink-0">
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 sticky top-24 space-y-7">
-            <h2 className="font-bold text-gray-900 text-lg">Filters</h2>
-
-            {/* Category */}
+  const filterPanel = (
+    <div className="space-y-7">
+      {/* Category */}
             <div>
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Category</h3>
               <div className="flex flex-wrap gap-2">
@@ -190,16 +186,61 @@ function CarsPageInner() {
               <span className="text-sm text-gray-700">Available cars only</span>
             </label>
 
-            {hasActiveFilters && (
-              <button onClick={clearFilters} className="w-full text-xs text-red-400 hover:text-red-500 text-center py-2 transition">
-                Clear all filters
-              </button>
-            )}
+      {hasActiveFilters && (
+        <button onClick={clearFilters} className="w-full text-xs text-red-400 hover:text-red-500 text-center py-2 transition">
+          Clear all filters
+        </button>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-50 font-sans">
+      <Navbar />
+
+      {/* Search bar strip */}
+      <div className="bg-gray-900 pt-20 pb-6 px-4">
+        <div className="max-w-5xl mx-auto">
+          <SearchBar compact />
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 py-8 flex gap-8">
+        {/* ── FILTERS SIDEBAR (desktop) ───────────────────────── */}
+        <aside className="hidden lg:block w-64 shrink-0">
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 sticky top-24">
+            <h2 className="font-bold text-gray-900 text-lg mb-5">Filters</h2>
+            {filterPanel}
           </div>
         </aside>
 
         {/* ── CAR GRID ─────────────────────────────────────────── */}
         <main className="flex-1 min-w-0">
+          <button
+            onClick={() => setShowMobileFilters(true)}
+            className="lg:hidden mb-5 flex items-center gap-2 px-4 py-2 text-sm rounded-full font-semibold border border-gray-200 bg-white text-gray-700"
+          >
+            ⚙️ Filters
+            {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-amber-500" />}
+          </button>
+
+          <div className="flex flex-wrap gap-2 mb-5">
+            {BROWSE_LENSES.map((lens) => (
+              <button
+                key={lens.label}
+                onClick={() => setSortBy(lens.sort)}
+                className={`px-4 py-2 text-sm rounded-full font-semibold transition ${
+                  sortBy === lens.sort
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-white border border-gray-200 text-gray-600 hover:border-amber-300 hover:text-amber-600'
+                }`}
+              >
+                {lens.icon && <span className="mr-1">{lens.icon}</span>}
+                {lens.label}
+              </button>
+            ))}
+          </div>
+
           <div className="flex items-center justify-between mb-6">
             <p className="text-sm text-gray-500">
               <span className="font-bold text-gray-900">{loading ? '…' : cars.length}</span> cars found
@@ -241,6 +282,10 @@ function CarsPageInner() {
           )}
         </main>
       </div>
+
+      <Modal open={showMobileFilters} onClose={() => setShowMobileFilters(false)} title="Filters">
+        {filterPanel}
+      </Modal>
 
       <Footer />
     </div>

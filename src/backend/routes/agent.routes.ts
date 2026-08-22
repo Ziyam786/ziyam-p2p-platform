@@ -19,7 +19,11 @@ router.get('/agent/service-requests', async (req: Request, res: Response) => {
     include: {
       car: { select: { make: true, model: true, registrationNo: true, city: true, images: true } },
       requestedBy: { select: { fullName: true, phoneNumber: true } },
-      booking: { select: { id: true, startTime: true, endTime: true } },
+      // liveLatitude/liveLongitude let a field agent locate the car for a
+      // mid-trip wash/service job without calling the guest for an address —
+      // same host-reported/telematics ping the renter/host trip tracker uses,
+      // only populated once the trip is ACTIVE and the host's app has shared it.
+      booking: { select: { id: true, startTime: true, endTime: true, status: true, liveLatitude: true, liveLongitude: true, liveLocationUpdatedAt: true } },
     },
     orderBy: { scheduledDate: 'desc' },
   });

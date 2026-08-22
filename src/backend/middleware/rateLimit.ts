@@ -59,7 +59,7 @@ export const kycRateLimiter = rateLimit({
   limit: 15,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => (req as { user?: { id?: string } }).user?.id ?? ipKeyGenerator(req.ip ?? ''),
+  keyGenerator: (req) => req.user?.userId ?? ipKeyGenerator(req.ip ?? ''),
   message: {
     error: 'Too many verification attempts. Please try again in an hour, or contact support if you are stuck.',
   },

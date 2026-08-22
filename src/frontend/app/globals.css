@@ -16,15 +16,15 @@ html {
   }
 }
 
-/* Premium gradient CTA — transform/opacity/box-shadow only, so hover/press stay compositor-cheap. Anchored on Marc8's Essence Blue (#183eeb). */
+/* Premium gradient CTA — transform/opacity/box-shadow only, so hover/press stay compositor-cheap. Anchored on Eightlines' logo gold (#C4922C), matching the amber-500 reskin in tailwind.config.js. */
 .btn-gradient {
-  background-image: linear-gradient(135deg, #5872ea 0%, #183eeb 55%, #0e259d 100%);
-  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.35) inset, 0 6px 16px -4px rgba(24, 62, 235, 0.45);
+  background-image: linear-gradient(135deg, #e0ad53 0%, #c4922c 55%, #8a5f19 100%);
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.35) inset, 0 6px 16px -4px rgba(196, 146, 44, 0.45);
   transition: box-shadow 0.2s ease, filter 0.2s ease;
 }
 .btn-gradient:hover {
   filter: brightness(1.05);
-  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.4) inset, 0 10px 22px -4px rgba(24, 62, 235, 0.55);
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.4) inset, 0 10px 22px -4px rgba(196, 146, 44, 0.55);
 }
 .btn-gradient:active {
   filter: brightness(0.97);

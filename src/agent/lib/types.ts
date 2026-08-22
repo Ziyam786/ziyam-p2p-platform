@@ -130,4 +130,13 @@ export interface AgentServiceRequest {
   notes?: string | null;
   car: { make: string; model: string; registrationNo: string; city: string; images: string[] };
   requestedBy: { fullName: string; phoneNumber: string };
+  booking?: {
+    id: string;
+    startTime: string;
+    endTime: string;
+    status: string;
+    liveLatitude?: number | null;
+    liveLongitude?: number | null;
+    liveLocationUpdatedAt?: string | null;
+  } | null;
 }

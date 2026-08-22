@@ -10,6 +10,7 @@ import type { Car } from '../lib/types';
 import CarSpinViewer from './CarSpinViewer';
 import { isAngleComplete } from '../lib/carPhotoAngles';
 import type { ExteriorAngle } from '../lib/carPhotoAngles';
+import { useLongRentalDiscounts, bestDiscountTier } from '../lib/useLongRentalDiscounts';
 
 interface CarCardProps {
   car: Car;
@@ -29,6 +30,7 @@ export default function CarCard({ car }: CarCardProps) {
   const { user } = useAuth();
   const { isWishlisted, toggle } = useWishlist();
   const wishlisted = isWishlisted(car.id);
+  const bestDiscount = bestDiscountTier(useLongRentalDiscounts());
 
   async function handleWishlist(e: React.MouseEvent) {
     e.preventDefault();
@@ -116,6 +118,11 @@ export default function CarCard({ car }: CarCardProps) {
           )}
           {car.offersDelivery && (
             <span className="bg-purple-50 text-purple-600 text-[10px] font-bold px-2 py-0.5 rounded-full">🚚 Delivery Available</span>
+          )}
+          {bestDiscount && (
+            <span className="bg-amber-50 text-amber-600 text-[10px] font-bold px-2 py-0.5 rounded-full">
+              📅 {Math.round(bestDiscount.percent * 100)}% off {bestDiscount.minDays}+ day trips
+            </span>
           )}
         </div>
 

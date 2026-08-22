@@ -293,6 +293,18 @@ router.post('/kyc/driving-license', requireAuth, kycRateLimiter, async (req: Req
     if (hasDoc) {
       await assertReadableDocument(docBase64);
       const result = await extractKycDocument(docBase64, 'image');
+      // Diagnostic only — logs shape/metadata, never extracted_data/verify_data
+      // (those can carry the renter's name, DOB, DL number). Needed because
+      // Arya's per-doc-type response fields aren't fully itemized in their
+      // docs; if `success`/`error_message` turn out to live somewhere else
+      // for driving licences specifically, this is what will show it.
+      console.log('[KYC] Arya driving-license response:', {
+        success: result.success,
+        doc_type: result.doc_type,
+        error_message: result.error_message,
+        image_quality: result.image_quality,
+        topLevelKeys: Object.keys(result),
+      });
       if (!result.success) {
         await prisma.kycVerificationLog.create({
           data: { userId: req.user!.userId, method: 'DRIVING_LICENSE', outcome: 'FAILED', detail: result.error_message ?? 'Extraction failed' },

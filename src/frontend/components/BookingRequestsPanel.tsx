@@ -33,12 +33,18 @@ export default function BookingRequestsPanel({ onChanged }: { onChanged?: () => 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pausePromptCarId, setPausePromptCarId] = useState<string | null>(null);
 
-  function load() {
-    setLoading(true);
+  function load(showSpinner = true) {
+    if (showSpinner) setLoading(true);
     hostReviewApi.requests().then((res) => setRequests(res.data)).finally(() => setLoading(false));
   }
 
-  useEffect(load, []);
+  useEffect(() => {
+    load();
+    // Matches NotificationBell's 60s cadence — a host sitting on this panel
+    // otherwise never sees a new request until they navigate away and back.
+    const interval = setInterval(() => load(false), 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   async function accept(booking: Booking) {
     setBusyId(booking.id);

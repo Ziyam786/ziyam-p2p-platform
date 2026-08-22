@@ -19,6 +19,7 @@ import CarSpinViewer from '../../../components/CarSpinViewer';
 import { isAngleComplete, EXTERIOR_SPIN_ORDER, type ExteriorAngle } from '../../../lib/carPhotoAngles';
 import type { AvailabilityRange } from '../../../lib/api';
 import type { Car, DemandPricing, LongRentalDiscount, Review } from '../../../lib/types';
+import { COMPANY } from '../../../lib/companyInfo';
 
 const INCLUDED_ITEMS = [
   { icon: '⛽', label: 'Fuel not included' },
@@ -747,6 +748,19 @@ export default function CarDetailPage() {
               <p className="text-xs text-gray-400 text-center">
                 You won't be charged yet. Review before confirming.
               </p>
+
+              <a
+                href={`${COMPANY.whatsappUrl}?text=${encodeURIComponent(
+                  `Hi, I'm interested in the ${car.make} ${car.model} (₹${car.dailyRate.toLocaleString('en-IN')}/day)` +
+                    (days > 0 ? ` for ${days} day${days === 1 ? '' : 's'}` : '') +
+                    ' — can you share more details?'
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-emerald-600 border border-emerald-200 rounded-xl py-2.5 hover:bg-emerald-50 transition"
+              >
+                💬 Get an instant quote on WhatsApp
+              </a>
 
               <div className="flex items-center justify-center gap-4 text-xs text-gray-400">
                 <span>🔒 Secure Payment</span>
