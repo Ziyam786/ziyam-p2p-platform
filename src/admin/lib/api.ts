@@ -1,6 +1,6 @@
 import type {
   AdminBooking, AdminCar, AdminDamageClaim, AdminDisputeSupportRequest, AdminPayout, AdminRefundRequest, AdminReview, AdminStats, AdminUser, AuditEntry,
-  BalanceSheetData, BookingConditionPhoto, BookingStatus, ChatConversationSummary, ChatMessageRow, CommandCenterData, CustomRoleRow,
+  AxonPartner, BalanceSheetData, BookingConditionPhoto, BookingStatus, ChatConversationSummary, ChatMessageRow, CommandCenterData, CustomRoleRow,
   FleetExpenseRow, FleetSummary, JournalEntryRow, KycVerificationLogRow, MonthlyBalanceRow, OpsInvoiceRow, OpsInvoiceStatus, OpsTripRow,
   OutstandingFrequency, OutstandingRow, OutstandingType, PlatformBookingEntry, PromoCode, SessionUser, SettingRow,
 } from './types';
@@ -121,6 +121,10 @@ export const adminApi = {
   updatePromoCode: (code: string, data: Partial<Pick<PromoCode, 'discountPercent' | 'discountFlat' | 'maxUses' | 'expiresAt'>>) =>
     patch<{ success: true; data: PromoCode }>(`/admin/promo-codes/${code}`, data),
   deletePromoCode: (code: string) => del<{ success: true }>(`/admin/promo-codes/${code}`),
+
+  axonPartners: () => get<{ success: true; data: AxonPartner[] }>('/admin/axon-partners'),
+  createAxonPartner: (data: { name: string; companyName: string; contactEmail: string }) =>
+    post<{ success: true; data: AxonPartner }>('/admin/axon-partners', data),
 };
 
 /* ── Fleet Financial Dashboard & Ledger ──────────────────────────────── */

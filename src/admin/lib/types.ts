@@ -268,6 +268,17 @@ export interface PromoCode {
   createdAt: string;
 }
 
+export interface AxonPartner {
+  id: string;
+  name: string;
+  companyName: string;
+  contactEmail: string;
+  status: 'ACTIVE' | 'SUSPENDED';
+  createdAt: string;
+  bookingCount: number;
+  apiKey?: string; // only ever present in the response right after creation
+}
+
 export interface SettingRow {
   key: string;
   value: unknown;

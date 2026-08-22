@@ -19,6 +19,7 @@ const NAV = [
   { href: '/refund-requests', label: 'Refund Requests', icon: '↩️' },
   { href: '/fleet-ledger', label: 'Fleet Ledger', icon: '📒' },
   { href: '/finance', label: 'Financial ERP', icon: '🏦' },
+  { href: '/axon-partners', label: 'Axon Partners', icon: '🌐' },
   { href: '/team-access', label: 'Team & Access', icon: '🔐' },
   { href: '/promo-codes', label: 'Promo Codes', icon: '🎟️' },
   { href: '/content', label: 'Site Content', icon: '📝' },
