@@ -4,6 +4,7 @@ import Razorpay from 'razorpay';
 import { config } from '../config';
 import { getSetting } from './settingsService';
 import { notify } from './notificationService';
+import { razorpayxPayoutService } from './razorpayxPayoutService';
 
 const prisma = new PrismaClient();
 
@@ -32,14 +33,31 @@ export class PayoutEngine {
    * completed." Computed at check-time, matching house style elsewhere
    * (docsComplete/stepsCompleted in CarOnboardingWizard) — never persisted as
    * a boolean since the underlying fields can change at any time.
+   *
+   * Also the single gate for the Sandbox-verified bank account and PAN
+   * (Aug-2026 policy) — previously the bank check was duplicated across
+   * three separate call sites; centralized here alongside PAN so there's one
+   * place that decides "is this host actually payable."
    */
-  private static assertPayoutEligible(host: { partnerAgreementWetSignedUrl: string | null; partnerAgreementEsignStatus: string | null }) {
+  private static assertPayoutEligible(host: {
+    partnerAgreementWetSignedUrl: string | null;
+    partnerAgreementEsignStatus: string | null;
+    payoutAccountId: string | null;
+    bankAccountVerified: boolean;
+    isPanVerified: boolean;
+  }) {
     const eligible = Boolean(host.partnerAgreementWetSignedUrl) && host.partnerAgreementEsignStatus === 'sign_complete';
     if (!eligible) {
       throw new Error(
         'Payout blocked: this host has not completed the Host Onboarding Agreement (both wet and e-signature required). ' +
         'Ask them to finish it from Account → Host Agreement.'
       );
+    }
+    if (!host.payoutAccountId || !host.bankAccountVerified) {
+      throw new Error('Host has no linked, Sandbox-verified payout account');
+    }
+    if (!host.isPanVerified) {
+      throw new Error('Payout blocked: this host has not completed PAN verification. Ask them to verify it from their dashboard.');
     }
   }
 
@@ -203,29 +221,45 @@ export class PayoutEngine {
 
       for (const payout of maturePayouts) {
         try {
-          if (!payout.host.payoutAccountId || !payout.host.bankAccountVerified) {
-            throw new Error('Host has no linked, Sandbox-verified payout account');
+          this.assertPayoutEligible(payout.host);
+          if (payout.booking.source === 'AXON_PARTNER') {
+            const fundAccountId = await razorpayxPayoutService.getOrCreateFundAccount(payout.host);
+            const result = await razorpayxPayoutService.createPayout(fundAccountId, payout.netPayout, payout.id);
+            // QUEUED_FOR_N1, not SETTLED, here on purpose — the webhook
+            // (razorpayxWebhook.routes.ts) is the authoritative confirmation
+            // and moves it to SETTLED once RazorpayX actually reports
+            // `payout.processed`, same "webhook is the source of truth"
+            // pattern as the existing Razorpay Payments webhook. Moving off
+            // HELD_IN_ESCROW is also what keeps this same cron tick from
+            // re-selecting this ledger next hour and dispatching a second,
+            // genuinely duplicate payout while the first is still in
+            // flight — this query only looks for HELD_IN_ESCROW.
+            await prisma.payoutLedger.update({
+              where: { id: payout.id },
+              data: { status: PayoutStatus.QUEUED_FOR_N1, payoutTxnId: result.id },
+            });
+          } else {
+            if (!payout.booking.razorpayPaymentId) {
+              throw new Error('Underlying booking has no captured Razorpay payment to split from');
+            }
+            const payoutTxnId = await this.executeBankTransfer(
+              payout.host.payoutAccountId!,
+              payout.netPayout,
+              payout.booking.razorpayPaymentId,
+              payout.id
+            );
+            await prisma.payoutLedger.update({
+              where: { id: payout.id },
+              data: { status: PayoutStatus.SETTLED, payoutTxnId },
+            });
+            await notify(
+              payout.hostId,
+              'PAYOUT_SETTLED',
+              'Payout settled',
+              `₹${payout.netPayout.toLocaleString()} has been sent to your linked account.`,
+              '/host/dashboard'
+            );
           }
-          if (!payout.booking.razorpayPaymentId) {
-            throw new Error('Underlying booking has no captured Razorpay payment to split from');
-          }
-          const payoutTxnId = await this.executeBankTransfer(
-            payout.host.payoutAccountId,
-            payout.netPayout,
-            payout.booking.razorpayPaymentId,
-            payout.id
-          );
-          await prisma.payoutLedger.update({
-            where: { id: payout.id },
-            data: { status: PayoutStatus.SETTLED, payoutTxnId },
-          });
-          await notify(
-            payout.hostId,
-            'PAYOUT_SETTLED',
-            'Payout settled',
-            `₹${payout.netPayout.toLocaleString()} has been sent to your linked account.`,
-            '/host/dashboard'
-          );
           console.log(`[PAYOUT SUCCESS] ₹${payout.netPayout} -> host ${payout.hostId}`);
         } catch (error: any) {
           console.error('[PAYOUT ERROR] Ledger %s:', payout.id, error.message);
@@ -331,7 +365,7 @@ export class PayoutEngine {
             }),
           ]);
           await notify(
-            booking.customerId,
+            booking.customerId!,
             'GENERIC',
             'Booking declined',
             `The host didn't respond in time for your ${booking.car.make} ${booking.car.model} booking — you've been fully refunded.`,
@@ -371,7 +405,7 @@ export class PayoutEngine {
             },
           });
           await notify(
-            booking.customerId,
+            booking.customerId!,
             'GENERIC',
             'Reservation expired',
             `Your reservation for the ${booking.car.make} ${booking.car.model} expired before the balance was paid — the ₹${booking.reservationFeeAmount} reservation fee isn't refundable, and the dates are open to other guests now.`,
@@ -390,12 +424,32 @@ export class PayoutEngine {
     const payout = await prisma.payoutLedger.findUnique({ where: { id: ledgerId }, include: { host: true, booking: true } });
     if (!payout) throw new Error('Payout ledger entry not found');
     if (payout.status !== PayoutStatus.FAILED) throw new Error(`Cannot retry a payout in status ${payout.status}`);
-    if (!payout.host.payoutAccountId || !payout.host.bankAccountVerified) throw new Error('Host has no linked, Sandbox-verified payout account');
+    this.assertPayoutEligible(payout.host);
+
+    if (payout.booking.source === 'AXON_PARTNER') {
+      try {
+        const fundAccountId = await razorpayxPayoutService.getOrCreateFundAccount(payout.host);
+        const result = await razorpayxPayoutService.createPayout(fundAccountId, payout.netPayout, payout.id);
+        // QUEUED_FOR_N1, not SETTLED — see initializePayoutCron above; the
+        // RazorpayX webhook is what actually confirms settlement. Setting
+        // this also closes the "status !== FAILED" re-entry guard above, so
+        // a second retryPayout call on this same ledger correctly throws
+        // instead of dispatching a second real payout.
+        return await prisma.payoutLedger.update({
+          where: { id: ledgerId },
+          data: { status: PayoutStatus.QUEUED_FOR_N1, payoutTxnId: result.id },
+        });
+      } catch (error: any) {
+        await prisma.payoutLedger.update({ where: { id: ledgerId }, data: { status: PayoutStatus.FAILED } });
+        throw error;
+      }
+    }
+
     if (!payout.booking.razorpayPaymentId) throw new Error('Underlying booking has no captured Razorpay payment to split from');
 
     try {
       const payoutTxnId = await this.executeBankTransfer(
-        payout.host.payoutAccountId,
+        payout.host.payoutAccountId!,
         payout.netPayout,
         payout.booking.razorpayPaymentId,
         payout.id
@@ -442,8 +496,14 @@ export class PayoutEngine {
     const host = await prisma.user.findUnique({ where: { id: booking.car.ownerId } });
     if (!host) throw new Error('Host account not found');
     this.assertPayoutEligible(host);
-    if (!host.payoutAccountId || !host.bankAccountVerified) throw new Error('Host has no linked, Sandbox-verified payout account');
-    if (!booking.razorpayPaymentId) throw new Error('Underlying booking has no captured Razorpay payment to split from');
+    // AXON_PARTNER bookings never carry a captured Razorpay Payments payment
+    // (the partner, not Ziyam Checkout, collects the fare — see
+    // axon.routes.ts) and are always created with depositAmount = 0, so the
+    // deposit-portion leg below never actually fires for them. This guard
+    // only protects the GUEST-path deposit-portion transfer.
+    if (booking.source !== 'AXON_PARTNER' && !booking.razorpayPaymentId) {
+      throw new Error('Underlying booking has no captured Razorpay payment to split from');
+    }
 
     const depositPortion = Math.min(claim.approvedDeduction, booking.depositAmount);
     const excessPortion = Math.max(0, claim.approvedDeduction - booking.depositAmount);
@@ -475,22 +535,53 @@ export class PayoutEngine {
 
     try {
       const txnIds: string[] = [];
+      // Fetched once and reused for both legs below — getOrCreateFundAccount
+      // is idempotent but there's no reason to round-trip it twice for the
+      // same host within a single reimbursement.
+      const axonFundAccountId =
+        booking.source === 'AXON_PARTNER' ? await razorpayxPayoutService.getOrCreateFundAccount(host) : null;
+
       if (depositPortion > 0) {
         const amount = excessPortion > 0 ? depositPortion : netPayout; // single-leg case carries the fee-adjusted total
-        txnIds.push(await this.executeBankTransfer(host.payoutAccountId, amount, booking.razorpayPaymentId, ledger.id));
+        if (booking.source === 'AXON_PARTNER') {
+          const result = await razorpayxPayoutService.createPayout(axonFundAccountId!, amount, ledger.id);
+          txnIds.push(result.id);
+        } else {
+          txnIds.push(await this.executeBankTransfer(host.payoutAccountId!, amount, booking.razorpayPaymentId!, ledger.id));
+        }
       }
       if (excessPortion > 0) {
         const amount = depositPortion > 0 ? netPayout - depositPortion : netPayout;
-        txnIds.push(await this.executeBankTransfer(host.payoutAccountId, amount, claim.excessChargeRazorpayPaymentId!, ledger.id));
+        if (booking.source === 'AXON_PARTNER') {
+          const result = await razorpayxPayoutService.createPayout(axonFundAccountId!, amount, ledger.id);
+          txnIds.push(result.id);
+        } else {
+          txnIds.push(await this.executeBankTransfer(host.payoutAccountId!, amount, claim.excessChargeRazorpayPaymentId!, ledger.id));
+        }
       }
-      await prisma.payoutLedger.update({ where: { id: ledger.id }, data: { status: PayoutStatus.SETTLED, payoutTxnId: txnIds.join(',') } });
-      await notify(
-        host.id,
-        'PAYOUT_SETTLED',
-        'Reimbursement sent',
-        `₹${netPayout.toLocaleString()} for your approved trip issue report has been sent to your linked account.`,
-        '/host/dashboard'
-      );
+
+      if (booking.source === 'AXON_PARTNER') {
+        // QUEUED_FOR_N1, not SETTLED — same "webhook is the authoritative
+        // confirmation" reasoning as the other two RazorpayX call sites
+        // above. This ledger only exists here (created just above with
+        // HELD_IN_ESCROW) so there's no cron re-selection risk to worry
+        // about, but the status still needs to reflect "dispatched,
+        // awaiting webhook" rather than either its stale initial value or
+        // a premature SETTLED.
+        await prisma.payoutLedger.update({
+          where: { id: ledger.id },
+          data: { status: PayoutStatus.QUEUED_FOR_N1, payoutTxnId: txnIds.join(',') },
+        });
+      } else {
+        await prisma.payoutLedger.update({ where: { id: ledger.id }, data: { status: PayoutStatus.SETTLED, payoutTxnId: txnIds.join(',') } });
+        await notify(
+          host.id,
+          'PAYOUT_SETTLED',
+          'Reimbursement sent',
+          `₹${netPayout.toLocaleString()} for your approved trip issue report has been sent to your linked account.`,
+          '/host/dashboard'
+        );
+      }
     } catch (error: any) {
       await prisma.payoutLedger.update({ where: { id: ledger.id }, data: { status: PayoutStatus.FAILED } });
       throw error;

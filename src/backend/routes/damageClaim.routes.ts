@@ -51,7 +51,7 @@ router.post('/bookings/:id/issue-reports', requireAuth, async (req: Request, res
     },
   });
 
-  const recipientId = isCustomer ? booking.car.ownerId : booking.customerId;
+  const recipientId = isCustomer ? booking.car.ownerId : booking.customerId!;
   await notify(
     recipientId,
     'GENERIC',
@@ -190,7 +190,7 @@ router.patch('/admin/issue-reports/:id', requireAuth, requireRole('ADMIN'), asyn
         data: { bookingId: booking.id, type: RefundRequestType.DEPOSIT_RELEASE, amount: booking.depositAmount },
       }),
     ]);
-    await notify(booking.customerId, 'GENERIC', 'Issue report rejected', 'The issue reported on your trip was rejected — your full deposit is queued for release.', `/account/trips/${booking.id}`);
+    await notify(booking.customerId!, 'GENERIC', 'Issue report rejected', 'The issue reported on your trip was rejected — your full deposit is queued for release.', `/account/trips/${booking.id}`);
     return res.json({ success: true, message: 'Claim rejected, full deposit queued for release.' });
   }
 
@@ -235,7 +235,7 @@ router.patch('/admin/issue-reports/:id', requireAuth, requireRole('ADMIN'), asyn
 
   if (excessPortion > 0) {
     await notify(
-      booking.customerId,
+      booking.customerId!,
       'GENERIC',
       'Issue report resolved — balance due',
       `Your trip's issue report was approved for ₹${approvedDeduction.toLocaleString('en-IN')}. Your ₹${booking.depositAmount.toLocaleString('en-IN')} deposit covers part of it — please pay the remaining ₹${excessPortion.toLocaleString('en-IN')} from your trip page.`,
@@ -245,7 +245,7 @@ router.patch('/admin/issue-reports/:id', requireAuth, requireRole('ADMIN'), asyn
     // triggered from the Razorpay excess-charge confirmation instead.
   } else {
     await notify(
-      booking.customerId,
+      booking.customerId!,
       'GENERIC',
       'Issue report resolved',
       forfeited

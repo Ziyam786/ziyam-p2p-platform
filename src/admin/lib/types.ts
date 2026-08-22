@@ -108,6 +108,8 @@ export interface AdminBooking {
   car?: { make: string; model: string; city: string };
   customerId: string;
   customer?: { fullName: string; email: string };
+  source?: 'GUEST' | 'AXON_PARTNER';
+  axonPartner?: { companyName: string } | null;
   startTime: string;
   endTime: string;
   totalAmount: number;
@@ -266,6 +268,17 @@ export interface PromoCode {
   active: boolean;
   expiresAt?: string | null;
   createdAt: string;
+}
+
+export interface AxonPartner {
+  id: string;
+  name: string;
+  companyName: string;
+  contactEmail: string;
+  status: 'ACTIVE' | 'SUSPENDED';
+  createdAt: string;
+  bookingCount: number;
+  apiKey?: string; // only ever present in the response right after creation
 }
 
 export interface SettingRow {

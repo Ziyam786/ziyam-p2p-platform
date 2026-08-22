@@ -191,7 +191,16 @@ export default function BookingsPage() {
                     <td className="py-3 px-4 font-medium text-slate-200">
                       {b.car?.make} {b.car?.model} <span className="text-slate-500 text-xs">({b.car?.city})</span>
                     </td>
-                    <td className="py-3 px-4 text-slate-400">{b.customer?.fullName ?? '—'}</td>
+                    <td className="py-3 px-4 text-slate-400">
+                      {b.source === 'AXON_PARTNER' ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="bg-sky-500/10 text-sky-300 text-[10px] font-bold px-2 py-0.5 rounded-full">AXON</span>
+                          {b.axonPartner?.companyName ?? 'Partner'}
+                        </span>
+                      ) : (
+                        b.customer?.fullName ?? '—'
+                      )}
+                    </td>
                     <td className="py-3 px-4 text-slate-400 text-xs">
                       {new Date(b.startTime).toLocaleDateString()} → {new Date(b.endTime).toLocaleDateString()}
                     </td>

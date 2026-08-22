@@ -49,6 +49,20 @@ export const config = {
     webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? '',
   },
 
+  // RazorpayX Payouts — a separate product from Razorpay Payments above, used
+  // to pay hosts directly from Ziyam's own RazorpayX balance (see
+  // razorpayxPayoutService.ts), not a split of a captured payment like
+  // payoutEngine.ts's Transfers-based flow. These are separate credentials
+  // from RAZORPAY_KEY_ID/SECRET — confirm on the RazorpayX dashboard once the
+  // account exists; Razorpay's docs don't make explicit whether the key pair
+  // is shared with or distinct from standard Payments keys.
+  razorpayx: {
+    keyId: process.env.RAZORPAYX_KEY_ID ?? '',
+    keySecret: process.env.RAZORPAYX_KEY_SECRET ?? '',
+    accountNumber: process.env.RAZORPAYX_ACCOUNT_NUMBER ?? '', // the RazorpayX business account_number payouts debit from
+    webhookSecret: process.env.RAZORPAYX_WEBHOOK_SECRET ?? '',
+  },
+
   telematics: {
     gatewayUrl: process.env.TELEMATICS_GATEWAY_URL ?? 'https://api.telematics-provider.com/v1',
     apiKey: process.env.TELEMATICS_API_KEY ?? '',
@@ -158,18 +172,6 @@ export const config = {
   supabase: {
     url: process.env.SUPABASE_URL ?? '',
     publishableKey: process.env.SUPABASE_PUBLISHABLE_KEY ?? '',
-  },
-
-  // Axon Supply Gateway (routes/axon.routes.ts) — B2B endpoints external
-  // fleet aggregators (Zoomcar, Revv) call directly for live inventory,
-  // pricing, and calendar sync. There's no user session on their side, so
-  // each partner gets a static key instead; comma-separated so one
-  // compromised/retired partner key can be rotated without affecting others.
-  axon: {
-    partnerApiKeys: (process.env.AXON_PARTNER_API_KEYS ?? '')
-      .split(',')
-      .map((k) => k.trim())
-      .filter(Boolean),
   },
 
   // Global cutover date for the fleet photo-angle requirement (see

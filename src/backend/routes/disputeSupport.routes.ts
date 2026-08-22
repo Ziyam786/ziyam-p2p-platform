@@ -45,14 +45,14 @@ router.post('/bookings/:id/dispute-support', requireAuth, async (req: Request, r
       assignedAgentId,
       'GENERIC',
       'New dispute support request',
-      `${booking.customer.fullName} needs help with their ${booking.car.make} ${booking.car.model} trip via ${channel === 'PHONE' ? 'phone' : 'WhatsApp'}.`,
+      `${booking.customer!.fullName} needs help with their ${booking.car.make} ${booking.car.model} trip via ${channel === 'PHONE' ? 'phone' : 'WhatsApp'}.`,
       `/admin/dispute-support`
     );
     if (channel === 'WHATSAPP' && isWhatsappConfigured()) {
       const agent = await prisma.user.findUnique({ where: { id: assignedAgentId }, select: { phoneNumber: true } });
       if (agent?.phoneNumber) {
         sendTemplateWhatsapp(agent.phoneNumber, 'dispute_support_request', {
-          guest_name: booking.customer.fullName,
+          guest_name: booking.customer!.fullName,
           car: `${booking.car.make} ${booking.car.model}`,
           booking_id: id,
         }).catch(() => {});

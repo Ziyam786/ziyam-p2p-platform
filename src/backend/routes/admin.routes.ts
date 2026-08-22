@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient, Role, BookingStatus, PayoutStatus } from '@prisma/client';
-import { randomInt, randomUUID } from 'crypto';
+import crypto, { randomInt, randomUUID } from 'crypto';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { recordAudit } from '../middleware/auditLog';
 import { PayoutEngine } from '../services/payoutEngine';
@@ -45,6 +45,7 @@ router.get('/admin/bookings', async (req: Request, res: Response) => {
     include: {
       car: { select: { make: true, model: true, city: true } },
       customer: { select: { fullName: true, email: true } },
+      axonPartner: { select: { companyName: true } },
       refundRequests: { orderBy: { createdAt: 'desc' }, take: 1 },
     },
     orderBy: { createdAt: 'desc' },
@@ -476,6 +477,58 @@ router.post('/admin/payouts/:id/retry', async (req: Request, res: Response) => {
     console.error('[admin/payouts/:id/retry] failed:', error);
     res.status(400).json({ error: safeErrorMessage(error) });
   }
+});
+
+/* ── Axon Partners (B2B partner-booking API) ─────────────────────── */
+router.get('/admin/axon-partners', requireAuth, requireRole(Role.ADMIN), async (_req: Request, res: Response) => {
+  const partners = await prisma.axonPartner.findMany({
+    orderBy: { createdAt: 'desc' },
+    include: { _count: { select: { bookings: true } } },
+  });
+  res.json({
+    success: true,
+    data: partners.map((p) => ({
+      id: p.id,
+      name: p.name,
+      companyName: p.companyName,
+      contactEmail: p.contactEmail,
+      status: p.status,
+      createdAt: p.createdAt,
+      bookingCount: p._count.bookings,
+    })),
+  });
+});
+
+router.post('/admin/axon-partners', requireAuth, requireRole(Role.ADMIN), async (req: Request, res: Response) => {
+  const { name, companyName, contactEmail } = req.body;
+  if (!name || !companyName || !contactEmail) {
+    return res.status(400).json({ error: 'name, companyName, and contactEmail are required' });
+  }
+
+  const rawKey = crypto.randomBytes(24).toString('base64url'); // 32 chars, URL-safe — the partner's actual X-Axon-Api-Key value
+  const apiKeyHash = await hashPassword(rawKey);
+
+  const partner = await prisma.axonPartner.create({
+    data: { name, companyName, contactEmail, apiKeyHash },
+  });
+  await recordAudit(req.user!.userId, 'CREATE_AXON_PARTNER', 'AxonPartner', partner.id, { name, companyName, contactEmail });
+
+  // The raw key is returned exactly once, here — apiKeyHash is the only copy
+  // ever persisted. If the admin loses this response, the only recovery is
+  // creating a new partner (or a future "rotate key" action, not built here).
+  res.json({
+    success: true,
+    data: {
+      id: partner.id,
+      name: partner.name,
+      companyName: partner.companyName,
+      contactEmail: partner.contactEmail,
+      status: partner.status,
+      createdAt: partner.createdAt,
+      bookingCount: 0,
+      apiKey: rawKey,
+    },
+  });
 });
 
 /* ── Audit log ────────────────────────────────────────────────────── */

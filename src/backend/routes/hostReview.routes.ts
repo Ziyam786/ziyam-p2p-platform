@@ -42,7 +42,7 @@ router.post('/bookings/:id/host-review', requireAuth, async (req: Request, res: 
       where: { id },
       data: { status: BookingStatus.CONFIRMED, hostReviewDeadline: null, startOtp },
     });
-    await notify(updated.customerId, 'BOOKING_CONFIRMED', 'Booking confirmed!', `Your trip in the ${booking.car.make} ${booking.car.model} is booked.`, `/account/trips/${updated.id}`);
+    await notify(updated.customerId!, 'BOOKING_CONFIRMED', 'Booking confirmed!', `Your trip in the ${booking.car.make} ${booking.car.model} is booked.`, `/account/trips/${updated.id}`);
 
     // Best-effort, same as the original trigger site — never blocks the response.
     if (isSetuConfigured()) {
@@ -79,7 +79,7 @@ router.post('/bookings/:id/host-review', requireAuth, async (req: Request, res: 
     }),
   ]);
   await notify(
-    updated.customerId,
+    updated.customerId!,
     'GENERIC',
     'Booking declined',
     `The host declined your ${booking.car.make} ${booking.car.model} booking (${rejectionReason}) — you've been fully refunded.`,

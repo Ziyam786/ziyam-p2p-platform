@@ -27,8 +27,8 @@ export async function startLeaseAgreementEsign(bookingId: string): Promise<{ esi
     bookingId: booking.id,
     createdAt: booking.createdAt,
     hostName: booking.car.owner.fullName,
-    guestName: booking.customer.fullName,
-    guestPhone: booking.customer.phoneNumber,
+    guestName: booking.customer!.fullName,
+    guestPhone: booking.customer!.phoneNumber,
     registrationNo: booking.car.registrationNo,
     chassisNo: booking.car.chassis,
     make: booking.car.make,
@@ -48,7 +48,7 @@ export async function startLeaseAgreementEsign(bookingId: string): Promise<{ esi
     documentId,
     [
       { identifier: booking.car.owner.email, displayName: booking.car.owner.fullName },
-      { identifier: booking.customer.email, displayName: booking.customer.fullName },
+      { identifier: booking.customer!.email, displayName: booking.customer!.fullName },
     ],
     `${config.clientUrl}/bookings/${booking.id}/agreement?esigned=1`
   );

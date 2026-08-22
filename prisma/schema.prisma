@@ -191,6 +191,14 @@ model User {
   bankIfsc            String?
   bankNameAtBank      String?
   bankAccountVerified Boolean @default(false)
+  razorpayxFundAccountId String? // cached RazorpayX fund_account_id, created once, reused for every subsequent payout
+
+  // Sandbox PAN verification — required for hosts before payouts release
+  // (assertPayoutEligible in payoutEngine.ts), same provider/pattern as the
+  // bank penny-drop check above.
+  panNumber     String?
+  panCategory   String?
+  isPanVerified Boolean @default(false)
 
   // Extended verification checklist (matches host-app profile: signature for
   // lease agreements, alternate contact, liveness selfie)
@@ -513,12 +521,36 @@ model PushToken {
   @@index([userId])
 }
 
+enum AxonPartnerStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+model AxonPartner {
+  id           String            @id @default(uuid())
+  name         String
+  companyName  String
+  contactEmail String
+  apiKeyHash   String
+  status       AxonPartnerStatus @default(ACTIVE)
+  createdAt    DateTime          @default(now())
+  bookings     Booking[]
+}
+
+enum BookingSource {
+  GUEST
+  AXON_PARTNER
+}
+
 model Booking {
   id                    String        @id @default(uuid())
   carId                 String
   car                   Car           @relation(fields: [carId], references: [id])
-  customerId            String
-  customer              User          @relation("CustomerBookings", fields: [customerId], references: [id])
+  customerId            String?
+  customer              User?         @relation("CustomerBookings", fields: [customerId], references: [id])
+  axonPartnerId         String?
+  axonPartner           AxonPartner?  @relation(fields: [axonPartnerId], references: [id])
+  source                BookingSource @default(GUEST)
   startTime             DateTime
   endTime               DateTime
   totalAmount           Float

@@ -141,6 +141,11 @@ export interface Booking {
     isDrivingLicenseVerified?: boolean;
     isSelfieVerified?: boolean;
   };
+  // B2B partner bookings (see Axon Network) have no real Ziyam customer —
+  // customerId is null and the partner's own end-customer is the actual
+  // driver, off-platform. axonPartner is populated instead in that case.
+  source?: 'GUEST' | 'AXON_PARTNER';
+  axonPartner?: { companyName: string } | null;
   startTime: string;
   endTime: string;
   totalAmount: number;
