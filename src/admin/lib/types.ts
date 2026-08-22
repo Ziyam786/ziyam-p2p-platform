@@ -105,9 +105,9 @@ export interface AdminCar {
 export interface AdminBooking {
   id: string;
   carId: string;
-  car?: { make: string; model: string; city: string };
-  customerId: string;
-  customer?: { fullName: string; email: string };
+  car?: { make: string; model: string; city: string; registrationNo: string; telematicsImei?: string | null };
+  customerId: string | null;
+  customer?: { fullName: string; email: string; phoneNumber: string };
   source?: 'GUEST' | 'AXON_PARTNER';
   axonPartner?: { companyName: string } | null;
   startTime: string;
@@ -129,6 +129,11 @@ export interface AdminBooking {
   reservationFeeAmount: number;
   reservationPaidAt?: string | null;
   reservationDeadline?: string | null;
+  // Host-app-reported in-trip GPS — same mechanism as delivery tracking, but
+  // scoped to ACTIVE bookings. Null until the host's device has shared once.
+  liveLatitude?: number | null;
+  liveLongitude?: number | null;
+  liveLocationUpdatedAt?: string | null;
   refundRequests?: { type: RefundRequestType; amount: number; status: RefundRequestStatus; createdAt: string }[];
   createdAt: string;
 }
