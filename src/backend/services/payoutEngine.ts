@@ -225,12 +225,19 @@ export class PayoutEngine {
           if (payout.booking.source === 'AXON_PARTNER') {
             const fundAccountId = await razorpayxPayoutService.getOrCreateFundAccount(payout.host);
             const result = await razorpayxPayoutService.createPayout(fundAccountId, payout.netPayout, payout.id);
-            // Left HELD_IN_ESCROW here on purpose — the webhook
+            // QUEUED_FOR_N1, not SETTLED, here on purpose — the webhook
             // (razorpayxWebhook.routes.ts) is the authoritative confirmation
             // and moves it to SETTLED once RazorpayX actually reports
             // `payout.processed`, same "webhook is the source of truth"
-            // pattern as the existing Razorpay Payments webhook.
-            await prisma.payoutLedger.update({ where: { id: payout.id }, data: { payoutTxnId: result.id } });
+            // pattern as the existing Razorpay Payments webhook. Moving off
+            // HELD_IN_ESCROW is also what keeps this same cron tick from
+            // re-selecting this ledger next hour and dispatching a second,
+            // genuinely duplicate payout while the first is still in
+            // flight — this query only looks for HELD_IN_ESCROW.
+            await prisma.payoutLedger.update({
+              where: { id: payout.id },
+              data: { status: PayoutStatus.QUEUED_FOR_N1, payoutTxnId: result.id },
+            });
           } else {
             if (!payout.booking.razorpayPaymentId) {
               throw new Error('Underlying booking has no captured Razorpay payment to split from');
@@ -423,11 +430,14 @@ export class PayoutEngine {
       try {
         const fundAccountId = await razorpayxPayoutService.getOrCreateFundAccount(payout.host);
         const result = await razorpayxPayoutService.createPayout(fundAccountId, payout.netPayout, payout.id);
-        // Left HELD_IN_ESCROW here on purpose — see initializePayoutCron above;
-        // the RazorpayX webhook is what actually confirms settlement.
+        // QUEUED_FOR_N1, not SETTLED — see initializePayoutCron above; the
+        // RazorpayX webhook is what actually confirms settlement. Setting
+        // this also closes the "status !== FAILED" re-entry guard above, so
+        // a second retryPayout call on this same ledger correctly throws
+        // instead of dispatching a second real payout.
         return await prisma.payoutLedger.update({
           where: { id: ledgerId },
-          data: { payoutTxnId: result.id },
+          data: { status: PayoutStatus.QUEUED_FOR_N1, payoutTxnId: result.id },
         });
       } catch (error: any) {
         await prisma.payoutLedger.update({ where: { id: ledgerId }, data: { status: PayoutStatus.FAILED } });
@@ -551,10 +561,17 @@ export class PayoutEngine {
       }
 
       if (booking.source === 'AXON_PARTNER') {
-        // Left HELD_IN_ESCROW here on purpose — same "webhook is the
-        // authoritative confirmation" reasoning as the other two RazorpayX
-        // call sites above.
-        await prisma.payoutLedger.update({ where: { id: ledger.id }, data: { payoutTxnId: txnIds.join(',') } });
+        // QUEUED_FOR_N1, not SETTLED — same "webhook is the authoritative
+        // confirmation" reasoning as the other two RazorpayX call sites
+        // above. This ledger only exists here (created just above with
+        // HELD_IN_ESCROW) so there's no cron re-selection risk to worry
+        // about, but the status still needs to reflect "dispatched,
+        // awaiting webhook" rather than either its stale initial value or
+        // a premature SETTLED.
+        await prisma.payoutLedger.update({
+          where: { id: ledger.id },
+          data: { status: PayoutStatus.QUEUED_FOR_N1, payoutTxnId: txnIds.join(',') },
+        });
       } else {
         await prisma.payoutLedger.update({ where: { id: ledger.id }, data: { status: PayoutStatus.SETTLED, payoutTxnId: txnIds.join(',') } });
         await notify(
