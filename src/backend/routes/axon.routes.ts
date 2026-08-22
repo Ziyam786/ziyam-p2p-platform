@@ -2,7 +2,11 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { PrismaClient, AxonPartnerStatus } from '@prisma/client';
 import { AxonSupplyGateway } from '../services/axonSupplyGateway';
 import { AxonPricingEngine } from '../services/axonPricingEngine';
+import { PayoutEngine } from '../services/payoutEngine';
 import { comparePassword } from '../utils/password';
+import { isBookable } from '../utils/carPhotoAngles';
+import { notify } from '../services/notificationService';
+import { config } from '../config';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -105,6 +109,66 @@ router.get('/calendar/:carId/feed.ics', async (req: Request, res: Response) => {
     return res.send(icsContent);
   } catch (error: any) {
     return res.status(500).send('Error generating calendar feed');
+  }
+});
+
+// POST /api/v1/axon/bookings - Create a real, auto-confirmed booking
+router.post('/bookings', async (req: Request, res: Response) => {
+  try {
+    const { carId, pickupTime, dropTime } = req.body;
+    if (!carId || !pickupTime || !dropTime) {
+      return res.status(400).json({ error: 'carId, pickupTime, and dropTime are required' });
+    }
+
+    const pickup = new Date(pickupTime);
+    const drop = new Date(dropTime);
+    if (Number.isNaN(pickup.getTime()) || Number.isNaN(drop.getTime()) || drop <= pickup) {
+      return res.status(400).json({ error: 'pickupTime must be a valid date strictly before dropTime' });
+    }
+
+    const car = await prisma.car.findUnique({ where: { id: carId } });
+    if (!car) return res.status(404).json({ error: 'Car not found' });
+    if (!car.isAvailable || car.verificationStatus !== 'VERIFIED' || !isBookable(car, config.photoAngleEnforcementDate)) {
+      return res.status(422).json({ error: 'This car is not currently bookable' });
+    }
+
+    const available = await AxonSupplyGateway.isCarAvailableForWindow(carId, pickup, drop);
+    if (!available) return res.status(409).json({ error: 'This car is already booked for the requested window' });
+
+    const fare = AxonPricingEngine.calculateFare({ dailyRate: car.dailyRate, pickupTime: pickup, dropTime: drop });
+
+    // Booking.platformFee/hostPayoutAmount are the same Ziyam-commission
+    // split every other booking-creation path computes (see
+    // booking.routes.ts, admin.routes.ts) — PayoutEngine.splitAmount reads
+    // this at trip completion (booking.totalAmount - booking.platformFee),
+    // so an Axon booking must populate it the same way, not leave it at 0.
+    const { platformFee, hostPayout } = await PayoutEngine.splitAmount(fare.baseFare, 0);
+
+    const booking = await prisma.booking.create({
+      data: {
+        carId,
+        customerId: null,
+        axonPartnerId: req.axonPartner!.id,
+        source: 'AXON_PARTNER',
+        startTime: pickup,
+        endTime: drop,
+        totalAmount: fare.baseFare,
+        platformFee,
+        hostPayoutAmount: hostPayout,
+        deliveryFeeAmount: 0,
+        depositAmount: 0,
+        status: 'CONFIRMED',
+      },
+    });
+
+    await notify(car.ownerId, 'GENERIC', 'New booking (Axon partner)', `A partner booking is confirmed for your ${car.make} ${car.model}.`, '/host/dashboard');
+
+    return res.json({
+      success: true,
+      data: { bookingId: booking.id, status: booking.status, fare },
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Axon booking failed' });
   }
 });
 
