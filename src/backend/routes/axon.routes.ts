@@ -1,33 +1,45 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import crypto from 'crypto';
+import { PrismaClient, AxonPartnerStatus } from '@prisma/client';
 import { AxonSupplyGateway } from '../services/axonSupplyGateway';
 import { AxonPricingEngine } from '../services/axonPricingEngine';
-import { config } from '../config';
+import { comparePassword } from '../utils/password';
+
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      axonPartner?: { id: string; name: string; status: AxonPartnerStatus };
+    }
+  }
+}
+
+const prisma = new PrismaClient();
 
 const router = Router();
-
-function safeEqual(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
-}
 
 // Every route below is a B2B integration surface for external fleet
 // aggregators (Zoomcar, Revv), not an end-user session — there's no cookie
 // or JWT to check. Each partner instead gets a static key, sent as the
 // X-Axon-Api-Key header (search, pricing) or an apiKey query param (the
 // .ics calendar route, since a partner's calendar-sync job may not be able
-// to set a custom header on that GET). Fails closed: an empty configured
-// list (no AXON_PARTNER_API_KEYS set) rejects everyone rather than opening
-// the gateway to the public by omission.
-function requireAxonApiKey(req: Request, res: Response, next: NextFunction) {
-  const configuredKeys = config.axon.partnerApiKeys;
+// to set a custom header on that GET).
+async function requireAxonApiKey(req: Request, res: Response, next: NextFunction) {
   const suppliedKey = (req.headers['x-axon-api-key'] as string | undefined) ?? (req.query.apiKey as string | undefined);
-
-  if (configuredKeys.length === 0 || !suppliedKey || !configuredKeys.some((key) => safeEqual(key, suppliedKey))) {
+  if (!suppliedKey) {
     return res.status(401).json({ error: 'Invalid or missing Axon API key' });
   }
-  next();
+
+  // apiKeyHash is bcrypt — there's no indexed lookup by the raw key, so this
+  // checks every active partner's hash. Axon partners are a small, curated
+  // set (a handful, not thousands), so this is not a real cost at this scale.
+  const partners = await prisma.axonPartner.findMany({ where: { status: AxonPartnerStatus.ACTIVE } });
+  for (const partner of partners) {
+    if (await comparePassword(suppliedKey, partner.apiKeyHash)) {
+      req.axonPartner = { id: partner.id, name: partner.name, status: partner.status };
+      return next();
+    }
+  }
+  return res.status(401).json({ error: 'Invalid or missing Axon API key' });
 }
 
 router.use(requireAxonApiKey);
