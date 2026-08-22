@@ -76,15 +76,23 @@ router.post(
         return res.status(200).json({ received: true, processed: false });
       }
 
-      // Razorpay redelivers events; a ledger already in a terminal state
-      // has already been actioned (including the one notification below) —
-      // reprocessing would silently re-fire that notification to the host.
-      // Only a QUEUED_FOR_N1 -> terminal transition is valid here.
-      if (ledger.status === PayoutStatus.SETTLED || ledger.status === PayoutStatus.FAILED) {
+      const newStatus = event === 'payout.processed' ? PayoutStatus.SETTLED : PayoutStatus.FAILED;
+
+      // Razorpay redelivers events, so a true duplicate (the ledger is
+      // already sitting at the exact status this event would produce) is
+      // a no-op — reprocessing it would silently re-fire the notification
+      // below a second time. But RazorpayX can also legitimately send
+      // payout.reversed AFTER payout.processed (the beneficiary bank
+      // returns the transfer post-settlement) — that's a real SETTLED ->
+      // FAILED transition, not a duplicate, so a blanket "ledger is
+      // already terminal" skip would wrongly swallow it. Only skip when
+      // the target status matches the current one, or when the ledger is
+      // already FAILED (nothing meaningful can follow a FAILED ledger).
+      if (ledger.status === newStatus || ledger.status === PayoutStatus.FAILED) {
         return res.status(200).json({ received: true, alreadyTerminal: true });
       }
 
-      const newStatus = event === 'payout.processed' ? PayoutStatus.SETTLED : PayoutStatus.FAILED;
+      const isReversal = ledger.status === PayoutStatus.SETTLED && newStatus === PayoutStatus.FAILED;
 
       if (newStatus === PayoutStatus.SETTLED) {
         const reportedPaise = Number(payoutEntity.amount);
@@ -112,6 +120,19 @@ router.post(
           'PAYOUT_SETTLED',
           'Payout settled',
           `₹${ledger.netPayout.toLocaleString()} has been sent to your linked account.`,
+          '/host/dashboard'
+        );
+      } else if (isReversal) {
+        // The host already got the "payout settled" notification above at
+        // some earlier point — this is the correction telling them that's
+        // no longer true, since the beneficiary bank sent the money back to
+        // Ziyam after the fact. retryPayout only re-dispatches a FAILED
+        // ledger, so this transition is also what re-opens that path.
+        await notify(
+          ledger.hostId,
+          'GENERIC',
+          'Payout reversed',
+          `The ₹${ledger.netPayout.toLocaleString()} payout we told you had settled was reversed by your bank and returned to Ziyam. Please contact support to resolve this.`,
           '/host/dashboard'
         );
       }
