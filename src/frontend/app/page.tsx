@@ -260,10 +260,10 @@ export default function HomePage() {
 
       {/* ── HERO ─────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-slate-950 pt-28 pb-20 md:pt-36 md:pb-28">
-        <div aria-hidden className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(24,62,235,0.16),transparent_55%)]" />
+        <div aria-hidden className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(196,146,44,0.16),transparent_55%)]" />
         <motion.div style={reduceMotion ? undefined : { y: heroGlowY }} aria-hidden className="absolute inset-0 overflow-hidden">
           <Glow className="-top-32 -left-24 w-[30rem] h-[30rem] bg-amber-500/25" />
-          <Glow className="top-40 -right-32 w-[26rem] h-[26rem] bg-emerald-500/10" />
+          <Glow className="top-40 -right-32 w-[26rem] h-[26rem] bg-amber-200/10" />
         </motion.div>
         <div
           aria-hidden
